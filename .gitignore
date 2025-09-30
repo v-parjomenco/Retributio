@@ -16,6 +16,7 @@
 
 # Debugger Files
 *.pdb
+*.id
 
 # Compiled Dynamic libraries
 *.so
@@ -75,3 +76,5 @@ CMakeCache.txt
 
 # Windows Thumbnails
 Thumbs.db
+
+*.sln.docstates
