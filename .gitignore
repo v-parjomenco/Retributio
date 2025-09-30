@@ -39,3 +39,39 @@
 
 # debug information files
 *.dwo
+
+# Visual Studio
+.vs/
+*.vcxproj.user
+*.suo
+
+# Builds
+Debug/
+Release/
+x64/
+bin/
+obj/
+
+# IDE/Editor
+*.user
+*.opensdf
+*.ipch
+*.ncb
+*.sdf
+
+# Logs, temporary files
+*.log
+*.tmp
+
+# Textures, sounds
+assets/
+
+#CMake Files
+CMakeFiles/
+CMakeCache.txt
+
+# macOS
+.DS_Store
+
+# Windows Thumbnails
+Thumbs.db
