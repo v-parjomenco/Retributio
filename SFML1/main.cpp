@@ -7,11 +7,12 @@
 
 class TimeSystem {
 public:
-    // Сброс таймера и обновление дельты времени и всех значений, зависящих от времени
+    //// Сброс таймера и обновление дельты времени и всех значений, зависящих от времени
     void update(float smoothingAlpha = 0.1f) {
+        // Перезапуск таймера — время с прошлого кадра
         mDeltaTime = mClock.restart();
 
-        // Подсчёт мгновенного frames per second (FPS)
+        // Мгновенный FPS (по времени между кадрами)
         mFps = (mDeltaTime.asSeconds() > 0.f) ? (1.f / mDeltaTime.asSeconds()) : 0.f;
 
         // Чтобы не было резкого скачка на первом кадре при старте с нуля
@@ -19,6 +20,18 @@ public:
             mSmoothedFps = mFps; // первый кадр
         else
             mSmoothedFps = mSmoothedFps * (1.f - smoothingAlpha) + mFps * smoothingAlpha; // экспоненциальное сглаживание
+
+        // Накопление времени для фиксированных апдейтов
+        mTimeSinceLastUpdate += mDeltaTime;
+    }
+
+    // возвращает true, когда пора вызвать логику update() в игре (например, каждые 1/60 сек)
+    bool shouldUpdate(const sf::Time& fixedTimeStep) {
+        if (mTimeSinceLastUpdate >= fixedTimeStep) {
+            mTimeSinceLastUpdate -= fixedTimeStep;
+            return true;
+        }
+        return false;
     }
 
     // Получение дельты времени
@@ -46,6 +59,7 @@ private:
     sf::Time mDeltaTime; // дельта времени - время, прошедшее с прошлого кадра
     float mFps{ 0.f }; // frames per second
     float mSmoothedFps{ 0.f }; // сглаженный frames per second
+    sf::Time mTimeSinceLastUpdate = sf::Time::Zero;
 };
 
 class TextOutput {
@@ -77,7 +91,7 @@ public:
     void run();
 private:
     void processEvents();
-    void update();
+    void update(const sf::Time& fixedTimeStep);
     void render();
     void handlePlayerInput(sf::Keyboard::Key key, bool isPressed);
 private:
@@ -115,12 +129,18 @@ Game::Game() :
 
 void Game::run() {
     while (mWindow.isOpen()) {
-        // сбрасываем таймер и записыаем данные в дельту времени, с чьей помощью считаем FPS и сглаженный FPS
-        mTime.update();
+        processEvents(); // для базовой логики и стабильных кадров
+        mTime.update(); // обновили таймер и FPS
 
-        processEvents();
-        update();
-        render();
+        // Если накопилось достаточно времени — выполняем апдейт
+        while (mTime.shouldUpdate(config::FRAME_RATE)) {
+            processEvents(); // обрабатываем события повторно, если фрэймрейт упал)
+                             // это необязательно, но может помочь с отзывчивостью программы при подвисании
+                             // окно всё равно будет реагировать на клавиши и не зависнет “в воздухе”.
+
+            update(config::FRAME_RATE);
+        }
+        render(); // рендерим столько раз, сколько позволяет GPU
     }
 }
 
@@ -163,7 +183,7 @@ void Game::handlePlayerInput(sf::Keyboard::Key key, bool isPressed) {
         mIsMovingRight = isPressed;
 }
 
-void Game::update() {
+void Game::update(const sf::Time& fixedTimeStep) {
     
     mTextOutput.updateFpsText(mText, mTime.getSmoothedFps());// выводим сглаженный FPS
 
@@ -176,7 +196,7 @@ void Game::update() {
         movement.x -= 1.f;
     if (mIsMovingRight)
         movement.x += 1.f;
-    mPlayer.move(movement * config::PLAYER_SPEED * mTime.getDeltaTimeSeconds());
+    mPlayer.move(movement * config::PLAYER_SPEED * fixedTimeStep.asSeconds());
 }
 
 
