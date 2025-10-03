@@ -112,6 +112,19 @@ private:
 Game::Game() :
     mWindow(sf::VideoMode({ config::WINDOW_WIDTH, config::WINDOW_HEIGHT }), config::WINDOW_TITLE),
     mPlayer() {
+
+    // Применяем настройки рендеринга из config.h
+
+    if (config::ENABLE_VSYNC) {
+        mWindow.setVerticalSyncEnabled(true); // включаем вертикальную синхронизацию
+        #ifdef _DEBUG
+        utils::message::logDebug ("[Config] VSync включён (FRAME_LIMIT игнорируется)");
+        #endif
+    }
+    else if (config::FRAME_LIMIT > 0) {
+        mWindow.setFramerateLimit(config::FRAME_LIMIT); // ограничение FPS
+    }
+
     mPlayer.setRadius(40.f);
     mPlayer.setPosition({ 100.f, 100.f });
     mPlayer.setFillColor(sf::Color::Cyan);
@@ -133,12 +146,12 @@ void Game::run() {
         mTime.update(); // обновили таймер и FPS
 
         // Если накопилось достаточно времени — выполняем апдейт
-        while (mTime.shouldUpdate(config::FRAME_RATE)) {
+        while (mTime.shouldUpdate(config::FIXED_TIME_STEP)) {
             processEvents(); // обрабатываем события повторно, если фрэймрейт упал)
                              // это необязательно, но может помочь с отзывчивостью программы при подвисании
                              // окно всё равно будет реагировать на клавиши и не зависнет “в воздухе”.
 
-            update(config::FRAME_RATE);
+            update(config::FIXED_TIME_STEP);
         }
         render(); // рендерим столько раз, сколько позволяет GPU
     }

@@ -32,6 +32,19 @@ namespace utils {
         }
 
         // --------------------------------------------------------
+        // Показывает отладочное сообщение (только в Debug-сборке)
+        // --------------------------------------------------------
+        inline void logDebug(const std::string& message) {
+            #ifdef _DEBUG
+                #ifdef _WIN32
+                MessageBoxA(nullptr, message.c_str(), "Debug", MB_OK | MB_ICONINFORMATION);
+            #else
+                std::cout << "[Debug] " << message << std::endl;
+                #endif
+            #endif
+        }
+
+        // --------------------------------------------------------
         // Задержка перед выходом (используется при DEBUG_HOLD_ON_EXIT)
         // --------------------------------------------------------
         static void holdOnExit() {

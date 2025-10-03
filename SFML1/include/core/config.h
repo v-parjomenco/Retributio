@@ -27,7 +27,17 @@ namespace config {
     // -----------------------
     
     inline constexpr float PLAYER_SPEED = 100.f; // скорость игрока в пикселях в секунду
-    inline const sf::Time FRAME_RATE = sf::seconds(1.f / 60.f); // целевое время кадра (60 FPS)
+
+    // Фиксированный шаг логики (1/60)
+    inline const sf::Time FIXED_TIME_STEP = sf::seconds(1.f / 60.f);
+
+    // Настройки рендеринга / синхронизации
+    // Если true -> используем вертикальную синхронизацию (VSync), а ограничение FPS игнорируется.
+    inline constexpr bool ENABLE_VSYNC = true;
+
+    // Ограничение FPS через setFramerateLimit (0 — отключено).
+    // Игнорируется, если ENABLE_VSYNC == true.
+    inline constexpr unsigned int FRAME_LIMIT = 0;
      
     // -----------------------
     // Отладка
