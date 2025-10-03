@@ -1,4 +1,4 @@
-﻿#include "core/config.h"
+#include "core/config.h"
 #include <exception>
 #include "utils/message.h"
 #include <SFML/Graphics.hpp>
@@ -117,9 +117,7 @@ Game::Game() :
 
     if (config::ENABLE_VSYNC) {
         mWindow.setVerticalSyncEnabled(true); // включаем вертикальную синхронизацию
-        #ifdef _DEBUG
-        utils::message::logDebug ("[Config] VSync включён (FRAME_LIMIT игнорируется)");
-        #endif
+        DEBUG_MSG("[Config] VSync включён (FRAME_LIMIT игнорируется)");
     }
     else if (config::FRAME_LIMIT > 0) {
         mWindow.setFramerateLimit(config::FRAME_LIMIT); // ограничение FPS
@@ -156,8 +154,6 @@ void Game::run() {
         render(); // рендерим столько раз, сколько позволяет GPU
     }
 }
-
-
 
 void Game::render() {
     mWindow.clear();
