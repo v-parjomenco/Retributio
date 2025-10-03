@@ -1,38 +1,38 @@
-#pragma once
+п»ї#pragma once
 #include <string>
 #include <iostream>
-#include "../core/config.h" // подключаем флаг
+#include "../core/config.h" // РїРѕРґРєР»СЋС‡Р°РµРј С„Р»Р°Рі
 #ifdef _WIN32
     #include <windows.h>
 #endif
 
 namespace utils {
-    namespace message { // добавляем вложенное пространство имён message
+    namespace message { // РґРѕР±Р°РІР»СЏРµРј РІР»РѕР¶РµРЅРЅРѕРµ РїСЂРѕСЃС‚СЂР°РЅСЃС‚РІРѕ РёРјС‘РЅ message
 
         // --------------------------------------------------------
-        // Показывает окно или сообщение об ошибке (зависит от ОС)
+        // РџРѕРєР°Р·С‹РІР°РµС‚ РѕРєРЅРѕ РёР»Рё СЃРѕРѕР±С‰РµРЅРёРµ РѕР± РѕС€РёР±РєРµ (Р·Р°РІРёСЃРёС‚ РѕС‚ РћРЎ)
         // --------------------------------------------------------
         inline void showError(const std::string& message) {
             #ifdef _WIN32
-            MessageBoxA(nullptr, message.c_str(), "Ошибка", MB_OK | MB_ICONERROR);
+            MessageBoxA(nullptr, message.c_str(), "РћС€РёР±РєР°", MB_OK | MB_ICONERROR);
             #else
-            std::cerr << "Ошибка: " << message << std::endl;
+            std::cerr << "РћС€РёР±РєР°: " << message << std::endl;
             #endif
         }
 
         // --------------------------------------------------------
-        // Показывает информационное окно (или сообщение в консоль)
+        // РџРѕРєР°Р·С‹РІР°РµС‚ РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅРѕРµ РѕРєРЅРѕ (РёР»Рё СЃРѕРѕР±С‰РµРЅРёРµ РІ РєРѕРЅСЃРѕР»СЊ)
         // --------------------------------------------------------
         inline void showInfo(const std::string& message) {
             #ifdef _WIN32
-            MessageBoxA(nullptr, message.c_str(), "Информация", MB_OK | MB_ICONINFORMATION);
+            MessageBoxA(nullptr, message.c_str(), "РРЅС„РѕСЂРјР°С†РёСЏ", MB_OK | MB_ICONINFORMATION);
             #else
-            std::cout << "Информация: " << message << std::endl;
+            std::cout << "РРЅС„РѕСЂРјР°С†РёСЏ: " << message << std::endl;
             #endif
         }
 
         // --------------------------------------------------------
-        // Показывает отладочное сообщение (только в Debug-сборке)
+        // РџРѕРєР°Р·С‹РІР°РµС‚ РѕС‚Р»Р°РґРѕС‡РЅРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ (С‚РѕР»СЊРєРѕ РІ Debug-СЃР±РѕСЂРєРµ)
         // --------------------------------------------------------
         inline void logDebug(const std::string& message) {
             #ifdef _DEBUG
@@ -45,14 +45,14 @@ namespace utils {
         }
 
         // --------------------------------------------------------
-        // Задержка перед выходом (используется при DEBUG_HOLD_ON_EXIT)
+        // Р—Р°РґРµСЂР¶РєР° РїРµСЂРµРґ РІС‹С…РѕРґРѕРј (РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РїСЂРё DEBUG_HOLD_ON_EXIT)
         // --------------------------------------------------------
         static void holdOnExit() {
             if constexpr (config::DEBUG_HOLD_ON_EXIT) {
             #ifdef _WIN32
-                MessageBoxA(nullptr, "Нажмите OK, чтобы выйти.", "Завершение", MB_OK);
+                MessageBoxA(nullptr, "РќР°Р¶РјРёС‚Рµ OK, С‡С‚РѕР±С‹ РІС‹Р№С‚Рё.", "Р—Р°РІРµСЂС€РµРЅРёРµ", MB_OK);
             #else
-                std::cout << "\nНажмите Enter, чтобы выйти..." << std::endl;
+                std::cout << "\nРќР°Р¶РјРёС‚Рµ Enter, С‡С‚РѕР±С‹ РІС‹Р№С‚Рё..." << std::endl;
                 std::cin.get();
             #endif
             }
