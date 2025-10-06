@@ -13,27 +13,104 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="core">
+    <Filter Include="src">
+      <UniqueIdentifier>{deb96db4-6b52-4570-90d8-43f7d6b4575d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core">
+      <UniqueIdentifier>{bdbf2f26-52c0-41d7-8283-1d53a8dbf650}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include">
+      <UniqueIdentifier>{e2d5eff0-bf5b-4ba4-ac2a-cbd0c4ed6aaf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core">
       <UniqueIdentifier>{9aef76b6-d00c-450e-80af-0192eb5b8991}</UniqueIdentifier>
     </Filter>
-    <Filter Include="graphics">
+    <Filter Include="include\graphics">
       <UniqueIdentifier>{64e3d32f-24ba-488c-a220-38ae1abab74d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="utils">
+    <Filter Include="include\utils">
       <UniqueIdentifier>{c9b0edfe-1561-49ab-94c6-6285a375f017}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\entities">
+      <UniqueIdentifier>{9b43f4e2-c6df-43dc-adc6-3733ea92f2cf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\´graphics">
+      <UniqueIdentifier>{1a5da51e-6e78-4342-bdff-0cd330f6b569}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\entities">
+      <UniqueIdentifier>{6d625bb9-40ea-45dc-8050-b46308439134}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\utils">
+      <UniqueIdentifier>{0356d90c-66fb-4978-968e-6935bf837b8c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\third_party">
+      <UniqueIdentifier>{a4b6391a-fbd9-4df8-8c13-f11daa9def5c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets">
+      <UniqueIdentifier>{61620380-0e66-4572-b0c4-5abad7c7b71e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets\config">
+      <UniqueIdentifier>{5564a9a1-e55e-4be5-996a-526f8e122d39}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\resource_,manager.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\time_system.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\entities\player.cpp">
+      <Filter>src\entities</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\game.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\text_output.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\config_loader.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\config.h">
-      <Filter>core</Filter>
+      <Filter>include\core</Filter>
     </ClInclude>
     <ClInclude Include="include\utils\message.h">
-      <Filter>utils</Filter>
+      <Filter>include\utils</Filter>
     </ClInclude>
+    <ClInclude Include="include\core\resource_manager.h">
+      <Filter>include\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\time_system.h">
+      <Filter>include\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\entities\player.h">
+      <Filter>include\entities</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\game.h">
+      <Filter>include\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\text_output.h">
+      <Filter>include\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\third_party\json.hpp">
+      <Filter>include\third_party</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config_loader.h">
+      <Filter>include\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\third_party\json_silent.hpp">
+      <Filter>include\third_party</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="assets\config\player.json">
+      <Filter>assets\config</Filter>
+    </None>
   </ItemGroup>
 </Project>

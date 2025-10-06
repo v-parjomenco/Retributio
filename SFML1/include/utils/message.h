@@ -1,10 +1,14 @@
 #pragma once
-#include <string>
+
 #include <iostream>
-#include "../core/config.h"
+#include <string>
+
 #ifdef _WIN32
+    #define NOMINMAX        // предотвращает конфликт с std::min / std::max
     #include <windows.h>
 #endif
+
+#include "core/config.h"
 
 namespace utils {
 #ifdef _DEBUG

@@ -1,24 +1,24 @@
 # Prerequisites
 *.d
 
-# Compiled Object files
+# Compiled object files
 *.slo
 *.lo
 *.o
 *.obj
 
-# Precompiled Headers
+# Precompiled headers
 *.gch
 *.pch
 
 # Linker files
 *.ilk
 
-# Debugger Files
+# Debugger files
 *.pdb
 *.id
 
-# Compiled Dynamic libraries
+# Compiled dynamic libraries
 *.so
 *.dylib
 *.dll
@@ -27,7 +27,7 @@
 *.mod
 *.smod
 
-# Compiled Static libraries
+# Compiled static libraries
 *.lai
 *.la
 *.a
@@ -40,11 +40,6 @@
 
 # debug information files
 *.dwo
-
-# Visual Studio
-.vs/
-*.vcxproj.user
-*.suo
 
 # Builds
 Debug/
@@ -60,21 +55,42 @@ obj/
 *.ncb
 *.sdf
 
+# Visual Studio
+.vs/
+*.vcxproj.user
+*.suo
+
 # Logs, temporary files
 *.log
 *.tmp
 
-# Textures, sounds
-assets/
+# Big or temporary assets
+assets/cache/
+assets/tmp/
+assets/sounds/raw/
 
-#CMake Files
+#CMake files
 CMakeFiles/
 CMakeCache.txt
+
+# CMake builds
+build/
+cmake-build-*/
 
 # macOS
 .DS_Store
 
-# Windows Thumbnails
+# Windows thumbnails
 Thumbs.db
 
 *.sln.docstates
+
+# VS Code
+.vscode/
+
+# CLion / JetBrains
+.idea/
+
+# SFML cache/
+.sfml/
+

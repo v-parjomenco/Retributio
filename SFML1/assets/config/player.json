@@ -1,0 +1,6 @@
+{
+  "texture": "assets/images/player.png",
+  "scale": 0.12,
+  "speed": 200.0,
+  "start_position": { "x": 512, "y": 700 }
+}
