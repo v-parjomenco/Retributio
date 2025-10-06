@@ -8,7 +8,7 @@ namespace entities {
     // Данные здесь лишь по умолчанию, если не загрузится конфигурация из JSON
 	Player::Player(const sf::Texture& texture, sf::Vector2f scale, float speed) : mSprite(texture), mSpeed(speed) {
 		mSprite.setScale(scale);
-		mSprite.setPosition({ 100.f, 100.f });
+		mSprite.setPosition({ 0.f, 0.f });
 	}
 
     // Инициализация игрока из конфигурации

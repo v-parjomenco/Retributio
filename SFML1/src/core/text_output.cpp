@@ -5,9 +5,9 @@ namespace core {
 	void TextOutput::init(const sf::Font& font, std::optional<sf::Text>& text) const {
 
 		text.emplace(font); // инициализация объекта std::optional   
-		text->setCharacterSize(35); // установка размера текста
-		text->setFillColor(sf::Color::Red); // установка цвета текста красным
-		text->setPosition({ 10.f, 10.f }); // установка позиции текста
+		text->setCharacterSize(35); // установка размера текста  по умолчанию
+		text->setFillColor(sf::Color::Red); // установка цвета текста красным  по умолчанию
+		text->setPosition({ 10.f, 10.f }); // установка позиции текста по умолчанию
 	}
 
 	void TextOutput::updateFpsText(std::optional<sf::Text>& text, float fps) const {

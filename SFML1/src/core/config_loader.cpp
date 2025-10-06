@@ -8,8 +8,8 @@ using json = nlohmann::json;
 
 namespace core {
 
-    // Функция для парсинга масштаба из JSON.
-    // Принимает число, н-р: 0.12, массив: [0.12, 0.20] или объект: {"x": 0.12, "y": 0.20}
+    // Р¤СѓРЅРєС†РёСЏ РґР»СЏ РїР°СЂСЃРёРЅРіР° РјР°СЃС€С‚Р°Р±Р° РёР· JSON.
+    // РџСЂРёРЅРёРјР°РµС‚ С‡РёСЃР»Рѕ, РЅ-СЂ: 0.12, РјР°СЃСЃРёРІ: [0.12, 0.20] РёР»Рё РѕР±СЉРµРєС‚: {"x": 0.12, "y": 0.20}
 static sf::Vector2f parseScale(const json& scaleData) {
     if (scaleData.is_number()) {
         float s = scaleData.get<float>();
@@ -25,11 +25,11 @@ static sf::Vector2f parseScale(const json& scaleData) {
     }
     return { 1.f, 1.f };
 }
-    // Загружает JSON из файла и парсит PlayerConfig
+    // Р—Р°РіСЂСѓР¶Р°РµС‚ JSON РёР· С„Р°Р№Р»Р° Рё РїР°СЂСЃРёС‚ PlayerConfig
 PlayerConfig ConfigLoader::loadPlayerConfig(const std::string& path) {
     std::ifstream file(path);
     if (!file.is_open())
-        throw std::runtime_error("ConfigLoader: не могу открыть файл " + path);
+        throw std::runtime_error("ConfigLoader: РЅРµ РјРѕРіСѓ РѕС‚РєСЂС‹С‚СЊ С„Р°Р№Р» " + path); // РќРµ С‚Сѓ РѕС€РёР±РєСѓ РІС‹РґР°РµС‚ (СЃРј. РґРёР°Р»РѕРі)
 
     json data;
     file >> data;
@@ -41,7 +41,7 @@ PlayerConfig ConfigLoader::loadPlayerConfig(const std::string& path) {
         cfg.scale = parseScale(data["scale"]);
     }
 
-    // speed: если скорость в JSON-файле отсутствует, сохраняем значением по умолчанию
+    // speed: РµСЃР»Рё СЃРєРѕСЂРѕСЃС‚СЊ РІ JSON-С„Р°Р№Р»Рµ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, СЃРѕС…СЂР°РЅСЏРµРј Р·РЅР°С‡РµРЅРёРµРј РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
     cfg.speed = data.value("speed", config::PLAYER_SPEED);
 
     if (data.contains("start_position")) {
