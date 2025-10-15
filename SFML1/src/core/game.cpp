@@ -7,7 +7,6 @@ namespace core {
 		mWindow(sf::VideoMode({ config::WINDOW_WIDTH, config::WINDOW_HEIGHT }), config::WINDOW_TITLE) {
 
 		// Применяем настройки рендеринга из config.h
-
 		if (config::ENABLE_VSYNC) {
 			mWindow.setVerticalSyncEnabled(true); // включаем вертикальную синхронизацию
 			DEBUG_MSG("[Config] VSync включён (FRAME_LIMIT игнорируется)");
@@ -21,10 +20,10 @@ namespace core {
 
 		// Загружаем конфигурацию игрока
 		try {
-			core::PlayerConfig pconf = core::ConfigLoader::loadPlayerConfig("assets/config/player.json");
-			const sf::Texture& playerTexture = mResourceManager.getTexture(pconf.texture);
+			core::PlayerConfig playerConfig = core::ConfigLoader::loadPlayerConfig("assets/config/player.json");
+			const sf::Texture& playerTexture = mResourceManager.getTexture(playerConfig.texture);
 			mPlayer = std::make_unique<entities::Player>(playerTexture);
-            mPlayer->initFromConfig(pconf); // инициализируем игрока из конфигурации
+            mPlayer->initFromConfig(playerConfig); // инициализируем игрока из конфигурации
 		}
 		catch (const std::exception& e) {
 			// Кросс-платформенная обработка ошибок
@@ -61,18 +60,28 @@ namespace core {
 
 		while (const std::optional<sf::Event> event = mWindow.pollEvent()) {
 
+			// обработка закрытия окна
 			if (event->is<sf::Event::Closed>()) {
-				// обработка закрытия окна
 				mWindow.close();
 			}
+
+            // обработка нажатия и отпускания клавиш
 			else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
-				// обработка нажатия клавиши
 				handlePlayerInput(keyPressed->code, true);
 			}
 			else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) {
-				// обработка отпускания клавиши
 				handlePlayerInput(keyReleased->code, false);
 			}
+
+            // обработка изменения размера окна
+				else if (const auto* resized = event->getIf<sf::Event::Resized>()) {
+					sf::Vector2f newSize(static_cast<float>(resized->size.x), static_cast<float>(resized->size.y));
+					sf::View newView({ newSize.x / 2.f, newSize.y / 2.f }, { newSize.x, newSize.y });
+					// Обновляем View окна, чтобы другие поведения и отрисовка видели актуальный вид
+					mWindow.setView(newView);
+					// Игрок (а потом добавить и остальные объекты)
+					mPlayer->onResize(newView);
+				}
 		}
 	}
 

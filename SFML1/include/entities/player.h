@@ -3,8 +3,14 @@
 #include <SFML/Graphics.hpp>
 #include "core/config.h"
 #include "core/config_loader.h"
+#include "core/resize_behavior.h"
 
 namespace entities {
+    /**
+    * @class Player
+    * @brief Игровой объект, представляющий самолёт игрока.
+    * Управляется с клавиатуры и автоматически реагирует на изменение размера окна.
+    */
     class Player {
     public:
 
@@ -24,8 +30,15 @@ namespace entities {
         // Отрисовка игрока
         void draw(sf::RenderWindow& window) const;
 
-        //Получение глобальных границ спрайта
+        // Получение глобальных границ спрайта
         sf::FloatRect getGlobalBounds() const;
+
+        // Обновляет стартовую позицию игрока в зависимости от размера окна
+        void updateScreenPosition(const sf::View& view);
+        //void updateScreenPosition(const sf::View& view, bool preserveRelativeOffset);
+
+        // Ресайз-метод, вызываемый при изменении размера окна
+        void onResize(const sf::View& view, sf::RenderWindow* window = nullptr);
 
         // Сеттеры, позволяющие задавать параметры скорости игрока, масштаба и позиции на экране
         void setSpeed(float speed) { mSpeed = speed; }
@@ -33,7 +46,7 @@ namespace entities {
         void setPosition(sf::Vector2f pos) { mSprite.setPosition(pos); }
 
     private:
-        sf::Sprite mSprite;
+        sf::Sprite mSprite; // Спрайт, представляющий самолёт игрока
         float mSpeed{ 100.f }; // Скорость движения игрока в пикселях в секунду,
                                // значение по умолчанию, если JSON не загрузится
 
@@ -42,6 +55,9 @@ namespace entities {
         bool mIsMovingDown{ false };
         bool mIsMovingLeft{ false };
         bool mIsMovingRight{ false };
+
+        // Объект, для управления поведением при изменении размера окна
+        std::unique_ptr<core::IResizeBehavior> mResizeBehavior;
 
     };
 } // namespace entities
