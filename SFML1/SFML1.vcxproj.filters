@@ -87,6 +87,12 @@
     <ClCompile Include="src\core\lock_policy.cpp">
       <Filter>src\core</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\anchor_policy.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\json_utils.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\config.h">
@@ -132,6 +138,18 @@
       <Filter>include\core</Filter>
     </ClInclude>
     <ClInclude Include="include\core\lock_policy.h">
+      <Filter>include\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\anchor_policy.h">
+      <Filter>include\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\json_utils.h">
+      <Filter>include\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config_keys.h">
+      <Filter>include\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\json_validator.h">
       <Filter>include\core</Filter>
     </ClInclude>
   </ItemGroup>

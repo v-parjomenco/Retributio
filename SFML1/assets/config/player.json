@@ -2,5 +2,7 @@
   "texture": "assets/images/player4.png",
   "scale": 0.12,
   "speed": 500.0,
-  "resize_behavior": "FixedScreenScaling"
+  "resize_behavior": "FixedScreenScaling",
+  "anchor": "BottomCenter",
+  "start_position": { "x": 0, "y": 0 }
 }

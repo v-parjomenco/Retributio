@@ -33,14 +33,10 @@ namespace entities {
         // Получение глобальных границ спрайта
         sf::FloatRect getGlobalBounds() const;
 
-        // Обновляет стартовую позицию игрока в зависимости от размера окна
-        void updateScreenPosition(const sf::View& view);
-        //void updateScreenPosition(const sf::View& view, bool preserveRelativeOffset);
-
         // Ресайз-метод, вызываемый при изменении размера окна
         void onResize(const sf::View& view, sf::RenderWindow* window = nullptr);
 
-        // Сеттеры, позволяющие задавать параметры скорости игрока, масштаба и позиции на экране
+        // Сеттеры
         void setSpeed(float speed) { mSpeed = speed; }
         void setScale(sf::Vector2f scale) { mSprite.setScale(scale); }
         void setPosition(sf::Vector2f pos) { mSprite.setPosition(pos); }

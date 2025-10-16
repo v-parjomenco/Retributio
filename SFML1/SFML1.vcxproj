@@ -144,8 +144,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="src\core\anchor_policy.cpp" />
     <ClCompile Include="src\core\config_loader.cpp" />
     <ClCompile Include="src\core\game.cpp" />
+    <ClCompile Include="src\core\json_utils.cpp" />
     <ClCompile Include="src\core\lock_policy.cpp" />
     <ClCompile Include="src\core\resize_behavior.cpp" />
     <ClCompile Include="src\core\resize_behavior_factory.cpp" />
@@ -156,10 +158,14 @@
     <ClCompile Include="src\entities\player.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\core\anchor_policy.h" />
     <ClInclude Include="include\core\anchor_utils.h" />
     <ClInclude Include="include\core\config.h" />
+    <ClInclude Include="include\core\config_keys.h" />
     <ClInclude Include="include\core\config_loader.h" />
     <ClInclude Include="include\core\game.h" />
+    <ClInclude Include="include\core\json_utils.h" />
+    <ClInclude Include="include\core\json_validator.h" />
     <ClInclude Include="include\core\lock_policy.h" />
     <ClInclude Include="include\core\resize_behavior.h" />
     <ClInclude Include="include\core\resize_behavior_factory.h" />
