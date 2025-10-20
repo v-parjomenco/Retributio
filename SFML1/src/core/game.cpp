@@ -1,3 +1,4 @@
+#include <cassert>
 #include "core/game.h"
 #include "core/config_loader.h"
 
@@ -40,6 +41,7 @@ namespace core {
 	}
 
 	void Game::run() {
+		assert(mWindow.isOpen()); // проверка, что окно открылось
 		while (mWindow.isOpen()) {
 			processEvents(); // для базовой логики и стабильных кадров
 			mTime.update(); // обновили таймер и FPS
@@ -60,6 +62,7 @@ namespace core {
 
 		while (const std::optional<sf::Event> event = mWindow.pollEvent()) {
 
+			assert(event.has_value()); // проверка, что событие существует
 			// обработка закрытия окна
 			if (event->is<sf::Event::Closed>()) {
 				mWindow.close();
@@ -86,10 +89,13 @@ namespace core {
 	}
 
 	void Game::handlePlayerInput(sf::Keyboard::Key key, bool isPressed) {
+		assert(key != sf::Keyboard::Key::Unknown); // клавиша должна быть валидной
 		mPlayer->handleInput(key, isPressed);
 	}
 
 	void Game::update(const sf::Time& dt) {
+
+		assert(dt.asSeconds() > 0); // время обновления должно быть положительным
 		
 		mTextOutput.updateFpsText(mText, mTime.getSmoothedFps());// выводим сглаженный FPS
 		mPlayer->update(dt); // обновляем игрока

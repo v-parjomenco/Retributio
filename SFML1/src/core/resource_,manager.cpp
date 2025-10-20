@@ -1,13 +1,21 @@
+#include <cassert>
 #include "core/resource_manager.h"
 
 namespace core {
 
 	// Загружаем шрифт и проверяем корректность загрузки
 	const sf::Font& ResourceManager::getFont(const std::string& filename) {
+
+		// Проверка, чтобы избежать повторной загрузки одного и того же шрифта
+		static bool fontLoaded = false;
+		assert(!fontLoaded && "Шрифт уже был загружен ранее!");
+
 		if (!mFont.openFromFile(filename)) {
 			// Не удалось загрузить шрифт
 			throw std::runtime_error("Не удалось загрузить шрифт: " + filename);
 		}
+
+		fontLoaded = true; // отмечаем, что шрифт загружен
 		return mFont;
 	}
 
@@ -20,6 +28,13 @@ namespace core {
 		if (!texture.loadFromFile(filename))
 			throw std::runtime_error("Не удалось загрузить текстуру: " + filename);
 		texture.setSmooth(true); // Включаем сглаживание (антиалиасинг, если отключено)
+
+		// Если вдруг будем вставлять прямо этим методом, на будущее
+		//auto inserted = mTextures.emplace(filename, std::move(texture));
+		//Здесь assert проверяет, что ключ уникален
+		//assert(inserted.second);
+
+
 		return mTextures.emplace(filename, std::move(texture)).first->second;
 	}
 
