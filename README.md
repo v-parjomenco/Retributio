@@ -9,23 +9,24 @@ A 2D aerial combat indie game built with **C++17** and **SFML 3.0.2**.
 - Modular core/entity system
 
 ## Project Structure
-📦 SFML1
-┣ 📂 assets
-┃ ┣ 📂 config
-┃ ┣ 📂 fonts
-┃ ┣ 📂 images
-┃ ┗ 📂 sounds
-┣ 📂 data
-┃ ┗ 📂 definitions
-┣ 📂 include
-┃ ┣ 📂 core
-┃ ┣ 📂 entities
-┃ ┣ 📂 graphics
-┃ ┣ 📂 third_party
-┃ ┗ 📂 utils
-┣ 📂 src
-┣ 📄 CREDITS.md
-┗ 📄 LICENSE.MIT
+```text
+SFML1/
+├─ assets/
+│  ├─ config/
+│  ├─ fonts/
+│  ├─ images/
+│  └─ sounds/
+├─ data/
+│  └─ definitions/
+├─ include/
+│  ├─ core/
+│  ├─ entities/
+│  ├─ graphics/
+│  ├─ third_party/
+│  └─ utils/
+├─ src/
+├─ CREDITS.md
+└─ LICENSE.MIT
 
 ## Build
 1. Install [SFML 3.0.2](https://www.sfml-dev.org/download/sfml/3.0.2/)
