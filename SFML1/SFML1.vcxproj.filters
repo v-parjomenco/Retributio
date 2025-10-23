@@ -52,13 +52,22 @@
     <Filter Include="assets\config">
       <UniqueIdentifier>{5564a9a1-e55e-4be5-996a-526f8e122d39}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\resources">
+      <UniqueIdentifier>{084bcfe5-19b4-4f3e-89f7-b9106804ccbc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\resources">
+      <UniqueIdentifier>{b440ae58-8cbc-4611-b473-67b161379286}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="data">
+      <UniqueIdentifier>{dfacf5a0-50eb-40d8-be62-980899b48dbd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="data\definitions">
+      <UniqueIdentifier>{9c33457c-cd8a-4514-b69d-79f92384e630}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\resource_,manager.cpp">
-      <Filter>src\core</Filter>
     </ClCompile>
     <ClCompile Include="src\core\time_system.cpp">
       <Filter>src\core</Filter>
@@ -93,6 +102,12 @@
     <ClCompile Include="src\core\json_utils.cpp">
       <Filter>src\core</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\resources\resource_,manager.cpp">
+      <Filter>src\core\resources</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\resources\resource_paths.cpp">
+      <Filter>src\core\resources</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\config.h">
@@ -100,9 +115,6 @@
     </ClInclude>
     <ClInclude Include="include\utils\message.h">
       <Filter>include\utils</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resource_manager.h">
-      <Filter>include\core</Filter>
     </ClInclude>
     <ClInclude Include="include\core\time_system.h">
       <Filter>include\core</Filter>
@@ -152,10 +164,40 @@
     <ClInclude Include="include\core\json_validator.h">
       <Filter>include\core</Filter>
     </ClInclude>
+    <ClInclude Include="include\core\resources\resource_holder.h">
+      <Filter>include\core\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\resource_manager.h">
+      <Filter>include\core\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\i_resource.h">
+      <Filter>include\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\texture_resource.h">
+      <Filter>include\core\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\font_resource.h">
+      <Filter>include\core\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\soundbuffer_resource.h">
+      <Filter>include\core\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\resourceIDs.h">
+      <Filter>include\core\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\resource_paths.h">
+      <Filter>include\core\resources</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="assets\config\player.json">
       <Filter>assets\config</Filter>
+    </None>
+    <None Include="include\core\resources\resource_holder.inl">
+      <Filter>include\core\resources</Filter>
+    </None>
+    <None Include="data\definitions\resources.json">
+      <Filter>data\definitions</Filter>
     </None>
   </ItemGroup>
 </Project>

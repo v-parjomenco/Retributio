@@ -1,4 +1,5 @@
 #pragma once
+
 #include <string>
 #include <SFML/System/Vector2.hpp>
 #include "third_party/json_silent.hpp"

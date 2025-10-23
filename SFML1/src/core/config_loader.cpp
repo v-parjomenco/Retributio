@@ -44,7 +44,7 @@ namespace core {
         PlayerConfig cfg; // создаёт объект конфигурации игрока со значениями по по умолчанию
 
         // Загружает параметры из JSON с использованием ключей, из config_keys.h
-        cfg.texture                    = parseValue<std::string>(data, Player::TEXTURE, cfg.texture);
+        cfg.texturePath                    = parseValue<std::string>(data, Player::TEXTURE, cfg.texturePath);
         cfg.scale                      = parseValue<sf::Vector2f>(data, Player::SCALE, cfg.scale);
         cfg.speed                      = parseValue<float>(data, Player::SPEED, cfg.speed);
         cfg.startPosition              = parseValue<sf::Vector2f>(data, Player::START_POSITION, cfg.startPosition);

@@ -1,4 +1,5 @@
 #pragma once
+
 #include <SFML/Graphics.hpp>
 #include "core/anchor_utils.h"
 #include "core/config.h"

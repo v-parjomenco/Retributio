@@ -1,4 +1,5 @@
 #pragma once
+
 #include "core/resize_behavior.h"
 #include <memory>
 #include <string>

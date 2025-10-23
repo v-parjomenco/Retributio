@@ -1,11 +1,15 @@
 #include <cassert>
 #include "core/game.h"
 #include "core/config_loader.h"
+#include "core/resources/resource_paths.h"
 
 namespace core {
 
 	Game::Game() :
 		mWindow(sf::VideoMode({ config::WINDOW_WIDTH, config::WINDOW_HEIGHT }), config::WINDOW_TITLE) {
+
+		// Загружаем ресурсы JSON
+		core::resources::ResourcePaths::loadFromJSON("data/definitions/resources.json");
 
 		// Применяем настройки рендеринга из config.h
 		if (config::ENABLE_VSYNC) {
@@ -16,13 +20,15 @@ namespace core {
 			mWindow.setFramerateLimit(config::FRAME_LIMIT); // ограничение FPS
 		}
 
-		// Инициализация текста FPS
-		mTextOutput.init(mResourceManager.getFont("assets/fonts/Wolgadeutsche.otf"), mText);
+		// Инициализация шрифта по умолчанию для отображения FPS
+		mTextOutput.init(mResources.getFont(resources::FontID::Default).get(), mText);
 
 		// Загружаем конфигурацию игрока
 		try {
 			core::PlayerConfig playerConfig = core::ConfigLoader::loadPlayerConfig("assets/config/player.json");
-			const sf::Texture& playerTexture = mResourceManager.getTexture(playerConfig.texture);
+			// Берём текстуру игрока через ResourceManager
+			const sf::Texture& playerTexture =
+				mResources.getTexture(playerConfig.texturePath, true).get(); // smooth = true
 			mPlayer = std::make_unique<entities::Player>(playerTexture);
             mPlayer->initFromConfig(playerConfig); // инициализируем игрока из конфигурации
 		}
@@ -35,8 +41,10 @@ namespace core {
             std::cerr << "Ошибка при загрузке игрока. " << e.what() << std::endl;
 #endif
 			// fallback создаём игрока с настройками по умолчанию
-			const sf::Texture& playerTexture = mResourceManager.getTexture(config::PLAYER_TEXTURE);
-			mPlayer = std::make_unique<entities::Player>(playerTexture);
+			const sf::Texture& defaultTexture =
+				mResources.getTexture(resources::TextureID::Player, true).get(); // smooth = true
+			mPlayer = std::make_unique<entities::Player>(defaultTexture);
+
 		}
 	}
 

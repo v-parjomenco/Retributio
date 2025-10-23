@@ -14,7 +14,9 @@ A 2D aerial combat indie game built with **C++17** and **SFML 3.0.2**.
 ┃ ┣ 📂 config
 ┃ ┣ 📂 fonts
 ┃ ┣ 📂 images
-┃ ┗ 📂 sounds┃
+┃ ┗ 📂 sounds
+┣ 📂 data
+┃ ┗ 📂 definitions
 ┣ 📂 include
 ┃ ┣ 📂 core
 ┃ ┣ 📂 entities

@@ -2,11 +2,12 @@
 
 #include <string>
 #include <SFML/System/Vector2.hpp>
+#include "core/resources/resourceIDs.h"
 
 namespace core {
 
 struct PlayerConfig {
-    std::string texture = "assets/images/player.png";
+    std::string texturePath = "assets/images/player4.png"; // путь к файлу
     sf::Vector2f scale{1.f, 1.f};
     float speed = 100.f;
 

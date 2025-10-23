@@ -1,0 +1,9 @@
+{
+  "textures": {
+    "Player": "assets/images/player4.png"
+  },
+  "fonts": {
+    "Default": "assets/fonts/Wolgadeutsche.otf"
+  },
+  "sounds": {}
+}
