@@ -28,7 +28,7 @@ namespace core {
 			core::PlayerConfig playerConfig = core::ConfigLoader::loadPlayerConfig("assets/config/player.json");
 			// Берём текстуру игрока через ResourceManager
 			const sf::Texture& playerTexture =
-				mResources.getTexture(playerConfig.texturePath, true).get(); // smooth = true
+				mResources.getTextureByPath(playerConfig.texturePath, true).get(); // smooth = true
 			mPlayer = std::make_unique<entities::Player>(playerTexture);
             mPlayer->initFromConfig(playerConfig); // инициализируем игрока из конфигурации
 		}
@@ -70,7 +70,6 @@ namespace core {
 
 		while (const std::optional<sf::Event> event = mWindow.pollEvent()) {
 
-			assert(event.has_value()); // проверка, что событие существует
 			// обработка закрытия окна
 			if (event->is<sf::Event::Closed>()) {
 				mWindow.close();

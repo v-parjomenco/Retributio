@@ -72,7 +72,7 @@
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>EnableAllWarnings</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SFML_STATIC;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
@@ -108,7 +108,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>EnableAllWarnings</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SFML_STATIC;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
@@ -151,7 +151,8 @@
     <ClCompile Include="src\core\lock_policy.cpp" />
     <ClCompile Include="src\core\resize_behavior.cpp" />
     <ClCompile Include="src\core\resize_behavior_factory.cpp" />
-    <ClCompile Include="src\core\resources\resource_,manager.cpp" />
+    <ClCompile Include="src\core\resources\resource_loader.cpp" />
+    <ClCompile Include="src\core\resources\resource_manager.cpp" />
     <ClCompile Include="src\core\resources\resource_paths.cpp" />
     <ClCompile Include="src\core\scaling_policy.cpp" />
     <ClCompile Include="src\core\text_output.cpp" />
@@ -174,6 +175,7 @@
     <ClInclude Include="include\core\resources\font_resource.h" />
     <ClInclude Include="include\core\resources\resourceIDs.h" />
     <ClInclude Include="include\core\resources\resource_holder.h" />
+    <ClInclude Include="include\core\resources\resource_loader.h" />
     <ClInclude Include="include\core\resources\resource_manager.h" />
     <ClInclude Include="include\core\resources\resource_paths.h" />
     <ClInclude Include="include\core\resources\soundbuffer_resource.h" />

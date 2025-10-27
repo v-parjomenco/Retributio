@@ -29,6 +29,8 @@ namespace core {
         const resources::TextureResource& getTexture(resources::TextureID id, bool smooth = true);
         // Динамический ID, из JSON
         const resources::TextureResource& getTexture(const std::string& id, bool smooth = true);
+        // Получить текстуру по пути (explicit path)
+        const resources::TextureResource& getTextureByPath(const std::string& path, bool smooth = true);
 
         // Шрифты
 

@@ -24,6 +24,9 @@ public:
     template <typename... Args> // вариативный шаблон typename... (число и тип аргументов заранее неизвестны)
     void load(Identifier id, const std::string& filename, Args&&... args);
 
+    // Вставить уже созданный ресурс (unique_ptr) — позволяет избежать повторного чтения с диска.
+    void insert(Identifier id, std::unique_ptr<Resource> resource);
+
     // Получить ресурс
     Resource& get(const Identifier& id);
     const Resource& get(const Identifier& id) const;

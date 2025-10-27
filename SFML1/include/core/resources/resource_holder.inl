@@ -1,5 +1,39 @@
 #pragma once
 
+#include <type_traits>
+#include "core/resources/resourceIDs.h"
+
+namespace core::resources {
+    // Универсальная функция — по умолчанию возвращает "Неизвестный ID"
+    template <typename Identifier>
+    inline std::string idToString(const Identifier&) noexcept {
+        return u8"Неизвестный ID";
+    }
+
+    // Специализации для ожидаемых типов ID (enum'ы)
+    template <>
+    inline std::string idToString<TextureID>(const TextureID& id) noexcept {
+        return std::string(core::resources::toString(id));
+    }
+
+    template <>
+    inline std::string idToString<FontID>(const FontID& id) noexcept {
+        return std::string(core::resources::toString(id));
+    }
+
+    template <>
+    inline std::string idToString<SoundID>(const SoundID& id) noexcept {
+        return std::string(core::resources::toString(id));
+    }
+
+    // Специализация для std::string (динамические пути/ключи)
+    template <>
+    inline std::string idToString<std::string>(const std::string& id) noexcept {
+        return id;
+    }
+} // namespace core::resources
+
+
 // Загружаем ресурс из файла, с произвольными дополнительными параметрами,
 // которые могут форвардиться (передаваться дальше в том же виде, в котором получены)
 // в Resource::loadFromFile(filename, args...).
@@ -25,7 +59,7 @@ void ResourceHolder<Resource, Identifier>::load(Identifier id, const std::string
     }
 
     if (!success) {
-        throw std::runtime_error("[ResourceHolder::load] Не удалось загрузить файл: " + filename);
+        throw std::runtime_error("[ResourceHolder::load]\nНе удалось загрузить файл: " + filename);
     }
 
     // Вставляем загруженный ресурс в карту.
@@ -38,7 +72,9 @@ void ResourceHolder<Resource, Identifier>::load(Identifier id, const std::string
 template <typename Resource, typename Identifier>
 Resource& ResourceHolder<Resource, Identifier>::get(const Identifier& id) {
     auto found = mResourceMap.find(id);
-    assert(found != mResourceMap.end() && "[ResourceHolder::get]\nРесурс не найден");
+    if (found == mResourceMap.end()) {
+        throw std::runtime_error(std::string("[ResourceHolder::get]\nРесурс не найден: ") + core::resources::idToString(id));
+    }
     return *found->second;
 }
 
@@ -46,7 +82,9 @@ Resource& ResourceHolder<Resource, Identifier>::get(const Identifier& id) {
 template <typename Resource, typename Identifier>
 const Resource& ResourceHolder<Resource, Identifier>::get(const Identifier& id) const {
     auto found = mResourceMap.find(id);
-    assert(found != mResourceMap.end() && "[ResourceHolder::get]\nРесурс не найден");
+    if (found == mResourceMap.end()) {
+        throw std::runtime_error(std::string("[ResourceHolder::get]\nРесурс не найден: ") + core::resources::idToString(id));
+    }
     return *found->second;
 }
 
@@ -67,4 +105,16 @@ void ResourceHolder<Resource, Identifier>::unload(const Identifier& id) {
 template <typename Resource, typename Identifier>
 void ResourceHolder<Resource, Identifier>::clear() noexcept {
     mResourceMap.clear();
+}
+
+// Метод, позволяющий вставить уже загруженный ресурс через уникальный указатель на него.
+// Это предотвращает повторную загрузку ресурса с диска, если он был загружен через ResourceLoader.
+// После вставки ResourceHolder будет владеть ресурсом.
+template <typename Resource, typename Identifier>
+void ResourceHolder<Resource, Identifier>::insert(Identifier id, std::unique_ptr<Resource> resource) {
+    if (!resource) return; // ничего не вставляем, если nullptr
+    if (mResourceMap.find(id) != mResourceMap.end()) {
+        return; // уже есть — не перезаписываем текущий ресурс
+    }
+    mResourceMap.emplace(id, std::move(resource));
 }

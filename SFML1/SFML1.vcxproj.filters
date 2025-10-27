@@ -102,10 +102,13 @@
     <ClCompile Include="src\core\json_utils.cpp">
       <Filter>src\core</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\resources\resource_,manager.cpp">
+    <ClCompile Include="src\core\resources\resource_paths.cpp">
       <Filter>src\core\resources</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\resources\resource_paths.cpp">
+    <ClCompile Include="src\core\resources\resource_manager.cpp">
+      <Filter>src\core\resources</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\resources\resource_loader.cpp">
       <Filter>src\core\resources</Filter>
     </ClCompile>
   </ItemGroup>
@@ -186,6 +189,9 @@
       <Filter>include\core\resources</Filter>
     </ClInclude>
     <ClInclude Include="include\core\resources\resource_paths.h">
+      <Filter>include\core\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\resource_loader.h">
       <Filter>include\core\resources</Filter>
     </ClInclude>
   </ItemGroup>

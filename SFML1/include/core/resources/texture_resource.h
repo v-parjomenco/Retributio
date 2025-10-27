@@ -17,7 +17,9 @@ namespace core::resources {
         // Базовый метод
         bool loadFromFile(const std::string& filename) override {
             if (!mTexture.loadFromFile(filename)) return false;
-            mTexture.setSmooth(true); // сглаживание по умолчанию
+            // НЕ устанавливаем сглаживание здесь "вслепую".
+            // mSmooth содержит предпочтение (по умолчанию true), но реальная установка
+            // будет выполняться контролируемо в ResourceManager/ResourceLoader через setSmooth().
             return true;
         }
 

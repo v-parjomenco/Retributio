@@ -56,21 +56,21 @@ namespace core::resources {
     const std::string& ResourcePaths::get(TextureID id) {
         auto it = mTextures.find(id);
         if (it == mTextures.end())
-            throw std::runtime_error("[ResourcePaths::get]\nНе найден путь для TextureID");
+            throw std::runtime_error("[ResourcePaths::get]\nНе найден путь для TextureID: " + std::string(toString(id)));
         return it->second;
     }
 
     const std::string& ResourcePaths::get(FontID id) {
         auto it = mFonts.find(id);
         if (it == mFonts.end())
-            throw std::runtime_error("[ResourcePaths::get]\nНе найден путь для FontID");
+            throw std::runtime_error("[ResourcePaths::get]\nНе найден путь для FontID: " + std::string(toString(id)));
         return it->second;
     }
 
     const std::string& ResourcePaths::get(SoundID id) {
         auto it = mSounds.find(id);
         if (it == mSounds.end())
-            throw std::runtime_error("[ResourcePaths::get]\nНе найден путь для SoundID");
+            throw std::runtime_error("[ResourcePaths::get]\nНе найден путь для SoundID: " + std::string(toString(id)));
         return it->second;
     }
 
