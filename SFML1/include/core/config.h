@@ -1,8 +1,15 @@
 #pragma once
+#ifdef _MSC_VER
+    #pragma warning(disable: 4514 4623 4625 4626 4668 4820 5027 5039 5246 5267 4061 4365 4100)
+#endif
+
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 
 #include <string>
 #include <SFML/System/Clock.hpp>
 #include <SFML/System/Time.hpp>
+#include <SFML/Window/Keyboard.hpp>
 
 // ============================================================================
 // config.h — централизованная конфигурация проекта
@@ -15,22 +22,33 @@
 
 namespace config {
 
-    // -----------------------
+    // ------------------------------------------------------------------------
     // Структура конфигурации окна
-    // -----------------------
+    // ------------------------------------------------------------------------
     
     inline constexpr unsigned int WINDOW_WIDTH = 1024;
     inline constexpr unsigned int WINDOW_HEIGHT = 768;
     inline constexpr const char* WINDOW_TITLE = "SkyGuard (name subject to change)";
 
-    // -----------------------
-    // Игровые параметры
-    // -----------------------
+    // ------------------------------------------------------------------------
+    // Игровые параметры по умолчанию (могут быть переопределены в JSON)
+    // ------------------------------------------------------------------------
     //      
-    inline const std::string PLAYER_TEXTURE = "assets/images/player.png"; // путь к дефолтной текстуре игрока
-    
-    inline constexpr float PLAYER_SPEED = 100.f; // скорость игрока в пикселях в секунду по умолчанию,
-                                                 // если не загружена из JSON
+    inline const std::string PLAYER_TEXTURE = "assets/images/player.png"; // путь к дефолтной текстуре игрока    
+    inline constexpr float PLAYER_SPEED = 100.f; // скорость игрока в пикселях в секунду по умолчанию
+    inline constexpr float PLAYER_ACCELERATION = 800.f; // ускорение игрока
+    inline constexpr float PLAYER_FRICTION = 6.f; // коэффициент замедления при отпускании клавиш
+
+    // Дефолтные клавиши управления (могут быть переопределены в JSON)
+    inline constexpr sf::Keyboard::Key DEFAULT_KEY_UP = sf::Keyboard::Key::W;
+    inline constexpr sf::Keyboard::Key DEFAULT_KEY_DOWN = sf::Keyboard::Key::S;
+    inline constexpr sf::Keyboard::Key DEFAULT_KEY_LEFT = sf::Keyboard::Key::A;
+    inline constexpr sf::Keyboard::Key DEFAULT_KEY_RIGHT = sf::Keyboard::Key::D;
+
+    // Дефолтные строковые режимы (могут быть переопределены в JSON)
+    inline constexpr const char* DEFAULT_SCALING = "None";             // None | Uniform
+    inline constexpr const char* DEFAULT_LOCK_BEHAVIOR = "WorldLock";  // WorldLock | ScreenLock
+    inline constexpr const char* DEFAULT_ANCHOR = "BottomCenter";
 
     // Фиксированный шаг логики (1/60)
     inline const sf::Time FIXED_TIME_STEP = sf::seconds(1.f / 60.f);
@@ -43,9 +61,9 @@ namespace config {
     // Игнорируется, если ENABLE_VSYNC == true.
     inline constexpr unsigned int FRAME_LIMIT = 0;
      
-    // -----------------------
+    // ------------------------------------------------------------------------
     // Отладка
-    // -----------------------
+    // ------------------------------------------------------------------------
  
     // Показывать ли сообщение при завершении программы (для отладки)
     inline constexpr bool DEBUG_HOLD_ON_EXIT = true;

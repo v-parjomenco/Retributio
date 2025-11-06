@@ -26,6 +26,7 @@ namespace core {
                 case AnchorType::BottomLeft:    return { 0.f, size.y };
                 case AnchorType::BottomCenter:  return { size.x * 0.5f, size.y };
                 case AnchorType::BottomRight:   return { size.x, size.y };
+                case AnchorType::None:          return { 0.f, 0.f };
                 default:                        return { 0.f, 0.f };
             }
         }

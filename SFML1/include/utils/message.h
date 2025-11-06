@@ -51,7 +51,7 @@ namespace utils {
     }
 
     inline void showMessageBox(const std::string& text, const std::string& title, UINT type) {
-        MessageBoxW(nullptr, utf8ToNative(text).c_str(), utf8ToNative(title).c_str(), type);
+        MessageBoxW(nullptr, utf8ToNative(text).c_str(), utf8ToNative(title).c_str(), static_cast<UINT>(type));
     }
 #else
     inline void showMessageBox(const std::string& text, const std::string& title, int /*type*/) {

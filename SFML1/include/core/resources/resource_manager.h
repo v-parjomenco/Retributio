@@ -15,7 +15,7 @@
 #include "core/resources/resource_paths.h"
 #include "core/resources/soundbuffer_resource.h"
 
-namespace core {
+namespace core::resources {
 
     class ResourceManager {
     public:
@@ -58,4 +58,4 @@ namespace core {
         ResourceHolder<resources::SoundBufferResource, std::string> mDynamicSounds;
     };
 
-} // namespace core
+} // namespace core::resources

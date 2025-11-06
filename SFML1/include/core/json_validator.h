@@ -4,6 +4,7 @@
 #include <vector>
 #include <stdexcept>
 #include <third_party/json_silent.hpp>
+#include "utils/message.h"
 
 namespace core {
 
@@ -31,6 +32,12 @@ namespace core {
          */
         static void validate(const json& data, const std::vector<KeyRule>& rules) {
             for (const auto& rule : rules) {
+
+// Нужно включить когда будет запись логов, а не всплывающие сообщения
+//#ifdef _DEBUG
+//                DEBUG_MSG("[JsonValidator]\nПроверка ключа: " + rule.name);
+//#endif
+
                 if (!data.contains(rule.name)) {
                     if (rule.required)
                         throw std::runtime_error("\nConfig validation error: missing key '" + rule.name + "'");
@@ -76,6 +83,8 @@ namespace core {
             case nlohmann::json::value_t::object: return "object";
             case nlohmann::json::value_t::boolean: return "boolean";
             case nlohmann::json::value_t::null: return "null";
+            case nlohmann::json::value_t::binary: return "binary";
+            case nlohmann::json::value_t::discarded: return "discarded";
             default: return "unknown";
             }
         }

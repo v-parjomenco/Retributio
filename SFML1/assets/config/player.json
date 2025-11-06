@@ -1,8 +1,27 @@
 {
   "texture": "assets/images/player4.png",
-  "scale": 0.12,
+  "scale": {
+    "x": 0.12,
+    "y": 0.12
+  },
+
   "speed": 500.0,
-  "resize_behavior": "FixedScreenScaling",
+  "acceleration": 800.0,
+  "friction": 6.0,
+
+  "scaling": "Uniform",
+  "lock_behavior": "ScreenLock",
+
   "anchor": "BottomCenter",
-  "start_position": { "x": 0, "y": 0 }
+  "start_position": {
+    "x": 0,
+    "y": 0
+  },
+
+  "controls": {
+    "up": "W",
+    "down": "S",
+    "left": "A",
+    "right": "D"
+  }
 }

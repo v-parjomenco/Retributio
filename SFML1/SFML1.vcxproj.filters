@@ -34,9 +34,6 @@
     <Filter Include="include\entities">
       <UniqueIdentifier>{9b43f4e2-c6df-43dc-adc6-3733ea92f2cf}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\´graphics">
-      <UniqueIdentifier>{1a5da51e-6e78-4342-bdff-0cd330f6b569}</UniqueIdentifier>
-    </Filter>
     <Filter Include="src\entities">
       <UniqueIdentifier>{6d625bb9-40ea-45dc-8050-b46308439134}</UniqueIdentifier>
     </Filter>
@@ -64,6 +61,27 @@
     <Filter Include="data\definitions">
       <UniqueIdentifier>{9c33457c-cd8a-4514-b69d-79f92384e630}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\ecs">
+      <UniqueIdentifier>{99e88256-c0fd-4b02-bb4d-5bb29e941139}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\ecs\components">
+      <UniqueIdentifier>{f7ec6d21-e823-4cd9-b6d2-3325f8d63034}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\ecs\systems">
+      <UniqueIdentifier>{eb950d45-0eed-43bf-953d-e953b3f48973}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\graphics">
+      <UniqueIdentifier>{814cc160-ae31-4feb-8bf1-b9b25c9815c0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\ecs">
+      <UniqueIdentifier>{ab02906d-f0b6-4388-b9e0-61fb9db7abf3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\ecs\components">
+      <UniqueIdentifier>{e5e59b07-c436-495a-8413-7fc69f736502}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\ecs\systems">
+      <UniqueIdentifier>{ee5fecaa-622f-4059-81d9-b5f2ad5e7b99}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -72,9 +90,6 @@
     <ClCompile Include="src\core\time_system.cpp">
       <Filter>src\core</Filter>
     </ClCompile>
-    <ClCompile Include="src\entities\player.cpp">
-      <Filter>src\entities</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\game.cpp">
       <Filter>src\core</Filter>
     </ClCompile>
@@ -82,12 +97,6 @@
       <Filter>src\core</Filter>
     </ClCompile>
     <ClCompile Include="src\core\config_loader.cpp">
-      <Filter>src\core</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\resize_behavior.cpp">
-      <Filter>src\core</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\resize_behavior_factory.cpp">
       <Filter>src\core</Filter>
     </ClCompile>
     <ClCompile Include="src\core\scaling_policy.cpp">
@@ -111,6 +120,15 @@
     <ClCompile Include="src\core\resources\resource_loader.cpp">
       <Filter>src\core\resources</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\ecs\systems\movement_system.cpp">
+      <Filter>src\core\ecs\systems</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ecs\systems\render_system.cpp">
+      <Filter>src\core\ecs\systems</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\lock_behavior_factory.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\config.h">
@@ -121,9 +139,6 @@
     </ClInclude>
     <ClInclude Include="include\core\time_system.h">
       <Filter>include\core</Filter>
-    </ClInclude>
-    <ClInclude Include="include\entities\player.h">
-      <Filter>include\entities</Filter>
     </ClInclude>
     <ClInclude Include="include\core\game.h">
       <Filter>include\core</Filter>
@@ -139,12 +154,6 @@
     </ClInclude>
     <ClInclude Include="include\third_party\json_silent.hpp">
       <Filter>include\third_party</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resize_behavior.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resize_behavior_factory.h">
-      <Filter>include\core</Filter>
     </ClInclude>
     <ClInclude Include="include\core\anchor_utils.h">
       <Filter>include\core</Filter>
@@ -193,6 +202,75 @@
     </ClInclude>
     <ClInclude Include="include\core\resources\resource_loader.h">
       <Filter>include\core\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\component.h">
+      <Filter>include\core\ecs</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\component_storage.h">
+      <Filter>include\core\ecs</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\entity.h">
+      <Filter>include\core\ecs</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\entity_manager.h">
+      <Filter>include\core\ecs</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\registry.h">
+      <Filter>include\core\ecs</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\system.h">
+      <Filter>include\core\ecs</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\components\sprite_component.h">
+      <Filter>include\core\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\components\transform_component.h">
+      <Filter>include\core\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\components\velocity_component.h">
+      <Filter>include\core\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\world.h">
+      <Filter>include\core\ecs</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\system_manager.h">
+      <Filter>include\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\systems\movement_system.h">
+      <Filter>include\core\ecs\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\systems\render_system.h">
+      <Filter>include\core\ecs\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\components\player_config_component.h">
+      <Filter>include\core\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\systems\player_init_system.h">
+      <Filter>include\core\ecs\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\components\lock_behavior_component.h">
+      <Filter>include\core\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\systems\lock_system.h">
+      <Filter>include\core\ecs\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\lock_behavior_factory.h">
+      <Filter>include\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\components\scaling_behavior_component.h">
+      <Filter>include\core\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\systems\scaling_system.h">
+      <Filter>include\core\ecs\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\components\movement_stats_component.h">
+      <Filter>include\core\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\components\keyboard_control_component.h">
+      <Filter>include\core\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\systems\input_system.h">
+      <Filter>include\core\ecs\systems</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
