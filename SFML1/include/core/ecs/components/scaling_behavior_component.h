@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/scaling_policy.h"
+#include "core/ui/scaling_policy.h"
 
 namespace core::ecs {
 
@@ -14,7 +14,7 @@ namespace core::ecs {
         Mode mode{ Mode::None };
 
         // Политика хранит per-entity состояние (mLastUniform), что правильно для ECS.
-        core::UniformScalingPolicy policy{};
+        core::ui::UniformScalingPolicy policy{};
     };
 
 } // namespace core::ecs

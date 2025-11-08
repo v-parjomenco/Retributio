@@ -82,42 +82,78 @@
     <Filter Include="src\core\ecs\systems">
       <UniqueIdentifier>{ee5fecaa-622f-4059-81d9-b5f2ad5e7b99}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\resources\loader">
+      <UniqueIdentifier>{33527910-44cf-419f-b164-574ad205a23d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\resources\loader">
+      <UniqueIdentifier>{5573e816-c0d4-411a-a258-ec3ca4841165}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\ecs\detail">
+      <UniqueIdentifier>{b2c23598-5e15-408d-b2e2-a19cc500e3e1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\ecs\detail">
+      <UniqueIdentifier>{ea075cd8-7422-4c75-8290-13783b2d6e98}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\resources\holders">
+      <UniqueIdentifier>{c2fce24f-e7ac-4611-9a91-6eb19938f9b6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\resources\holders">
+      <UniqueIdentifier>{5f532b5a-92af-4508-b13a-61858f1bcf8f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\resources\ids">
+      <UniqueIdentifier>{67498e49-76ff-4496-a99f-53f1678b3282}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\resources\ids">
+      <UniqueIdentifier>{e536589b-0f4c-491c-8a35-403651eb424c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\resources\paths">
+      <UniqueIdentifier>{c797904b-153c-4ae3-90ac-7245c8f3172b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\resources\paths">
+      <UniqueIdentifier>{400b6695-47c4-4b82-8675-01310e29e35a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\resources\types">
+      <UniqueIdentifier>{d4ca4076-c66c-4cc4-b3f7-1ae99773109d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\resources\types">
+      <UniqueIdentifier>{7f1718df-4b54-421b-98ea-750867b1ea19}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\third_party">
+      <UniqueIdentifier>{542da4e4-e92e-4b57-9522-03efbc1328f4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\utils">
+      <UniqueIdentifier>{8aa01b97-66eb-4970-85d6-966448855cb3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\ui">
+      <UniqueIdentifier>{c9d10611-e365-449e-99a2-842d02429568}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\utils">
+      <UniqueIdentifier>{70f8b472-f605-4f4c-8b23-6d41ddac2465}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\ui">
+      <UniqueIdentifier>{ebdd78f9-792f-4f74-acaf-f3b77c272e76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\config">
+      <UniqueIdentifier>{1c709bb0-9660-4f9e-951a-812420316ab7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\config">
+      <UniqueIdentifier>{6412e2cf-1a21-4302-9e30-5e41d93cb26e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\utils\json">
+      <UniqueIdentifier>{7abc00f6-b82a-4142-b2cf-077517d71c6d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\utils\json">
+      <UniqueIdentifier>{dda58842-ac7d-4664-be82-975b957af4e9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\time_system.cpp">
-      <Filter>src\core</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\game.cpp">
       <Filter>src\core</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\text_output.cpp">
-      <Filter>src\core</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\config_loader.cpp">
-      <Filter>src\core</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\scaling_policy.cpp">
-      <Filter>src\core</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\lock_policy.cpp">
-      <Filter>src\core</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\anchor_policy.cpp">
-      <Filter>src\core</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\json_utils.cpp">
-      <Filter>src\core</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\resources\resource_paths.cpp">
-      <Filter>src\core\resources</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\resources\resource_manager.cpp">
-      <Filter>src\core\resources</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\resources\resource_loader.cpp">
       <Filter>src\core\resources</Filter>
     </ClCompile>
     <ClCompile Include="src\core\ecs\systems\movement_system.cpp">
@@ -126,81 +162,51 @@
     <ClCompile Include="src\core\ecs\systems\render_system.cpp">
       <Filter>src\core\ecs\systems</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\lock_behavior_factory.cpp">
-      <Filter>src\core</Filter>
+    <ClCompile Include="src\core\resources\loader\resource_loader.cpp">
+      <Filter>src\core\resources\loader</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\resources\paths\resource_paths.cpp">
+      <Filter>src\core\resources\paths</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\anchor_policy.cpp">
+      <Filter>src\core\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\lock_behavior_factory.cpp">
+      <Filter>src\core\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\lock_policy.cpp">
+      <Filter>src\core\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\scaling_policy.cpp">
+      <Filter>src\core\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ecs\systems\text_output.cpp">
+      <Filter>src\core\ecs\systems</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ecs\systems\time_system.cpp">
+      <Filter>src\core\ecs\systems</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\config\config_loader.cpp">
+      <Filter>src\core\config</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\utils\json\json_utils.cpp">
+      <Filter>src\core\utils\json</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\config.h">
       <Filter>include\core</Filter>
     </ClInclude>
-    <ClInclude Include="include\utils\message.h">
-      <Filter>include\utils</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\time_system.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\game.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\text_output.h">
       <Filter>include\core</Filter>
     </ClInclude>
     <ClInclude Include="include\third_party\json.hpp">
       <Filter>include\third_party</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\config_loader.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
     <ClInclude Include="include\third_party\json_silent.hpp">
       <Filter>include\third_party</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\anchor_utils.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\scaling_policy.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\lock_policy.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\anchor_policy.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\json_utils.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\config_keys.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\json_validator.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resources\resource_holder.h">
-      <Filter>include\core\resources</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\resources\resource_manager.h">
-      <Filter>include\core\resources</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\i_resource.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resources\texture_resource.h">
-      <Filter>include\core\resources</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resources\font_resource.h">
-      <Filter>include\core\resources</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resources\soundbuffer_resource.h">
-      <Filter>include\core\resources</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resources\resourceIDs.h">
-      <Filter>include\core\resources</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resources\resource_paths.h">
-      <Filter>include\core\resources</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resources\resource_loader.h">
       <Filter>include\core\resources</Filter>
     </ClInclude>
     <ClInclude Include="include\core\ecs\component.h">
@@ -233,9 +239,6 @@
     <ClInclude Include="include\core\ecs\world.h">
       <Filter>include\core\ecs</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\ecs\system_manager.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\ecs\systems\movement_system.h">
       <Filter>include\core\ecs\systems</Filter>
     </ClInclude>
@@ -254,9 +257,6 @@
     <ClInclude Include="include\core\ecs\systems\lock_system.h">
       <Filter>include\core\ecs\systems</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\lock_behavior_factory.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\ecs\components\scaling_behavior_component.h">
       <Filter>include\core\ecs\components</Filter>
     </ClInclude>
@@ -272,16 +272,82 @@
     <ClInclude Include="include\core\ecs\systems\input_system.h">
       <Filter>include\core\ecs\systems</Filter>
     </ClInclude>
+    <ClInclude Include="include\core\resources\loader\resource_loader.h">
+      <Filter>include\core\resources\loader</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\holders\resource_holder.h">
+      <Filter>include\core\resources\holders</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\ids\resourceIDs.h">
+      <Filter>include\core\resources\ids</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\paths\resource_paths.h">
+      <Filter>include\core\resources\paths</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\types\font_resource.h">
+      <Filter>include\core\resources\types</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\types\soundbuffer_resource.h">
+      <Filter>include\core\resources\types</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\types\texture_resource.h">
+      <Filter>include\core\resources\types</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ui\anchor_policy.h">
+      <Filter>include\core\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ui\anchor_utils.h">
+      <Filter>include\core\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ui\lock_policy.h">
+      <Filter>include\core\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ui\scaling_policy.h">
+      <Filter>include\core\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ui\lock_behavior_factory.h">
+      <Filter>include\core\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\systems\text_output.h">
+      <Filter>include\core\ecs\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\systems\time_system.h">
+      <Filter>include\core\ecs\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\utils\message.h">
+      <Filter>include\core\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\system_manager.h">
+      <Filter>include\core\ecs</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config\config_keys.h">
+      <Filter>include\core\config</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config\config_loader.h">
+      <Filter>include\core\config</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\i_resource.h">
+      <Filter>include\core\resources</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\utils\json\json_utils.h">
+      <Filter>include\core\utils\json</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\utils\json\json_validator.h">
+      <Filter>include\core\utils\json</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\ids\id_to_string.h">
+      <Filter>include\core\resources\ids</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="assets\config\player.json">
       <Filter>assets\config</Filter>
     </None>
-    <None Include="include\core\resources\resource_holder.inl">
-      <Filter>include\core\resources</Filter>
-    </None>
     <None Include="data\definitions\resources.json">
       <Filter>data\definitions</Filter>
+    </None>
+    <None Include="include\core\resources\holders\resource_holder.inl">
+      <Filter>include\core\resources\holders</Filter>
     </None>
   </ItemGroup>
 </Project>

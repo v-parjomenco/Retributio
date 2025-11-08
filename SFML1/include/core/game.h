@@ -9,9 +9,9 @@
 #include "core/ecs/systems/lock_system.h"
 #include "core/ecs/systems/render_system.h"
 #include "core/ecs/systems/scaling_system.h"
+#include "core/ecs/systems/time_system.h"
+#include "core/ecs/systems/text_output.h"
 #include "core/config.h"
-#include "core/text_output.h"
-#include "core/time_system.h"
 #include "core/resources/resource_manager.h"
 #include "utils/message.h"
 
@@ -29,8 +29,8 @@ namespace core {
 	private:
 		sf::RenderWindow mWindow;
 		core::resources::ResourceManager mResources;
-		core::TimeSystem mTime;		  // система для отслеживания времени
-		core::TextOutput mTextOutput; // система для вывода текста
+		ecs::TimeSystem mTime;		  // система для отслеживания времени
+		ecs::TextOutput mTextOutput; // система для вывода текста
 		std::optional<sf::Text> mText;
 		core::ecs::World mWorld; // ECS-мир
 		core::ecs::Entity mPlayerEntity; // сущность игрока

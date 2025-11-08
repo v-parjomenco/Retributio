@@ -1,0 +1,33 @@
+#pragma once
+
+#include "core/resources/ids/resourceIDs.h"
+
+namespace core::resources::ids {
+    // Универсальная функция — по умолчанию возвращает "Неизвестный ID"
+    template <typename Identifier>
+    inline std::string idToString(const Identifier&) noexcept {
+        return u8"Неизвестный ID";
+    }
+
+    // Специализации для ожидаемых типов ID (enum'ы)
+    template <>
+    inline std::string idToString<TextureID>(const TextureID& id) noexcept {
+        return std::string(toString(id));
+    }
+
+    template <>
+    inline std::string idToString<FontID>(const FontID& id) noexcept {
+        return std::string(toString(id));
+    }
+
+    template <>
+    inline std::string idToString<SoundID>(const SoundID& id) noexcept {
+        return std::string(toString(id));
+    }
+
+    // Специализация для std::string (динамические пути/ключи)
+    template <>
+    inline std::string idToString<std::string>(const std::string& id) noexcept {
+        return id;
+    }
+} // namespace core::resources::ids

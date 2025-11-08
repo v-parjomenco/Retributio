@@ -9,11 +9,11 @@ int main() {
         game.run();
     }
     catch (const std::exception& e) {
-        utils::message::showError(e.what());
-        utils::message::holdOnExit(); // если включён флаг в config.h, окно появится
+        core::utils::message::showError(e.what());
+        core::utils::message::holdOnExit(); // если включён флаг в config.h, окно появится
         return EXIT_FAILURE;
     }
 
-    utils::message::holdOnExit(); // задержка на выходе (если DEBUG_HOLD_ON_EXIT == true)
+    core::utils::message::holdOnExit(); // препятствует быстрому закрытию окна при выходе (если DEBUG_HOLD_ON_EXIT == true)
 	return EXIT_SUCCESS;
 }

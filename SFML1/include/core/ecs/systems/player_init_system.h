@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/anchor_policy.h"
-#include "core/anchor_utils.h"
+#include "core/ui/anchor_policy.h"
+#include "core/ui/anchor_utils.h"
 #include "core/config.h"
 #include "core/ecs/components/keyboard_control_component.h"
 #include "core/ecs/components/lock_behavior_component.h"
@@ -12,7 +12,7 @@
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/components/velocity_component.h"
 #include "core/ecs/system.h"
-#include "core/lock_behavior_factory.h"
+#include "core/ui/lock_behavior_factory.h"
 #include "core/resources/resource_manager.h"
 
 namespace core::ecs {
@@ -51,9 +51,9 @@ namespace core::ecs {
                     { static_cast<float>(config::WINDOW_WIDTH),
                       static_cast<float>(config::WINDOW_HEIGHT) }));
 
-                core::AnchorType anchor = core::anchors::fromString(cfg.anchor);
-                if (anchor != core::AnchorType::None)
-                    core::AnchorPolicy(anchor).apply(spriteComp.sprite, defaultView);
+                core::ui::AnchorType anchor = core::ui::anchors::fromString(cfg.anchor);
+                if (anchor != core::ui::AnchorType::None)
+                    core::ui::AnchorPolicy(anchor).apply(spriteComp.sprite, defaultView);
                 else
                     spriteComp.sprite.setPosition(cfg.startPosition);
 
@@ -67,9 +67,9 @@ namespace core::ecs {
                     scalingComp.mode = ScalingBehaviorComponent::Mode::None;
 
                 // Компонент фиксации
-                std::unique_ptr<ILockPolicy> lock_behavior;
+                std::unique_ptr<ui::ILockPolicy> lock_behavior;
                 if (!cfg.lockBehavior.empty() && cfg.lockBehavior != "None") {
-                    lock_behavior = core::LockBehaviorFactory::create(cfg.lockBehavior);
+                    lock_behavior = core::ui::LockBehaviorFactory::create(cfg.lockBehavior);
                 }
 
                 // Добавляем компоненты

@@ -1,4 +1,4 @@
-#include "core/resources/resource_loader.h"
+#include "core/resources/loader/resource_loader.h"
 #include "core/resources/resource_manager.h"
 
 namespace core::resources {
@@ -12,9 +12,9 @@ namespace core::resources {
     // Безопасно. В случае ошибки, компилятор скажет TextureID::Playre не существует.
 
         // Для базовых ресуросв движка
-    const TextureResource& ResourceManager::getTexture(TextureID id, bool smooth) {
+    const types::TextureResource& ResourceManager::getTexture(ids::TextureID id, bool smooth) {
         if (!mTextures.contains(id)) {
-            const std::string path = ResourcePaths::get(id); // путь берём из JSON
+            const std::string path = paths::ResourcePaths::get(id); // путь берём из JSON
             mTextures.load(id, path);
             mTextures.get(id).setSmooth(smooth);
         }
@@ -30,7 +30,7 @@ namespace core::resources {
     // т.к. в текущей реализации JSON не содержит «вложенных» структур.
 
     // Для кастомных JSON, с ключами - строками
-    const TextureResource& ResourceManager::getTexture(const std::string& id, bool smooth) {
+    const types::TextureResource& ResourceManager::getTexture(const std::string& id, bool smooth) {
         if (!mDynamicTextures.contains(id)) {
             const std::string path = id; // id здесь уже строка пути
             mDynamicTextures.load(id, path);
@@ -48,11 +48,11 @@ namespace core::resources {
     // в кэше всё равно хранится в mDynamicTextures, поэтому второй раз не загрузится.
 
     // Для данных, загружаемых из внешних конфигов (runtime).
-    const TextureResource& ResourceManager::getTextureByPath(const std::string& path, bool smooth) {
+    const types::TextureResource& ResourceManager::getTextureByPath(const std::string& path, bool smooth) {
         // Если ресурс с таким путём уже загружен (в динамическом контейнере) — вернём его
         if (!mDynamicTextures.contains(path)) {
             // Используем ResourceLoader, чтобы изолировать низкоуровневую загрузку
-            auto texPtr = ResourceLoader::loadTexture(path, smooth);
+            auto texPtr = loader::ResourceLoader::loadTexture(path, smooth);
             if (!texPtr) {
                 throw std::runtime_error(std::string("[ResourceManager::getTextureByPath]\nНе удалось загрузить текстуру: ") + path);
             }
@@ -67,15 +67,15 @@ namespace core::resources {
     // Шрифты
 
     // Статический ID, из enum class в resourceIDs
-    const FontResource& ResourceManager::getFont(FontID id) {
+    const types::FontResource& ResourceManager::getFont(ids::FontID id) {
         if (!mFonts.contains(id)) {
-            const std::string path = ResourcePaths::get(id); // путь берём из JSON
+            const std::string path = paths::ResourcePaths::get(id); // путь берём из JSON
             mFonts.load(id, path);
         }
         return mFonts.get(id);
     }
     // Динамический ID, из JSON
-    const FontResource& ResourceManager::getFont(const std::string& id) {
+    const types::FontResource& ResourceManager::getFont(const std::string& id) {
         if (!mDynamicFonts.contains(id)) {
             mDynamicFonts.load(id, id); // id = путь к файлу
         }
@@ -85,15 +85,15 @@ namespace core::resources {
     // Звуки
 
     // Статический ID, из enum class в resourceIDs
-    const SoundBufferResource& ResourceManager::getSound(SoundID id) {
+    const types::SoundBufferResource& ResourceManager::getSound(ids::SoundID id) {
         if (!mSounds.contains(id)) {
-            const std::string path = ResourcePaths::get(id);
+            const std::string path = paths::ResourcePaths::get(id);
             mSounds.load(id, path);
         }
         return mSounds.get(id);
     }
     // Динамический ID, из JSON
-    const SoundBufferResource& ResourceManager::getSound(const std::string& id) {
+    const types::SoundBufferResource& ResourceManager::getSound(const std::string& id) {
         if (!mDynamicSounds.contains(id)) {
             mDynamicSounds.load(id, id); // id = путь к файлу
         }

@@ -144,27 +144,25 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="src\core\anchor_policy.cpp" />
-    <ClCompile Include="src\core\config_loader.cpp" />
+    <ClCompile Include="src\core\config\config_loader.cpp" />
     <ClCompile Include="src\core\ecs\systems\movement_system.cpp" />
     <ClCompile Include="src\core\ecs\systems\render_system.cpp" />
+    <ClCompile Include="src\core\ecs\systems\text_output.cpp" />
+    <ClCompile Include="src\core\ecs\systems\time_system.cpp" />
     <ClCompile Include="src\core\game.cpp" />
-    <ClCompile Include="src\core\json_utils.cpp" />
-    <ClCompile Include="src\core\lock_behavior_factory.cpp" />
-    <ClCompile Include="src\core\lock_policy.cpp" />
-    <ClCompile Include="src\core\resources\resource_loader.cpp" />
+    <ClCompile Include="src\core\resources\loader\resource_loader.cpp" />
+    <ClCompile Include="src\core\resources\paths\resource_paths.cpp" />
     <ClCompile Include="src\core\resources\resource_manager.cpp" />
-    <ClCompile Include="src\core\resources\resource_paths.cpp" />
-    <ClCompile Include="src\core\scaling_policy.cpp" />
-    <ClCompile Include="src\core\text_output.cpp" />
-    <ClCompile Include="src\core\time_system.cpp" />
+    <ClCompile Include="src\core\utils\json\json_utils.cpp" />
+    <ClCompile Include="src\ui\anchor_policy.cpp" />
+    <ClCompile Include="src\ui\lock_behavior_factory.cpp" />
+    <ClCompile Include="src\ui\lock_policy.cpp" />
+    <ClCompile Include="src\ui\scaling_policy.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\core\anchor_policy.h" />
-    <ClInclude Include="include\core\anchor_utils.h" />
     <ClInclude Include="include\core\config.h" />
-    <ClInclude Include="include\core\config_keys.h" />
-    <ClInclude Include="include\core\config_loader.h" />
+    <ClInclude Include="include\core\config\config_keys.h" />
+    <ClInclude Include="include\core\config\config_loader.h" />
     <ClInclude Include="include\core\ecs\component.h" />
     <ClInclude Include="include\core\ecs\components\keyboard_control_component.h" />
     <ClInclude Include="include\core\ecs\components\lock_behavior_component.h" />
@@ -185,33 +183,36 @@
     <ClInclude Include="include\core\ecs\systems\player_init_system.h" />
     <ClInclude Include="include\core\ecs\systems\render_system.h" />
     <ClInclude Include="include\core\ecs\systems\scaling_system.h" />
+    <ClInclude Include="include\core\ecs\systems\text_output.h" />
+    <ClInclude Include="include\core\ecs\systems\time_system.h" />
     <ClInclude Include="include\core\ecs\system_manager.h" />
     <ClInclude Include="include\core\ecs\world.h" />
     <ClInclude Include="include\core\game.h" />
-    <ClInclude Include="include\core\i_resource.h" />
-    <ClInclude Include="include\core\json_utils.h" />
-    <ClInclude Include="include\core\json_validator.h" />
-    <ClInclude Include="include\core\lock_behavior_factory.h" />
-    <ClInclude Include="include\core\lock_policy.h" />
-    <ClInclude Include="include\core\resources\font_resource.h" />
-    <ClInclude Include="include\core\resources\resourceIDs.h" />
-    <ClInclude Include="include\core\resources\resource_holder.h" />
-    <ClInclude Include="include\core\resources\resource_loader.h" />
+    <ClInclude Include="include\core\resources\holders\resource_holder.h" />
+    <ClInclude Include="include\core\resources\ids\id_to_string.h" />
+    <ClInclude Include="include\core\resources\ids\resourceIDs.h" />
+    <ClInclude Include="include\core\resources\i_resource.h" />
+    <ClInclude Include="include\core\resources\loader\resource_loader.h" />
+    <ClInclude Include="include\core\resources\paths\resource_paths.h" />
     <ClInclude Include="include\core\resources\resource_manager.h" />
-    <ClInclude Include="include\core\resources\resource_paths.h" />
-    <ClInclude Include="include\core\resources\soundbuffer_resource.h" />
-    <ClInclude Include="include\core\resources\texture_resource.h" />
-    <ClInclude Include="include\core\scaling_policy.h" />
-    <ClInclude Include="include\core\text_output.h" />
-    <ClInclude Include="include\core\time_system.h" />
+    <ClInclude Include="include\core\resources\types\font_resource.h" />
+    <ClInclude Include="include\core\resources\types\soundbuffer_resource.h" />
+    <ClInclude Include="include\core\resources\types\texture_resource.h" />
+    <ClInclude Include="include\core\ui\anchor_policy.h" />
+    <ClInclude Include="include\core\ui\anchor_utils.h" />
+    <ClInclude Include="include\core\ui\lock_behavior_factory.h" />
+    <ClInclude Include="include\core\ui\lock_policy.h" />
+    <ClInclude Include="include\core\ui\scaling_policy.h" />
+    <ClInclude Include="include\core\utils\json\json_utils.h" />
+    <ClInclude Include="include\core\utils\json\json_validator.h" />
+    <ClInclude Include="include\core\utils\message.h" />
     <ClInclude Include="include\third_party\json.hpp" />
     <ClInclude Include="include\third_party\json_silent.hpp" />
-    <ClInclude Include="include\utils\message.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="assets\config\player.json" />
     <None Include="data\definitions\resources.json" />
-    <None Include="include\core\resources\resource_holder.inl" />
+    <None Include="include\core\resources\holders\resource_holder.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

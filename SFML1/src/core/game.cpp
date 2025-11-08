@@ -1,7 +1,7 @@
 #include <cassert>
 #include "core/game.h"
-#include "core/config_loader.h"
-#include "core/resources/resource_paths.h"
+#include "core/config/config_loader.h"
+#include "core/resources/paths/resource_paths.h"
 
 namespace core {
 
@@ -9,7 +9,7 @@ namespace core {
 		mWindow(sf::VideoMode({ config::WINDOW_WIDTH, config::WINDOW_HEIGHT }), config::WINDOW_TITLE) {
 
 		// Загружаем ресурсы JSON
-		core::resources::ResourcePaths::loadFromJSON("data/definitions/resources.json");
+		core::resources::paths::ResourcePaths::loadFromJSON("data/definitions/resources.json");
 
 		// Применяем настройки рендеринга из config.h
 		if constexpr (config::ENABLE_VSYNC) {
@@ -21,7 +21,7 @@ namespace core {
 		}
 
 		// Инициализация шрифта по умолчанию для отображения FPS
-		mTextOutput.init(mResources.getFont(resources::FontID::Default).get(), mText);
+		mTextOutput.init(mResources.getFont(resources::ids::FontID::Default).get(), mText);
 
 		initWorld(); // создаём ECS-мир и сущности
 	}
@@ -29,7 +29,7 @@ namespace core {
 	void Game::initWorld() {
 		try {
 			// Создаём конфигурацию игрока (из player.json)
-			core::PlayerConfig playerCfg = core::ConfigLoader::loadPlayerConfig("assets/config/player.json");
+			config::PlayerConfig playerCfg = config::ConfigLoader::loadPlayerConfig("assets/config/player.json");
 
 			// Получаем текстуру по пути
 			const sf::Texture& playerTexture =
