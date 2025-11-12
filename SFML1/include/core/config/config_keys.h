@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace config::keys {
+namespace core::config::keys {
 
     // Общие ключи, встречающиеся во многих JSON
     namespace Common {

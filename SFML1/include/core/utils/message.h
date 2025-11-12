@@ -102,7 +102,7 @@ namespace core::utils {
 
 #ifdef _DEBUG
     #define DEBUG_MSG(msg) \
-        utils::message::logDebug( \
+        ::core::utils::message::logDebug( \
             std::string("[") + __FILE__ + ":" + std::to_string(__LINE__) + "] " + msg \
         )
 #else
@@ -110,7 +110,7 @@ namespace core::utils {
 #endif
 
         inline void holdOnExit() {
-            if constexpr (config::DEBUG_HOLD_ON_EXIT) {
+            if constexpr (::config::DEBUG_HOLD_ON_EXIT) {
 #ifdef _WIN32
                 showMessageBox("Нажмите OK, чтобы выйти.", "Завершение", MB_OK);
 #else

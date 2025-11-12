@@ -14,6 +14,6 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    core::utils::message::holdOnExit(); // препятствует быстрому закрытию окна при выходе (если DEBUG_HOLD_ON_EXIT == true)
+    core::utils::message::holdOnExit();     // препятствует быстрому закрытию окна при выходе (если DEBUG_HOLD_ON_EXIT == true)
 	return EXIT_SUCCESS;
 }

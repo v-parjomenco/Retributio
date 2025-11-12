@@ -1,3 +1,9 @@
+// =====================================================
+// File: core/ecs/system_manager.h
+// Purpose: Owns and sequences systems (update/render)
+// Used by: World
+// Related headers: system.h
+// =====================================================
 #pragma once
 
 #include <memory>

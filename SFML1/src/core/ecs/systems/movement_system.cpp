@@ -1,3 +1,9 @@
+// =====================================================
+// File: src/core/ecs/systems/movement_system.cpp
+// Purpose: position += velocity * dt (perf-aware iteration)
+// Used by: MovementSystem
+// Related headers: movement_system.h
+// =====================================================
 #include "core/ecs/systems/movement_system.h"
 
 namespace core::ecs {
@@ -9,12 +15,21 @@ namespace core::ecs {
         auto& transforms = world.storage<TransformComponent>();
         auto& velocities = world.storage<VelocityComponent>();
 
-        // Итерируемся по ВСЕМ трансформам,
-        // хранящимся в ComponentStorage<TransformComponent> (внутри это unordered_map<Entity, TransformComponent>)
-        // (можно оптимизировать: итерироваться по меньшему из двух storage)
-        for (auto& [entity, transform] : transforms) {
-            if (auto* vel = velocities.get(entity)) { // есть ли скорость у этой же сущности? 
-                transform.position += vel->linear * dt;
+        const bool iterateTransforms = (transforms.size() <= velocities.size());
+
+        // Выбираем меньшее хранилище для итерации, чтобы снизить число map - lookup
+        if (iterateTransforms) { // NEW CODE
+            for (auto& [entity, transform] : transforms) {
+                if (auto* vel = velocities.get(entity)) {
+                    transform.position += vel->linear * dt; // простое интегрирование методом Эйлера
+                }
+            }
+        }
+        else { // NEW CODE
+            for (auto& [entity, velocity] : velocities) {
+                if (auto* tr = transforms.get(entity)) {
+                    tr->position += velocity.linear * dt;
+                }
             }
         }
     }

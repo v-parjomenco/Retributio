@@ -1,3 +1,9 @@
+// =====================================================
+// File: core/ecs/components/velocity_component.h
+// Purpose: Stores current linear & angular velocity of entity
+// Used by: MovementSystem
+// Related headers: transform_component.h
+// =====================================================
 #pragma once
 
 #include <SFML/System/Vector2.hpp>

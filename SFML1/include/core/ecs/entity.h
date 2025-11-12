@@ -1,3 +1,9 @@
+// =====================================================
+// File: core/ecs/entity.h
+// Purpose: Lightweight entity identifier wrapper (uint32_t)
+// Used by: ComponentStorage<T>, EntityManager, World
+// Related headers: entity_manager.h
+// =====================================================
 #pragma once
 
 #include <cstdint>

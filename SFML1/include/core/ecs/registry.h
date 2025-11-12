@@ -1,3 +1,9 @@
+// =====================================================
+// File: core/ecs/registry.h
+// Purpose: Thin wrapper over EntityManager (will host storages later)
+// Used by: World
+// Related headers: entity_manager.h, world.h
+// =====================================================
 #pragma once
 
 #include <typeindex>
@@ -24,7 +30,7 @@ namespace core::ecs {
         ~Registry() = default;
 
         // Создаём сущность — просто делегируем менеджеру
-        Entity createEntity() {
+        [[nodiscard]] Entity createEntity() {
             return mEntities.create();
         }
 
@@ -35,12 +41,12 @@ namespace core::ecs {
         }
 
         // Проверяем, жива ли сущность
-        bool isAlive(Entity e) const noexcept {
+        [[nodiscard]] bool isAlive(Entity e) const noexcept {
             return mEntities.isAlive(e);
         }
 
         // Доступ к живым сущностям — для систем
-        const std::vector<Entity>& viewAll() const noexcept {
+        [[nodiscard]] const std::vector<Entity>& viewAll() const noexcept {
             return mEntities.dense();
         }
 

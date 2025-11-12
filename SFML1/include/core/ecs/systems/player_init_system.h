@@ -48,8 +48,8 @@ namespace core::ecs {
 
                 // Позиция и якорь
                 sf::View defaultView(sf::FloatRect({ 0.f, 0.f },
-                    { static_cast<float>(config::WINDOW_WIDTH),
-                      static_cast<float>(config::WINDOW_HEIGHT) }));
+                    { static_cast<float>(::config::WINDOW_WIDTH),
+                      static_cast<float>(::config::WINDOW_HEIGHT) }));
 
                 core::ui::AnchorType anchor = core::ui::anchors::fromString(cfg.anchor);
                 if (anchor != core::ui::AnchorType::None)

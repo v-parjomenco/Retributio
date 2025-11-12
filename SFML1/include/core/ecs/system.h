@@ -1,3 +1,9 @@
+// =====================================================
+// File: core/ecs/system.h
+// Purpose: Base interface for systems (update/render)
+// Used by: SystemManager, concrete systems
+// Related headers: system_manager.h, world.h
+// =====================================================
 #pragma once
 
 #include <SFML/Graphics.hpp>

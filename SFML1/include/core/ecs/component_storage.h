@@ -1,24 +1,16 @@
-// TODO: позже заменить на SparseSet для оптимизации под массовые сущности
-/*
-Прежде чем прыгать в SparseSet-хранилище, нужно:
-
-Подключить систему (SystemManager)
-— чтобы у нас появились "логические процессы", которые работают с компонентами (например, MovementSystem, RenderSystem).
-
-Создать World (или ECSWorld)
-— он будет координировать всё:
-entities, components, systems.
-
-Добавить обновление (update loop)
-— чтобы каждый кадр ECS мир вызывал все активные системы и они работали с компонентами.
-
-И только после этого, когда всё функционально работает,
-мы заменим unordered_map на SparseSet, не меняя интерфейса.
-*/
+// =====================================================
+// File: core/ecs/component_storage.h
+// Purpose: Per-type component storage (unordered_map<Entity,T> placeholder)
+// Used by: World
+// Related headers: entity.h, world.h
+// Notes: Will be swapped to SparseSet later without API changes.
+// =====================================================
 
 #pragma once
 
 #include <unordered_map>
+#include <utility>
+#include <type_traits>
 
 #include "core/ecs/entity.h"
 
@@ -34,42 +26,45 @@ namespace core::ecs {
     };
 
     // Шаблонное хранилище компонентов ОДНОГО типа (н-р: ComponentStorage<TransformComponent>)
-    // Не требует конструктора по умолчанию у T(важно для sf::Sprite / SpriteComponent)
-
+    // Не требует конструктора по умолчанию у T (важно для sf::Sprite / SpriteComponent)
     template <typename T>
     class ComponentStorage final : public IComponentStorage {
     public:
-        // Добавить или заменить компонент
+        // Добавить или заменить компонент по константной ссылке
         void set(Entity e, const T& value) {
             mData.insert_or_assign(e, value);
         }
 
+        // Добавить или заменить компонент по rvalue
         void set(Entity e, T&& value) {
             mData.insert_or_assign(e, std::move(value));
         }
 
-        // Вернуть указатель на компонент, если он есть, иначе вернуть nullptr
-        T* get(Entity e) {
+        // Вернуть указатель на компонент, если он есть, иначе nullptr
+        [[nodiscard]] T* get(Entity e) {
             auto it = mData.find(e);
             return (it == mData.end()) ? nullptr : &it->second;
         }
 
-        // Вернуть константный указатель на компонент, если он есть, иначе вернуть nullptr
-        const T* get(Entity e) const {
+        // Вернуть константный указатель на компонент, если он есть, иначе nullptr
+        [[nodiscard]] const T* get(Entity e) const {
             auto it = mData.find(e);
             return (it == mData.end()) ? nullptr : &it->second;
         }
 
         // Удалить компонент у сущности
-        void remove(Entity e) {
+        void remove(Entity e) noexcept {
             mData.erase(e);
         }
 
         // Можно итерироваться по всем компонентам этого типа
         auto begin() { return mData.begin(); }
-        auto end()   { return mData.end(); }
+        auto end() { return mData.end(); }
         auto begin() const { return mData.begin(); }
         auto end()   const { return mData.end(); }
+
+        // Даёт возможность системам выбирать меньший из сториджей для итерации (см. MovementSystem)
+        [[nodiscard]] std::size_t size() const noexcept { return mData.size(); }
 
     private:
         std::unordered_map<Entity, T> mData;

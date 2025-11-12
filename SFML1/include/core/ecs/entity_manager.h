@@ -1,3 +1,9 @@
+// =====================================================
+// File: core/ecs/entity_manager.h
+// Purpose: Dense+Sparse entity set with free list
+// Used by: Registry
+// Related headers: entity.h, registry.h
+// =====================================================
 #pragma once
 
 #include <algorithm>
@@ -24,7 +30,7 @@ namespace core::ecs {
          * @brief Создать новую сущность.
          * @return core::ecs::Entity — всегда валидный (id != 0)
          */
-        Entity create() {
+        [[nodiscard]] Entity create() {
             EntityId id;
 
             // Eсли есть свободные id в списке свободных id mFreeList — берём оттуда
@@ -53,7 +59,7 @@ namespace core::ecs {
          * @brief Удалить сущность.
          * Безопасно вызывать даже если уже удалена — метод просто вернёт.
          */
-        void destroy(Entity e) {
+        void destroy(Entity e) noexcept {
             const EntityId id = e.id;
             if (!isAlive(e)) {
                 return; // уже нет
@@ -83,7 +89,7 @@ namespace core::ecs {
          * @brief Проверка, жива ли сущность.
          * Работает за O(1).
          */
-        bool isAlive(Entity e) const noexcept {
+        [[nodiscard]] bool isAlive(Entity e) const noexcept {
             const EntityId id = e.id;
             // Сразу отсекаем неверные или нулевые id
             if (id == kInvalidId || id >= mSparse.size()) {
@@ -104,16 +110,12 @@ namespace core::ecs {
          * @brief Доступ к плотному вектору сущностей — для Registry / Systems.
          * Здесь они идут без дырок.
          */
-        const std::vector<Entity>& dense() const noexcept {
-            return mDense;
-        }
+        [[nodiscard]] const std::vector<Entity>& dense() const noexcept { return mDense; }
 
         /**
          * @brief Текущее количество живых сущностей.
          */
-        std::size_t aliveCount() const noexcept {
-            return mDense.size();
-        }
+        [[nodiscard]] std::size_t aliveCount() const noexcept { return mDense.size(); }
 
         /**
          * @brief Полная очистка всех сущностей, т.е. "жёсткий сброс мира".

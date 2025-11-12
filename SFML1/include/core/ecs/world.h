@@ -1,3 +1,9 @@
+// =====================================================
+// File: core/ecs/world.h
+// Purpose: ECS coordinator: entities, storages, systems
+// Used by: Game
+// Related headers: registry.h, system_manager.h, component_storage.h
+// =====================================================
 #pragma once
 
 #include <memory>
@@ -34,7 +40,7 @@ namespace core::ecs {
         World& operator=(World&&) noexcept = default;
 
         // --------------------------- Сущности -----------------------------
-        Entity createEntity() {
+        [[nodiscard]] Entity createEntity() {
             return mRegistry.createEntity();
         }
 
@@ -44,7 +50,7 @@ namespace core::ecs {
             // Позже: пройтись по всем storages и сделать remove(e)
         }
 
-        bool isAlive(Entity e) const noexcept {
+        [[nodiscard]] bool isAlive(Entity e) const noexcept {
             return mRegistry.isAlive(e);
         }
 
@@ -105,16 +111,16 @@ namespace core::ecs {
             return *s.get(e);
         }
 
-        // Получить компонент, если он есть
+        // Получить указатель на компонент, если компонент есть
         template <typename T>
-        T* getComponent(Entity e) {
+        [[nodiscard]] T* getComponent(Entity e) {
             auto& s = storage<T>();
             return s.get(e);
         }
 
-        // Возвращает указатель на компонент (или nullptr, если компонента нет)
+        // Получить константный указатель на компонент (или nullptr, если компонента нет)
         template <typename T>
-        const T* getComponent(Entity e) const {
+        [[nodiscard]] const T* getComponent(Entity e) const {
             auto& s = const_cast<World*>(this)->storage<T>();
             return s.get(e);
         }

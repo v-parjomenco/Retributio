@@ -10,9 +10,9 @@
 
 using namespace::core::utils::json;
 using namespace::core::utils::message;
-using namespace config::keys;
+using namespace core::config::keys;
 
-namespace config {
+namespace core::config {
 
         // Загружает JSON-конфигурацию игрока из файла
     PlayerConfig ConfigLoader::loadPlayerConfig(const std::string& path) {

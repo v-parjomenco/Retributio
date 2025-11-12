@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "position": [10, 10],
+  "characterSize": 35,
+  "color": {
+    "r": 255,
+    "g": 0,
+    "b": 0,
+    "a": 255
+  }
+}

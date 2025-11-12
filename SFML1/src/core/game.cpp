@@ -1,56 +1,74 @@
 #include <cassert>
+#include <optional>
 #include "core/game.h"
 #include "core/config/config_loader.h"
+#include "core/config/debug_overlay_config.h"
 #include "core/resources/paths/resource_paths.h"
+
+namespace cfg = ::config;        // глобальные дефолты движка (окно, vsync, fixed step, hotkeys...)
+namespace gcfg = ::core::config; // игровые JSON-конфиги/лоадеры (PlayerConfig, DebugOverlayConfig...)
 
 namespace core {
 
 	Game::Game() :
-		mWindow(sf::VideoMode({ config::WINDOW_WIDTH, config::WINDOW_HEIGHT }), config::WINDOW_TITLE) {
+		mWindow(sf::VideoMode({ cfg::WINDOW_WIDTH, cfg::WINDOW_HEIGHT }), cfg::WINDOW_TITLE) {
 
-		// Загружаем ресурсы JSON
+		// Загружаем ресурсы/пути из JSON
 		core::resources::paths::ResourcePaths::loadFromJSON("data/definitions/resources.json");
 
 		// Применяем настройки рендеринга из config.h
-		if constexpr (config::ENABLE_VSYNC) {
+		if constexpr (cfg::ENABLE_VSYNC) {
 			mWindow.setVerticalSyncEnabled(true); // включаем вертикальную синхронизацию
 			DEBUG_MSG("[Config] VSync enabled (FRAME_LIMIT ignored)");
 		}
-		else if constexpr (config::FRAME_LIMIT > 0) {
-			mWindow.setFramerateLimit(config::FRAME_LIMIT); // ограничение FPS
+		else if constexpr (cfg::FRAME_LIMIT > 0) {
+			mWindow.setFramerateLimit(cfg::FRAME_LIMIT); // ограничение FPS
 		}
-
-		// Инициализация шрифта по умолчанию для отображения FPS
-		mTextOutput.init(mResources.getFont(resources::ids::FontID::Default).get(), mText);
 
 		initWorld(); // создаём ECS-мир и сущности
 	}
 
 	void Game::initWorld() {
 		try {
-			// Создаём конфигурацию игрока (из player.json)
-			config::PlayerConfig playerCfg = config::ConfigLoader::loadPlayerConfig("assets/config/player.json");
-
-			// Получаем текстуру по пути
-			const sf::Texture& playerTexture =
-				mResources.getTextureByPath(playerCfg.texturePath, true).get(); // smooth = true
+			// Создаём конфигурацию игрока (data-driven)
+			gcfg::PlayerConfig playerCfg = gcfg::ConfigLoader::loadPlayerConfig("assets/config/player.json");
 
 			// Создаём сущность игрока
 			mPlayerEntity = mWorld.createEntity();
 
-			// Добавляем компонент с конфигурацией игрока (из player.json) в ECS-мир
+			// Добавляем компонент с конфигурацией игрока из JSON (playerCfg) в ECS-мир
 			// PlayerInitSystem при первом апдейте создаст остальные компоненты (Sprite, Transform и т.д.)
-			mWorld.addComponent(mPlayerEntity, core::ecs::PlayerConfigComponent{ playerCfg });
+			mWorld.addComponent(mPlayerEntity, ecs::PlayerConfigComponent{ playerCfg });
 
 			// Подключаем ECS-системы
 
-			mWorld.addSystem<core::ecs::PlayerInitSystem>(mResources);
-			mWorld.addSystem<core::ecs::MovementSystem>();
-			mWorld.addSystem<core::ecs::RenderSystem>();
+			mWorld.addSystem<ecs::PlayerInitSystem>(mResources);
+			mWorld.addSystem<ecs::MovementSystem>();
+			mWorld.addSystem<ecs::RenderSystem>();
 			// Эти системы требуют прямого доступа (onResize, onKeyEvent), поэтому сохраняем указатели
-			mScalingSystem = &mWorld.addSystem<core::ecs::ScalingSystem>();
-			mLockSystem = &mWorld.addSystem<core::ecs::LockSystem>();
-			mInputSystem = &mWorld.addSystem<core::ecs::InputSystem>();
+			mScalingSystem  = &mWorld.addSystem<ecs::ScalingSystem>();
+			mLockSystem		= &mWorld.addSystem<ecs::LockSystem>();
+			mInputSystem    = &mWorld.addSystem<ecs::InputSystem>();
+			mDebugOverlay   = &mWorld.addSystem<ecs::DebugOverlaySystem>();
+			// Привязываем overlay к сервису времени и шрифту (через ResourceManager)
+			if (mDebugOverlay) {
+				const sf::Font& font = mResources.getFont(resources::ids::FontID::Default).get();
+				mDebugOverlay->bind(mTime, font);
+				 
+				// Грузим конфиг для DebugOverlay
+				const auto overlayCfg = gcfg::loadDebugOverlayConfig("assets/config/debug_overlay.json");
+
+				// Применяем стиль
+				ecs::DebugOverlaySystem::Style st;
+				st.position = overlayCfg.position;
+				st.characterSize = overlayCfg.characterSize;
+				st.color = overlayCfg.color;
+				mDebugOverlay->applyStyle(st);
+
+				// enabled = config.json ∧ дефолт из config.h (Debug=true, Release=false)
+				mDebugOverlay->setEnabled(overlayCfg.enabled && cfg::SHOW_FPS_OVERLAY);
+
+			}
 		}
 		catch (const std::exception& e) {
 			// Кросс-платформенная обработка ошибок
@@ -60,24 +78,23 @@ namespace core {
 #else
 			std::cerr << "Ошибка при инициализации ECS: " << e.what() << std::endl;
 #endif
-			// fallback: создаём безопасный пустой мир
-			mWorld = std::move(core::ecs::World());
+			mWorld = std::move(ecs::World()); // fallback: создаём безопасный пустой мир
 		}
 	}
 
 	void Game::run() {
 		assert(mWindow.isOpen()); // проверка, что окно открылось
 		while (mWindow.isOpen()) {
-			processEvents(); // для базовой логики и стабильных кадров
-			mTime.update(); // обновили таймер и FPS
+			processEvents();      // для базовой логики и стабильных кадров
+			mTime.tick(); 		  // обновляем время ровно 1 раз на кадр
 
 			// Если накопилось достаточно времени — выполняем апдейт
-			while (mTime.shouldUpdate(config::FIXED_TIME_STEP)) {
-				processEvents(); // обрабатываем события повторно, если фрэймрейт упал)
-								 // это необязательно, но может помочь с отзывчивостью программы при подвисании
-								 // окно всё равно будет реагировать на клавиши и не зависнет “в воздухе”.
+			while (mTime.shouldUpdate(cfg::FIXED_TIME_STEP)) {
+				processEvents();  // обрабатываем события повторно, если фрэймрейт упал)
+								  // это необязательно, но может помочь с отзывчивостью программы при подвисании
+								  // окно всё равно будет реагировать на клавиши и не зависнет “в воздухе”.
 
-				update(config::FIXED_TIME_STEP);
+				update(cfg::FIXED_TIME_STEP);
 			}
 			render(); // рендерим столько раз, сколько позволяет GPU
 		}
@@ -87,14 +104,17 @@ namespace core {
 
 		while (const std::optional<sf::Event> event = mWindow.pollEvent()) {
 
-			// обработка закрытия окна
+			// Обработка закрытия окна
 			if (event->is<sf::Event::Closed>()) {
 				mWindow.close();
 			}
 
-            // обработка нажатия и отпускания клавиш
+            // Обработка нажатия и отпускания клавиш
 			else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
-				if (mInputSystem) { mInputSystem->onKeyEvent(keyPressed->code, true); 
+				if (mInputSystem) { mInputSystem->onKeyEvent(keyPressed->code, true);
+				}
+				if (mDebugOverlay && keyPressed->code == cfg::HOTKEY_TOGGLE_OVERLAY) {
+					mDebugOverlay->setEnabled(!mDebugOverlay->isEnabled());
 				}
 			}
 			else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) {
@@ -103,7 +123,7 @@ namespace core {
 				}
 			}
 
-            // обработка изменения размера окна
+            // Обработка изменения размера окна
 				else if (const auto* resized = event->getIf<sf::Event::Resized>()) {
 					sf::Vector2f newSize(static_cast<float>(resized->size.x), static_cast<float>(resized->size.y));
 					sf::View newView({ newSize.x / 2.f, newSize.y / 2.f }, { newSize.x, newSize.y });
@@ -118,15 +138,12 @@ namespace core {
 	void Game::update(const sf::Time& dt) {
 
 		assert(dt.asSeconds() > 0); // время обновления должно быть положительным		
-		mTextOutput.updateFpsText(mText, mTime.getSmoothedFps());// выводим сглаженный FPS
-
 		mWorld.update(dt.asSeconds()); // обновляем все ECS-системы
 	}
 
 	void Game::render() {
 		mWindow.clear();
 		mWorld.render(mWindow); // отрисовываем ECS-мир
-		mTextOutput.draw(mWindow, mText);
 		mWindow.display();
 	}
 } // namespace core

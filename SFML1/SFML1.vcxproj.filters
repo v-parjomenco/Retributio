@@ -145,6 +145,12 @@
     <Filter Include="src\core\utils\json">
       <UniqueIdentifier>{dda58842-ac7d-4664-be82-975b957af4e9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\time">
+      <UniqueIdentifier>{9165c4d7-a942-4ed7-aa4c-aa5029e55021}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\time">
+      <UniqueIdentifier>{b68e63b3-f44b-48c6-96c2-700a34fa361d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -180,17 +186,20 @@
     <ClCompile Include="src\ui\scaling_policy.cpp">
       <Filter>src\core\ui</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\ecs\systems\text_output.cpp">
-      <Filter>src\core\ecs\systems</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\ecs\systems\time_system.cpp">
-      <Filter>src\core\ecs\systems</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\config\config_loader.cpp">
       <Filter>src\core\config</Filter>
     </ClCompile>
     <ClCompile Include="src\core\utils\json\json_utils.cpp">
       <Filter>src\core\utils\json</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\time\time_service.cpp">
+      <Filter>src\core\time</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ecs\systems\debug_overlay_system.cpp">
+      <Filter>src\core\ecs\systems</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\config\debug_overlay_config.cpp">
+      <Filter>src\core\config</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -308,12 +317,6 @@
     <ClInclude Include="include\core\ui\lock_behavior_factory.h">
       <Filter>include\core\ui</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\ecs\systems\text_output.h">
-      <Filter>include\core\ecs\systems</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\ecs\systems\time_system.h">
-      <Filter>include\core\ecs\systems</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\utils\message.h">
       <Filter>include\core\utils</Filter>
     </ClInclude>
@@ -338,6 +341,15 @@
     <ClInclude Include="include\core\resources\ids\id_to_string.h">
       <Filter>include\core\resources\ids</Filter>
     </ClInclude>
+    <ClInclude Include="include\core\time\time_service.h">
+      <Filter>include\core\time</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\systems\debug_overlay_system.h">
+      <Filter>include\core\ecs\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config\debug_overlay_config.h">
+      <Filter>include\core\config</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="assets\config\player.json">
@@ -348,6 +360,9 @@
     </None>
     <None Include="include\core\resources\holders\resource_holder.inl">
       <Filter>include\core\resources\holders</Filter>
+    </None>
+    <None Include="assets\config\debug_overlay.json">
+      <Filter>assets\config</Filter>
     </None>
   </ItemGroup>
 </Project>
