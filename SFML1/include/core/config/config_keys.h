@@ -57,7 +57,7 @@ namespace core::config::keys {
         inline constexpr const char* COMPONENTS = "components";
     }
 
-} // namespace config::keys
+} // namespace core::config::keys
 
 // -----------------------------------------------------------------------------
 // config_keys.h

@@ -1,6 +1,8 @@
 #include <cstdlib>
 #include <exception>
-#include <core/game.h>
+
+#include "core/game.h"
+#include "core/utils/message.h"
 
 int main() {
 

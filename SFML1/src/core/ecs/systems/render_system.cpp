@@ -13,7 +13,7 @@ namespace core::ecs {
         // хранящимся в ComponentStorage<SpriteComponent> (внутри это unordered_map<Entity, SpriteComponent>)
         // (можно оптимизировать: итерироваться по меньшему из двух storage)
         for (auto& [entity, spriteComp] : sprites) {
-            if (auto* tr = transforms.get(entity)) { // есть ли трансформ у этой же сущности? 
+            if (auto* tr = transforms.get(entity)) {         // есть ли трансформ у этой же сущности? 
                 spriteComp.sprite.setPosition(tr->position); // если у сущности есть трансформ —
                                                              // обновляем позицию спрайта из TransformComponent
                                                              // tr->position — это sf::Vector2f,

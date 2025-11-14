@@ -1,3 +1,5 @@
+#include <string>
+
 #include "core/ecs/systems/debug_overlay_system.h"
 #include "core/time/time_service.h"
 

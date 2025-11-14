@@ -1,3 +1,6 @@
+#include <stdexcept>
+#include <string>
+
 #include "core/resources/loader/resource_loader.h"
 #include "core/resources/resource_manager.h"
 
@@ -6,10 +9,10 @@ namespace core::resources {
     // Текстуры
 
     // Статический ID, из enum class в resourceIDs
-
+    //
     // Используется для всего, что известно заранее, т.е. базовых ресурсов игры (иконок, фона, GUI, спрайтов врагов, и т.д.)
     // Путь берётся из ResourcePaths::get(id) — то есть, из JSON - файла resources.json, где каждому enum присвоен путь;
-    // Безопасно. В случае ошибки, компилятор скажет TextureID::Playre не существует.
+    // Безопасно. В случае ошибки, например, опечатки: (TextureID::Playre), компилятор сразу об этом скажет.
 
         // Для базовых ресуросв движка
     const types::TextureResource& ResourceManager::getTexture(ids::TextureID id, bool smooth) {
@@ -22,7 +25,7 @@ namespace core::resources {
     }
 
     // Динамический ID, из JSON
-
+    //
     // Используется, когда ресурсы уже описаны в JSON, но ключи - строки.
     // Например, есть динамический раздел "enemy_boss": "assets/textures/enemies/boss.png";
     // В этом случае id — это ключ, а не путь, но путь из этого ключа можно получить через ResourcePaths::get(id).
@@ -40,7 +43,7 @@ namespace core::resources {
     }
 
     // Получение текстуры по явному пути (путь = строка к файлу)
-
+    //
     // Низкоуровневая загрузка «по прямому пути» (runtime).
     // Используется, если путь задан в другом JSON (например, player.json),
     // но ты не знаешь заранее, какой именно спрайт указал дизайнер или мод;
@@ -54,7 +57,9 @@ namespace core::resources {
             // Используем ResourceLoader, чтобы изолировать низкоуровневую загрузку
             auto texPtr = loader::ResourceLoader::loadTexture(path, smooth);
             if (!texPtr) {
-                throw std::runtime_error(std::string("[ResourceManager::getTextureByPath]\nНе удалось загрузить текстуру: ") + path);
+                throw std::runtime_error(
+                    std::string{ "[ResourceManager::getTextureByPath]\nНе удалось загрузить текстуру: " } + path
+                );
             }
             // Вставляем уже загруженный ресурс в ResourceHolder, чтобы избежать двойной загрузки.
             mDynamicTextures.insert(path, std::move(texPtr));
@@ -65,7 +70,7 @@ namespace core::resources {
     }
 
     // Шрифты
-
+    //
     // Статический ID, из enum class в resourceIDs
     const types::FontResource& ResourceManager::getFont(ids::FontID id) {
         if (!mFonts.contains(id)) {
@@ -100,4 +105,4 @@ namespace core::resources {
         return mDynamicSounds.get(id);
     }
 
-} // namespace core
+} // namespace namespace core::resources

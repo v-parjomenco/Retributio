@@ -40,4 +40,4 @@ public:
     static PlayerConfig loadPlayerConfig(const std::string& path);
 };    
 
-} // namespace config
+} // namespace core::config

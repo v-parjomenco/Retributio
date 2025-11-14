@@ -88,4 +88,4 @@ namespace core::utils::json {
     template std::string parseValue<std::string>(const json&, const std::string&, const std::string&);
     template sf::Vector2f parseValue<sf::Vector2f>(const json&, const std::string&, const sf::Vector2f&);
 
-} // namespace core::json_utils
+} // namespace core::utils::json

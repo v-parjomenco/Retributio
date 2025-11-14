@@ -94,3 +94,5 @@ Thumbs.db
 # SFML cache/
 .sfml/
 
+# Comments
+*.txt

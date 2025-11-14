@@ -14,7 +14,7 @@ namespace core::ecs {
     * - переносит позицию в спрайт
     * - рисует спрайт
     */
-    class RenderSystem : public ISystem {
+    class RenderSystem final : public ISystem {
     public:
         RenderSystem() = default;
         ~RenderSystem() override = default;

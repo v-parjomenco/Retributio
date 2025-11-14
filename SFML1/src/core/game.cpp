@@ -1,5 +1,7 @@
 #include <cassert>
+#include <iostream>
 #include <optional>
+
 #include "core/game.h"
 #include "core/config/config_loader.h"
 #include "core/config/debug_overlay_config.h"

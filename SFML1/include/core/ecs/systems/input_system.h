@@ -2,6 +2,8 @@
 
 #include <array>
 #include <cassert>
+#include <cmath>
+
 #include "core/ecs/system.h"
 #include "core/ecs/world.h"
 #include "core/ecs/components/keyboard_control_component.h"

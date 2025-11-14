@@ -1,6 +1,8 @@
 #include <fstream>
 #include <stdexcept>
+
 #include "third_party/json_silent.hpp"
+
 #include "core/config.h"
 #include "core/config/config_keys.h"
 #include "core/config/config_loader.h"
@@ -8,13 +10,13 @@
 #include "core/utils/json/json_validator.h"
 #include "core/utils/message.h"
 
-using namespace::core::utils::json;
-using namespace::core::utils::message;
+using namespace ::core::utils::json;
+using namespace ::core::utils::message;
 using namespace core::config::keys;
 
 namespace core::config {
 
-        // Загружает JSON-конфигурацию игрока из файла
+    // Загружает JSON-конфигурацию игрока из файла
     PlayerConfig ConfigLoader::loadPlayerConfig(const std::string& path) {
         std::ifstream file(path);
         if (!file.is_open()) {
@@ -45,8 +47,8 @@ namespace core::config {
                 { Player::TEXTURE,         { json::value_t::string } },
                 { Player::SCALE,           { json::value_t::number_float, json::value_t::object, json::value_t::array } },
                 { Player::SPEED,           { json::value_t::number_float }, false },
-                { Player::ACCELERATION, { json::value_t::number_float }, false },
-                { Player::FRICTION, { json::value_t::number_float }, false },
+                { Player::ACCELERATION,    { json::value_t::number_float }, false },
+                { Player::FRICTION,        { json::value_t::number_float }, false },
                 { Player::ANCHOR,          { json::value_t::string }, false },
                 { Player::START_POSITION,  { json::value_t::object, json::value_t::array }, false },
                 { Player::SCALING,         { json::value_t::string }, false },
@@ -79,19 +81,21 @@ namespace core::config {
             const auto& c = data.at(Player::CONTROLS);
 
             // Каждая клавиша может быть переопределена в JSON
-            cfg.controls.up = parseKey(c, Player::CONTROL_UP, cfg.controls.up);
-            cfg.controls.down = parseKey(c, Player::CONTROL_DOWN, cfg.controls.down);
-            cfg.controls.left = parseKey(c, Player::CONTROL_LEFT, cfg.controls.left);
-            cfg.controls.right = parseKey(c, Player::CONTROL_RIGHT, cfg.controls.right);
+            cfg.controls.up             = parseKey(c, Player::CONTROL_UP, cfg.controls.up);
+            cfg.controls.down           = parseKey(c, Player::CONTROL_DOWN, cfg.controls.down);
+            cfg.controls.left           = parseKey(c, Player::CONTROL_LEFT, cfg.controls.left);
+            cfg.controls.right          = parseKey(c, Player::CONTROL_RIGHT, cfg.controls.right);
         }
         else {
-            core::utils::message::showError("[ConfigLoader]\nБлок controls отсутствует или имеет неверный тип. "
-                "Применены значения по умолчанию.");
+            core::utils::message::showError(
+                "[ConfigLoader]\nБлок controls отсутствует или имеет неверный тип. "
+                "Применены значения по умолчанию."
+            );
         }
 
         if (cfg.scaling != "Uniform" && cfg.scaling != "None") {
             core::utils::message::showError(
-                "[ConfigLoader]\nНеизвестное значение scaling: " + cfg.scaling +
+                std::string("[ConfigLoader]\nНеизвестное значение scaling: ") + cfg.scaling +
                 ". Применено значение по умолчанию (None)."
             );
             cfg.scaling = "None";
@@ -99,7 +103,7 @@ namespace core::config {
 
         if (cfg.lockBehavior != "ScreenLock" && cfg.lockBehavior != "WorldLock") {
             core::utils::message::showError(
-                "[ConfigLoader]\nНеизвестное значение lock_behavior: " + cfg.lockBehavior +
+                std::string("[ConfigLoader]\nНеизвестное значение lock_behavior: ") + cfg.lockBehavior +
                 ". Применено значение по умолчанию (WorldLock)."
             );
             cfg.lockBehavior = "WorldLock";
@@ -108,7 +112,7 @@ namespace core::config {
         if (core::ui::anchors::fromString(cfg.anchor) == core::ui::AnchorType::None &&
             cfg.anchor != "None") {
             core::utils::message::showError(
-                "[ConfigLoader]\nНеизвестное значение anchor: " + cfg.anchor +
+                std::string("[ConfigLoader]\nНеизвестное значение anchor: ") + cfg.anchor +
                 ". Применено значение по умолчанию (None)."
             );
             cfg.anchor = "None";
@@ -117,4 +121,4 @@ namespace core::config {
         return cfg;
     }
 
-} // namespace core
+} // namespace core::config

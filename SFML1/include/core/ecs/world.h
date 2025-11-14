@@ -44,10 +44,29 @@ namespace core::ecs {
             return mRegistry.createEntity();
         }
 
+        /**
+         * @brief Уничтожить сущность и все её компоненты.
+         *
+         * Важно:
+         *  - сначала вычищаем компоненты из всех хранилищ;
+         *  - затем удаляем сущность из Registry (dense/sparse структуры).
+         * Это гарантирует, что системы не будут продолжать работать с “висячими”
+         * компонентами уже несуществующей сущности.
+         */
         void destroyEntity(Entity e) {
-            // Сначала можно будет удалять компоненты у e
+            // Если сущность уже мертва — ничего не делаем
+            if (!mRegistry.isAlive(e)) {
+                return;
+            }
+            // Сначала удаляем компоненты этой сущности из всех хранилищ
+            for (auto& [type, storage] : mStorages) {
+                (void)type; // тип ключа здесь не используется — только само хранилище
+                if (storage) {
+                    storage->remove(e);
+                }
+            }
+            // Затем удаляем саму сущность из Registry
             mRegistry.destroyEntity(e);
-            // Позже: пройтись по всем storages и сделать remove(e)
         }
 
         [[nodiscard]] bool isAlive(Entity e) const noexcept {

@@ -21,8 +21,17 @@ namespace core::ecs {
     class IComponentStorage {
     public:
         virtual ~IComponentStorage() = default;
-        // Позже можно добавить сюда:
-        // virtual void onEntityDestroyed(Entity e) = 0; // удаляем все компоненты у сущности
+
+        /**
+         * @brief Удалить компонент сущности по её идентификатору.
+         *
+         * World использует этот интерфейс, чтобы при уничтожении сущности
+         * пройтись по всем хранилищам и удалить соответствующие компоненты.
+         * Конкретная реализация в ComponentStorage<T> должна быть максимально дешёвой
+         * (обычно это просто erase по ключу).
+         */
+        virtual void remove(Entity e) noexcept = 0;
+
     };
 
     // Шаблонное хранилище компонентов ОДНОГО типа (н-р: ComponentStorage<TransformComponent>)
@@ -52,8 +61,8 @@ namespace core::ecs {
             return (it == mData.end()) ? nullptr : &it->second;
         }
 
-        // Удалить компонент у сущности
-        void remove(Entity e) noexcept {
+        // Удалить компонент у сущности (реализация интерфейса IComponentStorage)
+        void remove(Entity e) noexcept override {
             mData.erase(e);
         }
 

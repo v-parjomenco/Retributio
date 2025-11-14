@@ -1,5 +1,9 @@
 #pragma once
 
+#include <memory>
+#include <vector>
+#include <utility>
+
 #include "core/ui/anchor_policy.h"
 #include "core/ui/anchor_utils.h"
 #include "core/config.h"
@@ -67,7 +71,7 @@ namespace core::ecs {
                     scalingComp.mode = ScalingBehaviorComponent::Mode::None;
 
                 // Компонент фиксации
-                std::unique_ptr<ui::ILockPolicy> lock_behavior;
+                std::unique_ptr<core::ui::ILockPolicy> lock_behavior;
                 if (!cfg.lockBehavior.empty() && cfg.lockBehavior != "None") {
                     lock_behavior = core::ui::LockBehaviorFactory::create(cfg.lockBehavior);
                 }

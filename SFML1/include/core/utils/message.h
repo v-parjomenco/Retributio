@@ -1,10 +1,13 @@
 #pragma once
 
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 #ifdef _WIN32
-    #define NOMINMAX        // предотвращает конфликт с std::min / std::max
+    #ifndef NOMINMAX        // предотвращает конфликт с std::min / std::max
+        #define NOMINMAX
+    #endif
     #include <windows.h>
 #endif
 
@@ -88,9 +91,9 @@ namespace core::utils {
     #else
             // Цветной вывод для Linux/macOS
             std::cout
-                << utils::ansi::cyan << "[Отладка] "
-                << utils::ansi::blue << message
-                << utils::ansi::reset << std::endl;
+                << ansi::cyan << "[Отладка] "
+                << ansi::blue << message
+                << ansi::reset << std::endl;
     #endif
 #endif
         }

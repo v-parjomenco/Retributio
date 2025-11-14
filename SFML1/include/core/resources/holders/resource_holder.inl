@@ -1,6 +1,10 @@
 #pragma once
 
 #include <type_traits>
+#include <utility>
+#include <stdexcept>
+#include <string>
+
 #include "core/resources/ids/resourceIDs.h"
 #include "core/resources/ids/id_to_string.h"
 
@@ -10,11 +14,14 @@ namespace core::resources::holders {
     // в Resource::loadFromFile(filename, args...).
     template <typename Resource, typename Identifier>
     template <typename... Args> // вариативный шаблон typename... (число и тип аргументов заранее неизвестны)
-    void ResourceHolder<Resource, Identifier>::load(Identifier id, const std::string& filename, Args&&... args) {
+    void ResourceHolder<Resource, Identifier>::load(Identifier id,
+                                                    const std::string& filename,
+                                                    Args&&... args) {
 
         // Проверка на дубликаты ID: если уже есть ресурс с таким ID — не загружаем снова.
         if (mResourceMap.find(id) != mResourceMap.end()) {
-            return; // если поиск по id нашёл дубликат до конца контейнера mResourceMap, выходим, код ниже не выполняется
+            // если поиск по id нашёл дубликат до конца контейнера mResourceMap, выходим, код ниже return не выполняется
+            return;
         }
 
         // Создание уникального указателя на ресурс
@@ -30,11 +37,14 @@ namespace core::resources::holders {
         }
 
         if (!success) {
-            throw std::runtime_error("[ResourceHolder::load]\nНе удалось загрузить файл: " + filename);
+            throw std::runtime_error(
+                std::string{ "[ResourceHolder::load]\nНе удалось загрузить файл: " } + filename
+            );
         }
 
         // Вставляем загруженный ресурс в карту.
-        mResourceMap.emplace(id, std::move(resource)); // std::move(resource) передаёт владение ресурсом в контейнер mResouceMap.
+        // std::move(resource) передаёт владение ресурсом в контейнер mResouceMap.
+        mResourceMap.emplace(id, std::move(resource));
     }
 
 
@@ -44,7 +54,10 @@ namespace core::resources::holders {
     Resource& ResourceHolder<Resource, Identifier>::get(const Identifier& id) {
         auto found = mResourceMap.find(id);
         if (found == mResourceMap.end()) {
-            throw std::runtime_error(std::string("[ResourceHolder::get]\nРесурс не найден: ") + core::resources::ids::idToString(id));
+            throw std::runtime_error(
+                std::string{ "[ResourceHolder::get]\nРесурс не найден: " } +
+                core::resources::ids::idToString(id)
+            );
         }
         return *found->second;
     }
@@ -54,22 +67,28 @@ namespace core::resources::holders {
     const Resource& ResourceHolder<Resource, Identifier>::get(const Identifier& id) const {
         auto found = mResourceMap.find(id);
         if (found == mResourceMap.end()) {
-            throw std::runtime_error(std::string("[ResourceHolder::get]\nРесурс не найден: ") + core::resources::ids::idToString(id));
+            throw std::runtime_error(
+                std::string{ "[ResourceHolder::get]\nРесурс не найден: " } +
+                core::resources::ids::idToString(id)
+            );
         }
         return *found->second;
     }
 
     // Проверить наличие ресурса по ID.
+    // noexcept подчёркивает, что метод не выбрасывает исключений и только делает поиск.
     template <typename Resource, typename Identifier>
-    bool ResourceHolder<Resource, Identifier>::contains(const Identifier& id) const noexcept { // noexcept явно показывает, что метод не кидает исключений, и только делает поиск
+    bool ResourceHolder<Resource, Identifier>::contains(const Identifier& id) const noexcept {
         return mResourceMap.find(id) != mResourceMap.end();
     }
 
     // Метод для удаления ресурса
     template <typename Resource, typename Identifier>
     void ResourceHolder<Resource, Identifier>::unload(const Identifier& id) {
-        if (!contains(id)) return; // проверяем перед удалением
-        mResourceMap.erase(id);
+        auto it = mResourceMap.find(id);
+        if (it != mResourceMap.end()) {
+            mResourceMap.erase(it);
+        }
     }
 
     // Метод для полной очистки ресурсов mResourceMap
@@ -78,12 +97,14 @@ namespace core::resources::holders {
         mResourceMap.clear();
     }
 
-    // Метод, позволяющий вставить уже загруженный ресурс через уникальный указатель на него.
-    // Это предотвращает повторную загрузку ресурса с диска, если он был загружен через ResourceLoader.
+    // Вставка уже загруженного ресурса через unique_ptr.
+    // Используется, например, ResourceLoader'ом, чтобы избежать двойной загрузки с диска.
     // После вставки ResourceHolder будет владеть ресурсом.
     template <typename Resource, typename Identifier>
     void ResourceHolder<Resource, Identifier>::insert(Identifier id, std::unique_ptr<Resource> resource) {
-        if (!resource) return; // ничего не вставляем, если nullptr
+        if (!resource) {
+            return; // ничего не вставляем, если nullptr
+        }
         if (mResourceMap.find(id) != mResourceMap.end()) {
             return; // уже есть — не перезаписываем текущий ресурс
         }

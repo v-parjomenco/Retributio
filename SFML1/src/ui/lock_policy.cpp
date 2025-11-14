@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "core/ui/lock_policy.h"
 
 namespace core {

@@ -30,7 +30,7 @@ namespace core::time {
         void tick(float smoothingAlpha = 0.1f) noexcept;
 
         // true, если накопилось достаточно времени для одного фиксированного шага
-        bool shouldUpdate(const sf::Time& fixedTimeStep) noexcept;
+        [[nodiscard]] bool shouldUpdate(const sf::Time& fixedTimeStep) noexcept;
 
         // Доступ к метрикам времени
         [[nodiscard]] sf::Time  getDeltaTime()        const noexcept { return mDeltaTime; }

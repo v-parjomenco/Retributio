@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include "core/resources/ids/resourceIDs.h"
 
 namespace core::resources::ids {
