@@ -2,7 +2,7 @@
 
 #include "core/ui/anchor_utils.h"
 
-namespace core {
+namespace core::ui {
 
     void ui::AnchorPolicy::apply(sf::Sprite& sprite, const sf::View& view) const {
         // Получаем локальные границы (без учёта scale и transform)
@@ -66,4 +66,4 @@ namespace core {
             worldPosition); // setPosition принимает позицию, где будет размещена точка origin
     }
 
-} // namespace core
+} // namespace core::ui

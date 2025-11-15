@@ -174,18 +174,6 @@
     <ClCompile Include="src\core\resources\paths\resource_paths.cpp">
       <Filter>src\core\resources\paths</Filter>
     </ClCompile>
-    <ClCompile Include="src\ui\anchor_policy.cpp">
-      <Filter>src\core\ui</Filter>
-    </ClCompile>
-    <ClCompile Include="src\ui\lock_behavior_factory.cpp">
-      <Filter>src\core\ui</Filter>
-    </ClCompile>
-    <ClCompile Include="src\ui\lock_policy.cpp">
-      <Filter>src\core\ui</Filter>
-    </ClCompile>
-    <ClCompile Include="src\ui\scaling_policy.cpp">
-      <Filter>src\core\ui</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\config\config_loader.cpp">
       <Filter>src\core\config</Filter>
     </ClCompile>
@@ -200,6 +188,18 @@
     </ClCompile>
     <ClCompile Include="src\core\config\debug_overlay_config.cpp">
       <Filter>src\core\config</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ui\anchor_policy.cpp">
+      <Filter>src\core\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ui\lock_behavior_factory.cpp">
+      <Filter>src\core\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ui\lock_policy.cpp">
+      <Filter>src\core\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ui\scaling_policy.cpp">
+      <Filter>src\core\ui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

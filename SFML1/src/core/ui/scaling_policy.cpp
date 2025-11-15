@@ -1,7 +1,7 @@
 #include "core/ui/scaling_policy.h"
 #include <algorithm>
 
-namespace core {
+namespace core::ui {
 
     void ui::UniformScalingPolicy::apply(sf::Sprite& sprite, const sf::View& view) {
         // Берём View изначального размера экрана
@@ -34,4 +34,4 @@ namespace core {
         mLastUniform = newUniform;
     }
 
-} // namespace core
+} // namespace core::ui

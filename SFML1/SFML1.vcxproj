@@ -174,11 +174,11 @@
     <ClCompile Include="src\core\resources\paths\resource_paths.cpp" />
     <ClCompile Include="src\core\resources\resource_manager.cpp" />
     <ClCompile Include="src\core\time\time_service.cpp" />
+    <ClCompile Include="src\core\ui\anchor_policy.cpp" />
+    <ClCompile Include="src\core\ui\lock_behavior_factory.cpp" />
+    <ClCompile Include="src\core\ui\lock_policy.cpp" />
+    <ClCompile Include="src\core\ui\scaling_policy.cpp" />
     <ClCompile Include="src\core\utils\json\json_utils.cpp" />
-    <ClCompile Include="src\ui\anchor_policy.cpp" />
-    <ClCompile Include="src\ui\lock_behavior_factory.cpp" />
-    <ClCompile Include="src\ui\lock_policy.cpp" />
-    <ClCompile Include="src\ui\scaling_policy.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\config.h" />

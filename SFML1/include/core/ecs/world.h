@@ -36,8 +36,11 @@ namespace core::ecs {
         World(const World&) = delete;
         World& operator=(const World&) = delete;
         // Разрешаем перемещение
+        // NOLINTNEXTLINE(performance-noexcept-move-constructor, bugprone-exception-escape)
         World(World&&) = default;
+        // NOLINTNEXTLINE(performance-noexcept-move-constructor, bugprone-exception-escape)
         World& operator=(World&&) = default;
+
 
         // --------------------------- Сущности -----------------------------
         [[nodiscard]] Entity createEntity() {

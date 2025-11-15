@@ -1,7 +1,7 @@
 #include "core/ui/lock_policy.h"
 #include <algorithm>
 
-namespace core {
+namespace core::ui {
 
     void ui::ScreenLockPolicy::apply(sf::Sprite& sprite, const sf::View& view) {
 
@@ -36,4 +36,4 @@ namespace core {
         mPreviousViewSize = currentViewSize;
     }
 
-} // namespace core
+} // namespace core::ui

@@ -5,7 +5,7 @@
 
 #include "core/utils/message.h"
 
-namespace core {
+namespace core::ui {
 
     using Creator = std::function<std::unique_ptr<ui::ILockPolicy>()>;
 
@@ -26,4 +26,4 @@ namespace core {
         return {};
     }
 
-} // namespace core
+} // namespace core::ui
