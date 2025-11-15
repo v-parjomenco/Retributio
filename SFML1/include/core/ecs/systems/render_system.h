@@ -2,8 +2,8 @@
 
 #include <SFML/Graphics.hpp>
 
-#include "core/ecs/components/transform_component.h"
 #include "core/ecs/components/sprite_component.h"
+#include "core/ecs/components/transform_component.h"
 #include "core/ecs/system.h"
 #include "core/ecs/world.h"
 
@@ -15,7 +15,7 @@ namespace core::ecs {
     * - рисует спрайт
     */
     class RenderSystem final : public ISystem {
-    public:
+      public:
         RenderSystem() = default;
         ~RenderSystem() override = default;
 

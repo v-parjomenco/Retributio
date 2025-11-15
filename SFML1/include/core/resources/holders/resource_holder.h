@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+
 #include "core/resources/i_resource.h"
 
 namespace core::resources::holders {
@@ -14,20 +15,20 @@ namespace core::resources::holders {
     // Хранит ресурсы как std::unique_ptr<Resource> в unordered_map<Identifier, unique_ptr<Resource>>.
     // Позволяет вызывать openFromFile / другие методы с произвольными параметрами.
 
-    template <typename Resource, typename Identifier>
-    class ResourceHolder {
-    public:
+    template <typename Resource, typename Identifier> class ResourceHolder {
+      public:
         ResourceHolder() = default;
         ~ResourceHolder() = default;
 
         // Загружаем ресурс из файла, с произвольными дополнительными параметрами,
         // которые могут форвардиться (передаваться дальше в том же виде, в котором получены)
         // в Resource::openFromFile(filename, args...).
-        template <typename... Args> // вариативный шаблон typename... (число и тип аргументов заранее неизвестны)
-        void load(Identifier id, const std::string& filename, Args&&... args);
+        template <
+            typename... Args> // вариативный шаблон typename... (число и тип аргументов заранее неизвестны)
+        void load(const Identifier& id, const std::string& filename, Args&&... args);
 
         // Вставить уже созданный ресурс (unique_ptr) — позволяет избежать повторного чтения с диска.
-        void insert(Identifier id, std::unique_ptr<Resource> resource);
+        void insert(const Identifier& id, std::unique_ptr<Resource> resource);
 
         // Получить ресурс
         Resource& get(const Identifier& id);
@@ -42,11 +43,11 @@ namespace core::resources::holders {
         // Очистить все ресурсы
         void clear() noexcept;
 
-    private:
+      private:
         std::unordered_map<Identifier, std::unique_ptr<Resource>> mResourceMap;
     };
 
 } // namespace core::resources::holders
 
-    // Включаем реализацию шаблонов
+// Включаем реализацию шаблонов
 #include "resource_holder.inl"

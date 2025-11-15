@@ -10,9 +10,10 @@
 
 namespace core::ecs {
 
-    class World; // предварительное объявление класса (forward declaration), чтобы компилятор знал, что такой класс есть
-                 // но ему не нужно знать, что у него внутри, поэтому мы не подключаем его, через include,
-                 // чтобы избежать цепочку рекурсивных зависимостей между заголовками
+    class
+        World; // предварительное объявление класса (forward declaration), чтобы компилятор знал, что такой класс есть
+    // но ему не нужно знать, что у него внутри, поэтому мы не подключаем его, через include,
+    // чтобы избежать цепочку рекурсивных зависимостей между заголовками
 
     /**
      * @brief Базовый интерфейс для всех систем ECS.
@@ -23,7 +24,7 @@ namespace core::ecs {
      *  - ничего не знает про конкретные сущности, только про их компоненты
      */
     class ISystem {
-    public:
+      public:
         virtual ~ISystem() = default;
 
         /**
@@ -33,8 +34,8 @@ namespace core::ecs {
          */
         virtual void update(World& world, float dt) {
             // по умолчанию ничего не делаем
-            (void)world;
-            (void)dt;
+            (void) world;
+            (void) dt;
         }
 
         /**
@@ -42,8 +43,8 @@ namespace core::ecs {
          */
         virtual void render(World& world, sf::RenderWindow& window) {
             // по умолчанию ничего не делаем
-            (void)world;
-            (void)window;
+            (void) world;
+            (void) window;
         }
     };
 

@@ -1,12 +1,13 @@
 #pragma once
 
 #include <SFML/Audio.hpp>
+
 #include "core/resources/i_resource.h"
 
 namespace core::resources::types {
 
     class SoundBufferResource : public core::resources::IResource {
-    public:
+      public:
         SoundBufferResource() = default;
         ~SoundBufferResource() override = default;
 
@@ -14,10 +15,14 @@ namespace core::resources::types {
             return mBuffer.loadFromFile(filename);
         }
 
-        sf::SoundBuffer& get() { return mBuffer; }
-        const sf::SoundBuffer& get() const { return mBuffer; }
+        sf::SoundBuffer& get() {
+            return mBuffer;
+        }
+        const sf::SoundBuffer& get() const {
+            return mBuffer;
+        }
 
-    private:
+      private:
         sf::SoundBuffer mBuffer;
     };
 

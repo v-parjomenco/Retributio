@@ -1,8 +1,8 @@
+#include "core/resources/resource_manager.h"
 #include <stdexcept>
 #include <string>
 
 #include "core/resources/loader/resource_loader.h"
-#include "core/resources/resource_manager.h"
 
 namespace core::resources {
 
@@ -14,7 +14,7 @@ namespace core::resources {
     // Путь берётся из ResourcePaths::get(id) — то есть, из JSON - файла resources.json, где каждому enum присвоен путь;
     // Безопасно. В случае ошибки, например, опечатки: (TextureID::Playre), компилятор сразу об этом скажет.
 
-        // Для базовых ресуросв движка
+    // Для базовых ресуросв движка
     const types::TextureResource& ResourceManager::getTexture(ids::TextureID id, bool smooth) {
         if (!mTextures.contains(id)) {
             const std::string path = paths::ResourcePaths::get(id); // путь берём из JSON
@@ -35,8 +35,7 @@ namespace core::resources {
     // Для кастомных JSON, с ключами - строками
     const types::TextureResource& ResourceManager::getTexture(const std::string& id, bool smooth) {
         if (!mDynamicTextures.contains(id)) {
-            const std::string path = id; // id здесь уже строка пути
-            mDynamicTextures.load(id, path);
+            mDynamicTextures.load(id, id); // id = путь к файлу
             mDynamicTextures.get(id).setSmooth(smooth);
         }
         return mDynamicTextures.get(id);
@@ -51,15 +50,17 @@ namespace core::resources {
     // в кэше всё равно хранится в mDynamicTextures, поэтому второй раз не загрузится.
 
     // Для данных, загружаемых из внешних конфигов (runtime).
-    const types::TextureResource& ResourceManager::getTextureByPath(const std::string& path, bool smooth) {
+    const types::TextureResource& ResourceManager::getTextureByPath(const std::string& path,
+                                                                    bool smooth) {
         // Если ресурс с таким путём уже загружен (в динамическом контейнере) — вернём его
         if (!mDynamicTextures.contains(path)) {
             // Используем ResourceLoader, чтобы изолировать низкоуровневую загрузку
             auto texPtr = loader::ResourceLoader::loadTexture(path, smooth);
             if (!texPtr) {
                 throw std::runtime_error(
-                    std::string{ "[ResourceManager::getTextureByPath]\nНе удалось загрузить текстуру: " } + path
-                );
+                    std::string{
+                        "[ResourceManager::getTextureByPath]\nНе удалось загрузить текстуру: "} +
+                    path);
             }
             // Вставляем уже загруженный ресурс в ResourceHolder, чтобы избежать двойной загрузки.
             mDynamicTextures.insert(path, std::move(texPtr));
@@ -105,4 +106,4 @@ namespace core::resources {
         return mDynamicSounds.get(id);
     }
 
-} // namespace namespace core::resources
+} // namespace core::resources

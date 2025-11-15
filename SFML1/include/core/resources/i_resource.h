@@ -7,7 +7,7 @@ namespace core::resources {
     // Базовый интерфейс для всех ресурсов.
     // Позволяет ResourceHolder загружать разные типы ресурсов через единый метод loadFromFile
     class IResource {
-    public:
+      public:
         virtual ~IResource() = default;
 
         // Унифицированный метод загрузки из файла

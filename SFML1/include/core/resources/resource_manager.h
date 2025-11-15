@@ -8,19 +8,17 @@
 #include <SFML/Audio.hpp>
 #include <SFML/Graphics.hpp>
 
-#include "core/resources/types/texture_resource.h"
-#include "core/resources/types/font_resource.h"
-#include "core/resources/types/soundbuffer_resource.h"
 #include "core/resources/holders/resource_holder.h"
 #include "core/resources/ids/resourceIDs.h"
 #include "core/resources/paths/resource_paths.h"
-
+#include "core/resources/types/font_resource.h"
+#include "core/resources/types/soundbuffer_resource.h"
+#include "core/resources/types/texture_resource.h"
 
 namespace core::resources {
 
     class ResourceManager {
-    public:
-
+      public:
         ResourceManager() = default;
         ~ResourceManager() = default;
 
@@ -47,7 +45,7 @@ namespace core::resources {
         // Динамический ID, из JSON
         const types::SoundBufferResource& getSound(const std::string& id);
 
-    private:
+      private:
         // ResourceHolder для статических ID
         holders::ResourceHolder<types::TextureResource, ids::TextureID> mTextures;
         holders::ResourceHolder<types::FontResource, ids::FontID> mFonts;

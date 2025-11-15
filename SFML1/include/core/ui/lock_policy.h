@@ -1,8 +1,10 @@
 #pragma once
 
-#include <SFML/Graphics.hpp>
-#include "core/config.h"
 #include <algorithm>
+
+#include <SFML/Graphics.hpp>
+
+#include "core/config.h"
 
 namespace core::ui {
 
@@ -10,7 +12,7 @@ namespace core::ui {
      * @brief Интерфейс фиксации позиции на экране
      */
     class ILockPolicy {
-    public:
+      public:
         virtual ~ILockPolicy() = default;
         virtual void apply(sf::Sprite& sprite, const sf::View& view) = 0;
     };
@@ -24,12 +26,12 @@ namespace core::ui {
      * Если спрайт был создан в мировых координатах, поведение может быть некорректным.
      */
     class ScreenLockPolicy final : public ILockPolicy {
-    public:
+      public:
         void apply(sf::Sprite& sprite, const sf::View& view) override;
 
-    private:
+      private:
         sf::Vector2f mPreviousViewSize;
-        bool mInitialized{ false };
+        bool mInitialized{false};
     };
 
 } // namespace core::ui

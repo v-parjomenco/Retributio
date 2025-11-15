@@ -8,9 +8,9 @@
 
 #pragma once
 
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
-#include <type_traits>
 
 #include "core/ecs/entity.h"
 
@@ -19,7 +19,7 @@ namespace core::ecs {
     // Базовый интерфейс для хранилища любого типа компонентов (type-erasure)
     // Нужен, чтобы World мог хранить разные ComponentStorage<T> в одном unordered_map и объединять в одну структуру
     class IComponentStorage {
-    public:
+      public:
         virtual ~IComponentStorage() = default;
 
         /**
@@ -31,14 +31,12 @@ namespace core::ecs {
          * (обычно это просто erase по ключу).
          */
         virtual void remove(Entity e) noexcept = 0;
-
     };
 
     // Шаблонное хранилище компонентов ОДНОГО типа (н-р: ComponentStorage<TransformComponent>)
     // Не требует конструктора по умолчанию у T (важно для sf::Sprite / SpriteComponent)
-    template <typename T>
-    class ComponentStorage final : public IComponentStorage {
-    public:
+    template <typename T> class ComponentStorage final : public IComponentStorage {
+      public:
         // Добавить или заменить компонент по константной ссылке
         void set(Entity e, const T& value) {
             mData.insert_or_assign(e, value);
@@ -67,15 +65,25 @@ namespace core::ecs {
         }
 
         // Можно итерироваться по всем компонентам этого типа
-        auto begin() { return mData.begin(); }
-        auto end() { return mData.end(); }
-        auto begin() const { return mData.begin(); }
-        auto end()   const { return mData.end(); }
+        auto begin() {
+            return mData.begin();
+        }
+        auto end() {
+            return mData.end();
+        }
+        auto begin() const {
+            return mData.begin();
+        }
+        auto end() const {
+            return mData.end();
+        }
 
         // Даёт возможность системам выбирать меньший из сториджей для итерации (см. MovementSystem)
-        [[nodiscard]] std::size_t size() const noexcept { return mData.size(); }
+        [[nodiscard]] std::size_t size() const noexcept {
+            return mData.size();
+        }
 
-    private:
+      private:
         std::unordered_map<Entity, T> mData;
     };
 

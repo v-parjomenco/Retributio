@@ -15,7 +15,7 @@ namespace core::config::keys {
         inline constexpr const char* START_POSITION = "start_position";
         inline constexpr const char* SCALING = "scaling";
         inline constexpr const char* LOCK_BEHAVIOR = "lock_behavior";
-    }
+    } // namespace Common
 
     // Ключи для конфигурации игрока
     namespace Player {
@@ -34,28 +34,28 @@ namespace core::config::keys {
         inline constexpr const char* CONTROL_DOWN = "down";
         inline constexpr const char* CONTROL_LEFT = "left";
         inline constexpr const char* CONTROL_RIGHT = "right";
-    }
+    } // namespace Player
 
     // Ключи для интерфейса (на будущее)
     namespace UI {
         inline constexpr const char* FONT = "font";
         inline constexpr const char* FONT_SIZE = "font_size";
         inline constexpr const char* COLOR = "color";
-    }
+    } // namespace UI
 
     // Ключи для мира (terrain, lighting, weather и т.д., на будущее)
     namespace World {
         inline constexpr const char* MAP_SIZE = "map_size";
         inline constexpr const char* GRAVITY = "gravity";
         inline constexpr const char* BACKGROUND = "background";
-    }
+    } // namespace World
 
     // Ключи для будущих конфигураций сущностей (Entity configs)
     namespace Entity {
         inline constexpr const char* NAME = "name";
         inline constexpr const char* TYPE = "type";
         inline constexpr const char* COMPONENTS = "components";
-    }
+    } // namespace Entity
 
 } // namespace core::config::keys
 

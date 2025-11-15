@@ -25,7 +25,7 @@ namespace core::ecs {
      *  - обновление по тегам/маскам
      */
     class Registry {
-    public:
+      public:
         Registry() = default;
         ~Registry() = default;
 
@@ -62,10 +62,14 @@ namespace core::ecs {
         }
 
         // Доступ к менеджеру (если вдруг нужен более низкий уровень)
-        EntityManager& entities() noexcept { return mEntities; }
-        const EntityManager& entities() const noexcept { return mEntities; }
+        EntityManager& entities() noexcept {
+            return mEntities;
+        }
+        const EntityManager& entities() const noexcept {
+            return mEntities;
+        }
 
-    private:
+      private:
         EntityManager mEntities;
     };
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SFML/Graphics.hpp>
+
 #include "core/config.h"
 
 namespace core::ui {
@@ -9,7 +10,7 @@ namespace core::ui {
      * @brief Интерфейс политики масштабирования
      */
     class IScalingPolicy {
-    public:
+      public:
         virtual ~IScalingPolicy() = default;
         virtual void apply(sf::Sprite& sprite, const sf::View& view) = 0;
     };
@@ -18,10 +19,11 @@ namespace core::ui {
      * @brief Масштабирование спрайта при изменении окна
      */
     class UniformScalingPolicy final : public IScalingPolicy {
-    public:
+      public:
         void apply(sf::Sprite& sprite, const sf::View& view) override;
-    private:
-        float mLastUniform{ 1.f };
+
+      private:
+        float mLastUniform{1.f};
     };
 
 } // namespace core::ui

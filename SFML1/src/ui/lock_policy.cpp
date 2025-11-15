@@ -1,6 +1,5 @@
-#include <algorithm>
-
 #include "core/ui/lock_policy.h"
+#include <algorithm>
 
 namespace core {
 
@@ -8,10 +7,8 @@ namespace core {
 
         // При первом вызове используем базовый размер из config.h
         if (!mInitialized) {
-            mPreviousViewSize = {
-                static_cast<float>(config::WINDOW_WIDTH),
-                static_cast<float>(config::WINDOW_HEIGHT)
-            };
+            mPreviousViewSize = {static_cast<float>(config::WINDOW_WIDTH),
+                                 static_cast<float>(config::WINDOW_HEIGHT)};
             mInitialized = true;
         }
 
@@ -23,19 +20,15 @@ namespace core {
         const sf::Vector2f previousPosition = sprite.getPosition();
 
         // Относительное положение (в долях от старого размера)
-        const sf::Vector2f relativePosition = {
-            previousPosition.x / previousWidth,
-            previousPosition.y / previousHeight
-        };
+        const sf::Vector2f relativePosition = {previousPosition.x / previousWidth,
+                                               previousPosition.y / previousHeight};
 
         // Получаем размер экрана после масштабирования
         const sf::Vector2f currentViewSize = view.getSize();
 
         // Пересчитываем новую позицию, сохраняя пропорции на экране
-        const sf::Vector2f newPosition = {
-            currentViewSize.x * relativePosition.x,
-            currentViewSize.y * relativePosition.y
-        };
+        const sf::Vector2f newPosition = {currentViewSize.x * relativePosition.x,
+                                          currentViewSize.y * relativePosition.y};
 
         sprite.setPosition(newPosition);
 

@@ -24,8 +24,7 @@ namespace core::ecs {
                     transform.position += vel->linear * dt; // простое интегрирование методом Эйлера
                 }
             }
-        }
-        else { // NEW CODE
+        } else { // NEW CODE
             for (auto& [entity, velocity] : velocities) {
                 if (auto* tr = transforms.get(entity)) {
                     tr->position += velocity.linear * dt;

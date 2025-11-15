@@ -1,21 +1,21 @@
-#include <cstdlib>
-#include <exception>
-
 #include "core/game.h"
 #include "core/utils/message.h"
+
+#include <cstdlib>
+#include <exception>
 
 int main() {
 
     try {
         core::Game game;
         game.run();
-    }
-    catch (const std::exception& e) {
+    } catch (const std::exception& e) {
         core::utils::message::showError(e.what());
         core::utils::message::holdOnExit(); // если включён флаг в config.h, окно появится
         return EXIT_FAILURE;
     }
 
-    core::utils::message::holdOnExit();     // препятствует быстрому закрытию окна при выходе (если DEBUG_HOLD_ON_EXIT == true)
-	return EXIT_SUCCESS;
+    core::utils::message::
+        holdOnExit(); // препятствует быстрому закрытию окна при выходе (если DEBUG_HOLD_ON_EXIT == true)
+    return EXIT_SUCCESS;
 }

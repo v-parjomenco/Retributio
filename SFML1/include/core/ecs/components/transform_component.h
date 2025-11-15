@@ -15,7 +15,7 @@ namespace core::ecs {
      * Можно расширить до rotation / scale / z-order позже.
      */
     struct TransformComponent {
-        sf::Vector2f position{ 0.f, 0.f };
+        sf::Vector2f position{0.f, 0.f};
     };
 
 } // namespace core::ecs

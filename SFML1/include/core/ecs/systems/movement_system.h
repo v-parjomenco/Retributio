@@ -11,7 +11,6 @@
 #include "core/ecs/system.h"
 #include "core/ecs/world.h"
 
-
 namespace core::ecs {
 
     /** 
@@ -20,7 +19,7 @@ namespace core::ecs {
     * и выполняет: position += velocity * dt
     */
     class MovementSystem : public ISystem {
-    public:
+      public:
         MovementSystem() = default;
         ~MovementSystem() override = default;
 

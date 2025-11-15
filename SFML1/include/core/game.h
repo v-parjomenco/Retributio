@@ -8,6 +8,7 @@
 #pragma once
 
 #include <SFML/Graphics.hpp>
+
 #include "core/config.h"
 #include "core/ecs/components/keyboard_control_component.h"
 #include "core/ecs/systems/debug_overlay_system.h"
@@ -24,29 +25,29 @@
 
 namespace core {
 
-	class Game {
-	public:
-		Game();
-		void run();
-	private:
-		void processEvents();
-		void update(const sf::Time& dt);
-		void render();
-		void initWorld(); // создаёт ECS-мир и инициализирует сущности
-	private:
-		sf::RenderWindow mWindow;
-		core::resources::ResourceManager mResources;
+    class Game {
+      public:
+        Game();
+        void run();
 
-		core::time::TimeService mTime;						 // сервис времени (вне ECS)
-		core::ecs::World mWorld;							 // ECS-мир
-		core::ecs::Entity mPlayerEntity;					 // сущность игрока
+      private:
+        void processEvents();
+        void update(const sf::Time& dt);
+        void render();
+        void initWorld(); // создаёт ECS-мир и инициализирует сущности
+      private:
+        sf::RenderWindow mWindow;
+        core::resources::ResourceManager mResources;
 
-		// Системы, к которым нужен прямой доступ
-		core::ecs::ScalingSystem* mScalingSystem{ nullptr }; // кэшируем систему масштабирования
-		core::ecs::LockSystem* mLockSystem{ nullptr };	     // кэшируем систему фиксации
-		core::ecs::InputSystem* mInputSystem{ nullptr };     // клавиатурный ввод
-		core::ecs::DebugOverlaySystem* mDebugOverlay{ nullptr };
+        core::time::TimeService mTime;   // сервис времени (вне ECS)
+        core::ecs::World mWorld;         // ECS-мир
+        core::ecs::Entity mPlayerEntity; // сущность игрока
 
-	};
+        // Системы, к которым нужен прямой доступ
+        core::ecs::ScalingSystem* mScalingSystem{nullptr}; // кэшируем систему масштабирования
+        core::ecs::LockSystem* mLockSystem{nullptr};       // кэшируем систему фиксации
+        core::ecs::InputSystem* mInputSystem{nullptr};     // клавиатурный ввод
+        core::ecs::DebugOverlaySystem* mDebugOverlay{nullptr};
+    };
 
 } // namespace core

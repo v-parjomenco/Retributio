@@ -16,7 +16,8 @@ namespace core::ecs {
         std::unique_ptr<core::ui::ILockPolicy> policy;
 
         explicit LockBehaviorComponent(std::unique_ptr<core::ui::ILockPolicy> p)
-            : policy(std::move(p)) {}
+            : policy(std::move(p)) {
+        }
     };
 
 } // namespace core::ecs

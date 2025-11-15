@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+
 #include "core/ui/lock_policy.h"
 
 namespace core::ui {
@@ -14,7 +15,7 @@ namespace core::ui {
      * - "WorldLock"  -> nullptr          (никакой фиксации; жить в мировых координатах)
      */
     class LockBehaviorFactory {
-    public:
+      public:
         static std::unique_ptr<ILockPolicy> create(const std::string& name);
     };
 

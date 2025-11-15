@@ -1,11 +1,9 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 #include <utility>
+#include <vector>
 
-#include "core/ui/anchor_policy.h"
-#include "core/ui/anchor_utils.h"
 #include "core/config.h"
 #include "core/ecs/components/keyboard_control_component.h"
 #include "core/ecs/components/lock_behavior_component.h"
@@ -16,8 +14,10 @@
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/components/velocity_component.h"
 #include "core/ecs/system.h"
-#include "core/ui/lock_behavior_factory.h"
 #include "core/resources/resource_manager.h"
+#include "core/ui/anchor_policy.h"
+#include "core/ui/anchor_utils.h"
+#include "core/ui/lock_behavior_factory.h"
 
 namespace core::ecs {
 
@@ -29,9 +29,9 @@ namespace core::ecs {
      * Работает один раз — при первом обновлении, затем может быть отключена.
      */
     class PlayerInitSystem final : public ISystem {
-    public:
-        explicit PlayerInitSystem(core::resources::ResourceManager& res) 
-            : mResources(res) {}
+      public:
+        explicit PlayerInitSystem(core::resources::ResourceManager& res) : mResources(res) {
+        }
 
         void update(World& world, float) override {
             auto& configs = world.storage<PlayerConfigComponent>();
@@ -51,24 +51,26 @@ namespace core::ecs {
                 SpriteComponent spriteComp(std::move(tempSprite));
 
                 // Позиция и якорь
-                sf::View defaultView(sf::FloatRect({ 0.f, 0.f },
-                    { static_cast<float>(::config::WINDOW_WIDTH),
-                      static_cast<float>(::config::WINDOW_HEIGHT) }));
+                sf::View defaultView(
+                    sf::FloatRect({0.f, 0.f}, {static_cast<float>(::config::WINDOW_WIDTH),
+                                               static_cast<float>(::config::WINDOW_HEIGHT)}));
 
                 core::ui::AnchorType anchor = core::ui::anchors::fromString(cfg.anchor);
-                if (anchor != core::ui::AnchorType::None)
+                if (anchor != core::ui::AnchorType::None) {
                     core::ui::AnchorPolicy(anchor).apply(spriteComp.sprite, defaultView);
-                else
+                } else {
                     spriteComp.sprite.setPosition(cfg.startPosition);
+                }
 
                 const sf::Vector2f anchoredPos = spriteComp.sprite.getPosition();
 
                 // Компонент масштабирования
                 ScalingBehaviorComponent scalingComp{};
-                if (cfg.scaling == "Uniform")
+                if (cfg.scaling == "Uniform") {
                     scalingComp.mode = ScalingBehaviorComponent::Mode::Uniform;
-                else
+                } else {
                     scalingComp.mode = ScalingBehaviorComponent::Mode::None;
+                }
 
                 // Компонент фиксации
                 std::unique_ptr<core::ui::ILockPolicy> lock_behavior;
@@ -78,27 +80,25 @@ namespace core::ecs {
 
                 // Добавляем компоненты
                 world.addComponent(entity, spriteComp);
-                world.addComponent(entity, TransformComponent{ anchoredPos });
-                world.addComponent(entity, VelocityComponent{ {0.f, 0.f} });
+                world.addComponent(entity, TransformComponent{anchoredPos});
+                world.addComponent(entity, VelocityComponent{{0.f, 0.f}});
                 world.addComponent(entity, std::move(scalingComp));
                 if (lock_behavior) {
                     world.addComponent(entity, LockBehaviorComponent(std::move(lock_behavior)));
                 }
 
                 // Параметры движения из JSON (скорость и др.)
-                world.addComponent(entity, MovementStatsComponent{
-                    cfg.speed,           // maxSpeed
-                    800.f,               // acceleration (пока фикс — можно вынести в JSON позднее)
-                    6.f                  // friction    (пока фикс — можно вынести в JSON позднее)
-                });
+                world.addComponent(
+                    entity, MovementStatsComponent{
+                                cfg.speed, // maxSpeed
+                                800.f, // acceleration (пока фикс — можно вынести в JSON позднее)
+                                6.f    // friction    (пока фикс — можно вынести в JSON позднее)
+                            });
 
                 // Управление с клавиатуры — берём из JSON (или из дефолтов config.h)
-                world.addComponent(entity, KeyboardControlComponent{
-                    cfg.controls.up,
-                    cfg.controls.down,
-                    cfg.controls.left,
-                    cfg.controls.right
-                });
+                world.addComponent(entity,
+                                   KeyboardControlComponent{cfg.controls.up, cfg.controls.down,
+                                                            cfg.controls.left, cfg.controls.right});
 
                 // Отложенное удаление PlayerConfigComponent (чтобы не ломать итератор)
                 toRemove.push_back(entity);
@@ -109,9 +109,10 @@ namespace core::ecs {
             }
         }
 
-        void render(World&, sf::RenderWindow&) override {}
+        void render(World&, sf::RenderWindow&) override {
+        }
 
-    private:
+      private:
         core::resources::ResourceManager& mResources;
     };
 

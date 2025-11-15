@@ -1,16 +1,16 @@
 #pragma once
 
-#include "core/ecs/system.h"
 #include "core/ecs/components/lock_behavior_component.h"
 #include "core/ecs/components/sprite_component.h"
 #include "core/ecs/components/transform_component.h"
+#include "core/ecs/system.h"
 
 namespace core::ecs {
 
     class LockSystem final : public ISystem {
-    public:
+      public:
         void onResize(World& world, const sf::View& view) {
-            auto& locks   = world.storage<LockBehaviorComponent>();
+            auto& locks = world.storage<LockBehaviorComponent>();
             auto& sprites = world.storage<SpriteComponent>();
             auto& transforms = world.storage<TransformComponent>();
 
@@ -28,8 +28,10 @@ namespace core::ecs {
             }
         }
 
-        void update(World&, float) override {}
-        void render(World&, sf::RenderWindow&) override {}
+        void update(World&, float) override {
+        }
+        void render(World&, sf::RenderWindow&) override {
+        }
     };
 
 } // namespace core::ecs

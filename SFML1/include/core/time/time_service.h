@@ -15,7 +15,7 @@
 namespace core::time {
 
     class TimeService {
-    public:
+      public:
         // Перезапуск всех временных метрик (используется при паузе/рестарте сцены)
         void reset() noexcept {
             mClock.restart();
@@ -33,18 +33,26 @@ namespace core::time {
         [[nodiscard]] bool shouldUpdate(const sf::Time& fixedTimeStep) noexcept;
 
         // Доступ к метрикам времени
-        [[nodiscard]] sf::Time  getDeltaTime()        const noexcept { return mDeltaTime; }
-        [[nodiscard]] float     getDeltaTimeSeconds() const noexcept { return mDeltaTime.asSeconds(); }
-        [[nodiscard]] float     getFps()              const noexcept { return mFps; }
-        [[nodiscard]] float     getSmoothedFps()      const noexcept { return mSmoothedFps; }
+        [[nodiscard]] sf::Time getDeltaTime() const noexcept {
+            return mDeltaTime;
+        }
+        [[nodiscard]] float getDeltaTimeSeconds() const noexcept {
+            return mDeltaTime.asSeconds();
+        }
+        [[nodiscard]] float getFps() const noexcept {
+            return mFps;
+        }
+        [[nodiscard]] float getSmoothedFps() const noexcept {
+            return mSmoothedFps;
+        }
 
-    private:
-        sf::Clock mClock;                      // секундомер кадра
-        sf::Time  mDeltaTime;                  // дельта времени между кадрами
-        float     mFps{0.f};                   // мгновенный FPS
-        float     mSmoothedFps{0.f};           // сглаженный FPS
-        sf::Time  mTimeSinceLastUpdate{};      // накопитель для fixed-step
-        bool      mInitialized{false};         // чтобы избежать скачка на первом кадре
+      private:
+        sf::Clock mClock;                // секундомер кадра
+        sf::Time mDeltaTime;             // дельта времени между кадрами
+        float mFps{0.f};                 // мгновенный FPS
+        float mSmoothedFps{0.f};         // сглаженный FPS
+        sf::Time mTimeSinceLastUpdate{}; // накопитель для fixed-step
+        bool mInitialized{false};        // чтобы избежать скачка на первом кадре
     };
 
 } // namespace core::time

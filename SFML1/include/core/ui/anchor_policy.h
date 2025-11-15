@@ -1,8 +1,9 @@
 #pragma once
 
 #include <SFML/Graphics.hpp>
-#include "core/ui/anchor_utils.h"
+
 #include "core/config.h"
+#include "core/ui/anchor_utils.h"
 
 namespace core::ui {
 
@@ -12,17 +13,21 @@ namespace core::ui {
      * Отвечает за вычисление origin и начальной позиции на экране
      */
     class AnchorPolicy final {
-    public:
-        explicit AnchorPolicy(AnchorType anchor = AnchorType::None)
-            : mAnchor(anchor) {}
+      public:
+        explicit AnchorPolicy(AnchorType anchor = AnchorType::None) : mAnchor(anchor) {
+        }
 
         void apply(sf::Sprite& sprite, const sf::View& view) const;
 
-        AnchorType getAnchor() const { return mAnchor; }
-        void setAnchor(AnchorType anchor) { mAnchor = anchor; }
+        AnchorType getAnchor() const {
+            return mAnchor;
+        }
+        void setAnchor(AnchorType anchor) {
+            mAnchor = anchor;
+        }
 
-    private:
-        AnchorType mAnchor{ AnchorType::None };
+      private:
+        AnchorType mAnchor{AnchorType::None};
     };
 
 } // namespace core::ui

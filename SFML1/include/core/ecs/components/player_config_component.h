@@ -1,4 +1,5 @@
 #pragma once
+
 #include "core/config/config_loader.h"
 
 namespace core::ecs {

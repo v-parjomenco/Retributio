@@ -27,7 +27,7 @@ namespace core::ecs {
      *  - добавлять новые системы
      */
     class SystemManager {
-    public:
+      public:
         SystemManager() = default;
         ~SystemManager() = default;
 
@@ -42,8 +42,7 @@ namespace core::ecs {
          * @brief Добавить систему любого типа.
          * @return ссылка на созданную систему, чтобы можно было её дальше настраивать.
          */
-        template <typename T, typename... Args>
-        T& addSystem(Args&&... args) {
+        template <typename T, typename... Args> T& addSystem(Args&&... args) {
             static_assert(std::is_base_of_v<ISystem, T>, "T must derive from ISystem");
             auto ptr = std::make_unique<T>(std::forward<Args>(args)...);
             T& ref = *ptr;
@@ -69,7 +68,7 @@ namespace core::ecs {
             }
         }
 
-    private:
+      private:
         std::vector<std::unique_ptr<ISystem>> mSystems;
     };
 

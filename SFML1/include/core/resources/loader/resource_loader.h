@@ -3,9 +3,9 @@
 #include <memory>
 #include <string>
 
-#include "core/resources/types/texture_resource.h"
 #include "core/resources/types/font_resource.h"
 #include "core/resources/types/soundbuffer_resource.h"
+#include "core/resources/types/texture_resource.h"
 
 namespace core::resources::loader {
 
@@ -14,11 +14,12 @@ namespace core::resources::loader {
      - Возвращает std::unique_ptr<Resource>, который затем можно вставить в ResourceHolder
      - Не управляет кэшированием/идентификаторами — этим занимается ResourceManager / ResourceHolder.
      - Позволяет изолировать код загрузки (и в будущем - сделать его асинхронным).
-    */  
+    */
     class ResourceLoader {
-    public:
+      public:
         // Возвращает unique_ptr на загруженный TextureResource или nullptr, если загрузка не удалась.
-        static std::unique_ptr<types::TextureResource> loadTexture(const std::string& path, bool smooth = true);
+        static std::unique_ptr<types::TextureResource> loadTexture(const std::string& path,
+                                                                   bool smooth = true);
 
         // Возвращает уникальный указатель на загруженный FontResource или nullptr при ошибке.
         static std::unique_ptr<types::FontResource> loadFont(const std::string& path);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "core/ui/scaling_policy.h"
 
 namespace core::ecs {
@@ -10,8 +12,8 @@ namespace core::ecs {
      * Mode::None    — масштабирование отключено
      */
     struct ScalingBehaviorComponent {
-        enum class Mode { None, Uniform };
-        Mode mode{ Mode::None };
+        enum class Mode : std::uint8_t { None, Uniform };
+        Mode mode{Mode::None};
 
         // Политика хранит per-entity состояние (mLastUniform), что правильно для ECS.
         core::ui::UniformScalingPolicy policy{};

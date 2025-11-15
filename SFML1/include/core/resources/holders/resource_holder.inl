@@ -14,7 +14,7 @@ namespace core::resources::holders {
     // в Resource::loadFromFile(filename, args...).
     template <typename Resource, typename Identifier>
     template <typename... Args> // вариативный шаблон typename... (число и тип аргументов заранее неизвестны)
-    void ResourceHolder<Resource, Identifier>::load(Identifier id,
+    void ResourceHolder<Resource, Identifier>::load(const Identifier& id,
                                                     const std::string& filename,
                                                     Args&&... args) {
 
@@ -101,7 +101,7 @@ namespace core::resources::holders {
     // Используется, например, ResourceLoader'ом, чтобы избежать двойной загрузки с диска.
     // После вставки ResourceHolder будет владеть ресурсом.
     template <typename Resource, typename Identifier>
-    void ResourceHolder<Resource, Identifier>::insert(Identifier id, std::unique_ptr<Resource> resource) {
+    void ResourceHolder<Resource, Identifier>::insert(const Identifier& id, std::unique_ptr<Resource> resource) {
         if (!resource) {
             return; // ничего не вставляем, если nullptr
         }

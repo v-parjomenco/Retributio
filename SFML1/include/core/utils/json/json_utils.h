@@ -1,8 +1,10 @@
 #pragma once
 
 #include <string>
+
 #include <SFML/System/Vector2.hpp>
 #include <SFML/Window/Keyboard.hpp>
+
 #include "third_party/json_silent.hpp"
 
 namespace core::utils::json {
@@ -17,10 +19,13 @@ namespace core::utils::json {
     template <>
     float parseValue<float>(const json& data, const std::string& key, const float& defaultValue);
     template <>
-    std::string parseValue<std::string>(const json& data, const std::string& key, const std::string& defaultValue);
+    std::string parseValue<std::string>(const json& data, const std::string& key,
+                                        const std::string& defaultValue);
     template <>
-    sf::Vector2f parseValue<sf::Vector2f>(const json& data, const std::string& key, const sf::Vector2f& defaultValue);
+    sf::Vector2f parseValue<sf::Vector2f>(const json& data, const std::string& key,
+                                          const sf::Vector2f& defaultValue);
 
-    sf::Keyboard::Key parseKey(const json& data, const std::string& key, sf::Keyboard::Key defaultValue);
+    sf::Keyboard::Key parseKey(const json& data, const std::string& key,
+                               sf::Keyboard::Key defaultValue);
 
 } // namespace core::utils::json

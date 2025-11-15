@@ -7,8 +7,8 @@
 #pragma once
 
 #include <memory>
-#include <typeindex>
 #include <type_traits>
+#include <typeindex>
 #include <unordered_map>
 
 #include <SFML/Graphics.hpp>
@@ -28,7 +28,7 @@ namespace core::ecs {
      *  - обновляет ВСЕ системы
      */
     class World {
-    public:
+      public:
         World() = default;
         ~World() = default;
 
@@ -36,8 +36,8 @@ namespace core::ecs {
         World(const World&) = delete;
         World& operator=(const World&) = delete;
         // Разрешаем перемещение
-        World(World&&) noexcept = default;
-        World& operator=(World&&) noexcept = default;
+        World(World&&) = default;
+        World& operator=(World&&) = default;
 
         // --------------------------- Сущности -----------------------------
         [[nodiscard]] Entity createEntity() {
@@ -60,7 +60,7 @@ namespace core::ecs {
             }
             // Сначала удаляем компоненты этой сущности из всех хранилищ
             for (auto& [type, storage] : mStorages) {
-                (void)type; // тип ключа здесь не используется — только само хранилище
+                (void) type; // тип ключа здесь не используется — только само хранилище
                 if (storage) {
                     storage->remove(e);
                 }
@@ -78,14 +78,13 @@ namespace core::ecs {
         /**
          * @brief Получить (создать при необходимости) хранилище компонента T.
          */
-        template <typename T>
-        ComponentStorage<T>& storage() {
+        template <typename T> ComponentStorage<T>& storage() {
             // Получение хранилища для компонента T
-            const std::type_index key{ typeid(T) }; // typeid(T) даёт тип во время выполнения
-                                                    // (TransformComponent, HealthComponent, и т.д.)
-                                                    // std::type_index - обёртка, вокруг typeid(T),
-                                                    // которая позволяет использовать тип typeid(T)
-                                                    // в unordered_map как ключ.
+            const std::type_index key{typeid(T)}; // typeid(T) даёт тип во время выполнения
+                                                  // (TransformComponent, HealthComponent, и т.д.)
+                                                  // std::type_index - обёртка, вокруг typeid(T),
+                                                  // которая позволяет использовать тип typeid(T)
+                                                  // в unordered_map как ключ.
             auto it = mStorages.find(key);
             if (it != mStorages.end()) {
                 /**
@@ -112,49 +111,43 @@ namespace core::ecs {
         }
 
         // Добавить компонент сущности в хранилище по rvalue через std::move
-        template <typename T>
-        T& addComponent(Entity e, T&& value) {
-            using PureT = std::remove_reference_t<T>;   // удаляем ссылки
+        template <typename T> T& addComponent(Entity e, T&& value) {
+            using PureT = std::remove_reference_t<T>; // удаляем ссылки
             auto& s = storage<PureT>();
             s.set(e, std::forward<T>(value));
             return *s.get(e);
         }
 
         // Добавить компонент сущности в хранилище по const ref
-        template <typename T>
-        T& addComponent(Entity e, const T& value) {
-            using PureT = std::remove_reference_t<T>;   // удаляем ссылки
-            auto& s = storage<PureT>(); // s - переменная типа ComponentStorage<T>,
-                                        // здесь мы вызываем у неё метод storage(),описанный выше
+        template <typename T> T& addComponent(Entity e, const T& value) {
+            using PureT = std::remove_reference_t<T>; // удаляем ссылки
+            auto& s = storage<PureT>();               // s - переменная типа ComponentStorage<T>,
+            // здесь мы вызываем у неё метод storage(),описанный выше
             s.set(e, value);
             return *s.get(e);
         }
 
         // Получить указатель на компонент, если компонент есть
-        template <typename T>
-        [[nodiscard]] T* getComponent(Entity e) {
+        template <typename T> [[nodiscard]] T* getComponent(Entity e) {
             auto& s = storage<T>();
             return s.get(e);
         }
 
         // Получить константный указатель на компонент (или nullptr, если компонента нет)
-        template <typename T>
-        [[nodiscard]] const T* getComponent(Entity e) const {
+        template <typename T> [[nodiscard]] const T* getComponent(Entity e) const {
             auto& s = const_cast<World*>(this)->storage<T>();
             return s.get(e);
         }
 
         // Вызывает erase в хранилище для этой сущности
-        template <typename T>
-        void removeComponent(Entity e) {
+        template <typename T> void removeComponent(Entity e) {
             auto& s = storage<T>();
             s.remove(e);
         }
 
         // --------------------------- Системы ------------------------------
 
-        template <typename T, typename... Args>
-        T& addSystem(Args&&... args) {
+        template <typename T, typename... Args> T& addSystem(Args&&... args) {
             return mSystems.addSystem<T>(std::forward<Args>(args)...);
         }
 
@@ -167,10 +160,14 @@ namespace core::ecs {
         }
 
         // Доступ к registry — если нужно низкоуровневое
-        Registry& registry() noexcept { return mRegistry; }
-        const Registry& registry() const noexcept { return mRegistry; }
+        Registry& registry() noexcept {
+            return mRegistry;
+        }
+        const Registry& registry() const noexcept {
+            return mRegistry;
+        }
 
-    private:
+      private:
         Registry mRegistry;
         SystemManager mSystems;
 

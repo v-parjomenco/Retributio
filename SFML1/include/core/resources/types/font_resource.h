@@ -1,14 +1,16 @@
 #pragma once
 
 #include <string>
+
 #include <SFML/Graphics.hpp>
+
 #include "core/resources/i_resource.h"
 
 namespace core::resources::types {
 
     // FontResource — тонкая оболочка вокруг sf::Font
     class FontResource : public core::resources::IResource {
-    public:
+      public:
         FontResource() = default;
         ~FontResource() override = default;
 
@@ -17,10 +19,14 @@ namespace core::resources::types {
             return mFont.openFromFile(filename);
         }
 
-        sf::Font& get() { return mFont; }
-        const sf::Font& get() const { return mFont; }
+        sf::Font& get() {
+            return mFont;
+        }
+        const sf::Font& get() const {
+            return mFont;
+        }
 
-    private:
+      private:
         sf::Font mFont;
     };
 

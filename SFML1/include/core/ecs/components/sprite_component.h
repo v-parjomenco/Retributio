@@ -18,8 +18,7 @@ namespace core::ecs {
         sf::Sprite sprite;
 
         // Явный конструктор — обязателен, т.к. sf::Sprite() = delete
-        explicit SpriteComponent(sf::Sprite spr)
-            : sprite(std::move(spr)) {
+        explicit SpriteComponent(sf::Sprite spr) : sprite(std::move(spr)) {
         }
 
         // Удаляем дефолтный конструктор, т.к. у sf::Sprite его нет

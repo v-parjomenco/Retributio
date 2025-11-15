@@ -1,8 +1,8 @@
 #pragma once
 
+#include <stdexcept>
 #include <string>
 #include <vector>
-#include <stdexcept>
 
 #include "third_party/json_silent.hpp"
 
@@ -17,7 +17,7 @@ namespace core::utils::json {
      * Поддерживает несколько возможных типов для одного ключа.
      */
     class JsonValidator {
-    public:
+      public:
         using json = nlohmann::json;
 
         struct KeyRule {
@@ -35,16 +35,18 @@ namespace core::utils::json {
         static void validate(const json& data, const std::vector<KeyRule>& rules) {
             for (const auto& rule : rules) {
 
-// Нужно включить когда будет запись логов, а не всплывающие сообщения
-//#ifdef _DEBUG
-//                DEBUG_MSG("[JsonValidator]\nПроверка ключа: " + rule.name);
-//#endif
+                // Нужно включить когда будет запись логов, а не всплывающие сообщения
+                //#ifdef _DEBUG
+                //                DEBUG_MSG("[JsonValidator]\nПроверка ключа: " + rule.name);
+                //#endif
 
                 if (!data.contains(rule.name)) {
-                    if (rule.required)
-                        throw std::runtime_error("\nConfig validation error: missing key '" + rule.name + "'");
-                    else
+                    if (rule.required) {
+                        throw std::runtime_error("\nConfig validation error: missing key '" +
+                                                 rule.name + "'");
+                    } else {
                         continue;
+                    }
                 }
 
                 const auto& value = data.at(rule.name);
@@ -62,32 +64,41 @@ namespace core::utils::json {
                     std::string expected;
                     for (size_t i = 0; i < rule.allowedTypes.size(); ++i) {
                         expected += typeName(rule.allowedTypes[i]);
-                        if (i + 1 < rule.allowedTypes.size()) expected += " or ";
+                        if (i + 1 < rule.allowedTypes.size()) {
+                            expected += " or ";
+                        }
                     }
 
-                    throw std::runtime_error(
-                        "\nConfig validation error: key '" + rule.name +
-                        "' has wrong type (" + typeName(type) +
-                        "), expected " + expected
-                    );
+                    throw std::runtime_error("\nConfig validation error: key '" + rule.name +
+                                             "' has wrong type (" + typeName(type) +
+                                             "), expected " + expected);
                 }
             }
         }
 
-    private:
+      private:
         static std::string typeName(nlohmann::json::value_t t) {
             switch (t) {
-            case nlohmann::json::value_t::string: return "string";
+            case nlohmann::json::value_t::string:
+                return "string";
             case nlohmann::json::value_t::number_float:
             case nlohmann::json::value_t::number_integer:
-            case nlohmann::json::value_t::number_unsigned: return "number";
-            case nlohmann::json::value_t::array: return "array";
-            case nlohmann::json::value_t::object: return "object";
-            case nlohmann::json::value_t::boolean: return "boolean";
-            case nlohmann::json::value_t::null: return "null";
-            case nlohmann::json::value_t::binary: return "binary";
-            case nlohmann::json::value_t::discarded: return "discarded";
-            default: return "unknown";
+            case nlohmann::json::value_t::number_unsigned:
+                return "number";
+            case nlohmann::json::value_t::array:
+                return "array";
+            case nlohmann::json::value_t::object:
+                return "object";
+            case nlohmann::json::value_t::boolean:
+                return "boolean";
+            case nlohmann::json::value_t::null:
+                return "null";
+            case nlohmann::json::value_t::binary:
+                return "binary";
+            case nlohmann::json::value_t::discarded:
+                return "discarded";
+            default:
+                return "unknown";
             }
         }
     };
