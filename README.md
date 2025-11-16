@@ -16,64 +16,20 @@ A modular 2D **C++17 + SFML 3.0.2** game engine powering an aerial combat indie 
 ## 📁 **Project Structure**
 ```text
 SFML1/
-├─ assets/                     # Game assets
-│  ├─ config/                  # JSON configs (e.g. player.json)
-│  ├─ fonts/                   # Fonts (e.g. Wolgadeutsche.otf)
-│  ├─ images/                  # Sprites and textures
-│  └─ sounds/                  # Sound effects and music
-│
-├─ data/                       # Engine data and definitions
-│  └─ definitions/             # Resource definitions (e.g. resources.json)
-│
-├─ include/                    # Header files (engine API)
-│  ├─ core/                    # Core engine logic
-│  │  ├─ config/               # Config keys and loader
-│  │  ├─ ecs/                  # Entity–Component–System framework
-│  │  │  ├─ components/        # Component definitions
-│  │  │  ├─ systems/           # Game logic systems (render, movement, etc.)
-│  │  │  └─ detail/            # Internal ECS mechanisms
-│  │  ├─ resources/            # Resource management layer
-│  │  │  ├─ holders/           # Generic resource holders (templates)
-│  │  │  ├─ ids/               # Enum identifiers and string helpers
-│  │  │  ├─ loader/            # Resource loading logic
-│  │  │  ├─ paths/             # Resource path definitions
-│  │  │  └─ types/             # Resource type wrappers (texture, font, sound)
-│  │  ├─ ui/                   # UI behaviors, anchors, scaling & lock policies
-│  │  └─ utils/                # Core utilities (JSON, messaging, etc.)
-│  │     └─ json/              # JSON parsing & validation helpers
-│  │
-│  ├─ entities/                # Game entities (Player, NPCs, etc.)
-│  ├─ graphics/                # Rendering utilities (future expansion)
-│  ├─ third_party/             # External libraries (e.g. nlohmann/json)
-│  └─ utils/                   # Global helper utilities
-│
-├─ src/                        # Source code (.cpp implementations)
-│  ├─ core/                    # Core engine source
-│  │  ├─ config/               # Config loader implementation
-│  │  ├─ ecs/                  # ECS framework implementation
-│  │  │  ├─ components/        # Component logic (if specialized)
-│  │  │  ├─ systems/           # System logic (movement, rendering, etc.)
-│  │  │  └─ detail/            # Internal ECS routines
-│  │  ├─ resources/            # Resource manager, holders, loader, paths, types
-│  │  │  ├─ holders/           # Template implementations for holders
-│  │  │  ├─ ids/               # Resource ID utilities
-│  │  │  ├─ loader/            # ResourceLoader implementations
-│  │  │  ├─ paths/             # Path resolver logic
-│  │  │  └─ types/             # Resource type behavior
-│  │  ├─ ui/                   # UI systems (anchor, scaling, lock behavior)
-│  │  └─ utils/                # Utility and JSON implementation
-│  │     └─ json/              # JSON parsing & validation code
-│  │
-│  ├─ entities/                # Entity logic implementations
-│  ├─ graphics/                # Graphics helpers and rendering classes
-│  ├─ third_party/             # Stubs or wrappers for external code (rarely used)
-│  └─ utils/                   # Standalone helper functions
-│
-├─ CREDITS.md                  # Contributors and acknowledgements
-├─ README.md                   # Project documentation
-├─ SFML1.sln                   # Visual Studio solution
-└─ LICENSE.MIT                 # MIT License
+├─ assets/              # Game assets (config, fonts, images, sounds)
+├─ data/                # Engine definitions (resources.json)
+├─ include/             # Header files
+│  └─ core/             # Core engine
+│     ├─ config/        # JSON config loading
+│     ├─ ecs/           # Entity-Component-System
+│     ├─ resources/     # Resource management
+│     ├─ ui/            # UI behaviors (anchors, scaling)
+│     └─ utils/         # Utilities (JSON, messaging)
+├─ src/                 # Implementation files
+└─ main.cpp             # Entry point
 ```
+
+**Full structure:** See [STRUCTURE.md](./STRUCTURE.md)
 
 ---
 
@@ -196,6 +152,25 @@ Use `parseValue` helpers to safely extract data types.
 - [ ] ECS-based physics and AI  
 - [ ] Widget/UI system  
 - [ ] Modular game state management  
+
+---
+
+## 🎯 **Project Vision**
+
+**SkyGuard** is a modular game engine designed to support:
+1. **Phase 1 (Current):** Aerial combat prototype
+2. **Phase 2 (Year 1-2):** Casual games to test engine flexibility
+3. **Phase 3 (Year 3-5):** Full 4X grand strategy game (Civ/EU5 scale)
+
+---
+
+## 🏛️ **Design Principles**
+
+1. **Data-Driven First** - Gameplay defined in JSON, not hardcoded
+2. **Separation of Concerns** - Simulation logic ≠ Rendering logic
+3. **Paradox-Style Modding** - Inspired by EU4/CK3 event/trigger system
+4. **Performance Over Beauty** - 60 FPS with 10K entities > fancy graphics
+5. **Incremental Complexity** - Start simple, add features gradually
 
 ---
 

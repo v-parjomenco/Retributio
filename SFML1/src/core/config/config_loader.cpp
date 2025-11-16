@@ -1,10 +1,12 @@
+#include "pch.h"
 #include "core/config/config_loader.h"
+
+#include <cstdlib>
 #include <fstream>
 #include <stdexcept>
 
 #include "third_party/json_silent.hpp"
 
-#include "core/config.h"
 #include "core/config/config_keys.h"
 #include "core/utils/json/json_utils.h"
 #include "core/utils/json/json_validator.h"

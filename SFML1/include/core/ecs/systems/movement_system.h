@@ -1,4 +1,4 @@
-// =====================================================
+п»ї// =====================================================
 // File: core/ecs/systems/movement_system.h
 // Purpose: position += velocity * dt
 // Used by: Game update loop via World/SystemManager
@@ -14,9 +14,9 @@
 namespace core::ecs {
 
     /** 
-    * @brief Система движения
-    * проходит по всем сущностям, у которых есть и Transform и Velocity,
-    * и выполняет: position += velocity * dt
+    * @brief РЎРёСЃС‚РµРјР° РґРІРёР¶РµРЅРёСЏ
+    * РїСЂРѕС…РѕРґРёС‚ РїРѕ РІСЃРµРј СЃСѓС‰РЅРѕСЃС‚СЏРј, Сѓ РєРѕС‚РѕСЂС‹С… РµСЃС‚СЊ Рё Transform Рё Velocity,
+    * Рё РІС‹РїРѕР»РЅСЏРµС‚: position += velocity * dt
     */
     class MovementSystem : public ISystem {
       public:

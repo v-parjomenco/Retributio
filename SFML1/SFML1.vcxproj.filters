@@ -151,6 +151,12 @@
     <Filter Include="src\core\time">
       <UniqueIdentifier>{b68e63b3-f44b-48c6-96c2-700a34fa361d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\compiler">
+      <UniqueIdentifier>{9e958531-9940-4131-8342-129aca9c3fc1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\compiler">
+      <UniqueIdentifier>{fc04f2a3-fe5f-4162-b0a0-fac0ce93b5fd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -200,6 +206,9 @@
     </ClCompile>
     <ClCompile Include="src\core\ui\scaling_policy.cpp">
       <Filter>src\core\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\pch.cpp">
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -349,6 +358,12 @@
     </ClInclude>
     <ClInclude Include="include\core\config\debug_overlay_config.h">
       <Filter>include\core\config</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\compiler\warnings.h">
+      <Filter>include\core\compiler</Filter>
+    </ClInclude>
+    <ClInclude Include="include\pch.h">
+      <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

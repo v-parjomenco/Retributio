@@ -1,4 +1,4 @@
-#pragma once
+п»ї#pragma once
 
 #include <cassert>
 #include <cstdint>
@@ -48,7 +48,7 @@ namespace core::ui {
             case AnchorType::None:
                 return {0.f, 0.f};
             default:
-                // Защита от потенциально некорректного значения enum
+                // Р—Р°С‰РёС‚Р° РѕС‚ РїРѕС‚РµРЅС†РёР°Р»СЊРЅРѕ РЅРµРєРѕСЂСЂРµРєС‚РЅРѕРіРѕ Р·РЅР°С‡РµРЅРёСЏ enum
                 assert(false && "Unknown AnchorType in computeAnchorOffset");
                 return {0.f, 0.f};
             }
@@ -86,7 +86,7 @@ namespace core::ui {
                 return AnchorType::None;
             }
 
-            // значение по умолчанию при ошибке
+            // Р·РЅР°С‡РµРЅРёРµ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ РїСЂРё РѕС€РёР±РєРµ
             return AnchorType::None;
         }
 

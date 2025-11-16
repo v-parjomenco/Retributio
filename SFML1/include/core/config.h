@@ -1,7 +1,4 @@
 #pragma once
-#ifdef _MSC_VER
-#pragma warning(disable : 4514 4623 4625 4626 4668 4820 5027 5039 5246 5267 4061 4365 4100)
-#endif
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX

@@ -1,6 +1,8 @@
+#include "pch.h"
 #include "core/config/debug_overlay_config.h"
-#include <cstdint>
+
 #include <fstream>
+#include <stdexcept>
 
 #include "core/utils/json/json_utils.h"
 #include "core/utils/json/json_validator.h"

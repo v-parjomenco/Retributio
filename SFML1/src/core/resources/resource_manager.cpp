@@ -1,6 +1,7 @@
+#include "pch.h"
 #include "core/resources/resource_manager.h"
+
 #include <stdexcept>
-#include <string>
 
 #include "core/resources/loader/resource_loader.h"
 

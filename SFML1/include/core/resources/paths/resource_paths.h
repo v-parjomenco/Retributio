@@ -1,4 +1,4 @@
-#pragma once
+п»ї#pragma once
 
 #include <string>
 #include <unordered_map>
@@ -21,7 +21,7 @@ namespace core::resources::paths {
         static std::unordered_map<ids::FontID, std::string> mFonts;
         static std::unordered_map<ids::SoundID, std::string> mSounds;
 
-        // Валидация структуры JSON
+        // Р’Р°Р»РёРґР°С†РёСЏ СЃС‚СЂСѓРєС‚СѓСЂС‹ JSON
         static void validateJSON(const nlohmann::json& data);
     };
 

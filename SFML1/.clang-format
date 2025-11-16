@@ -39,23 +39,27 @@ ReferenceAlignment: Left
 SortIncludes: true
 IncludeBlocks: Regroup
 IncludeCategories:
-  # 1) SFML-хедеры: <SFML/Graphics.hpp>, <SFML/System.hpp>, ...
+  # 0) PCH — всегда первым
+  - Regex: '^"pch.h"'
+    Priority: -1
+
+  # 1) SFML-хедеры
   - Regex: '^<SFML/.*>'
     Priority: 1
 
-  # 2) Стандартная библиотека: <vector>, <string>, <memory>...
+  # 2) Стандартная библиотека
   - Regex: '^<.*>'
     Priority: 0
 
-  # 3) third_party: "third_party/json_silent.hpp" и т.п.
+  # 3) third_party
   - Regex: '^"third_party/.*"'
     Priority: 2
 
-  # 4) Мои хедеры движка/игр: "core/...", "entities/...", "utils/..." и т.п.
+  # 4) Хедеры движка/игр
   - Regex: '^"(core|entities|graphics|utils)/.*"'
     Priority: 3
 
-  # 5) Всё остальное в кавычках — в самый конец, на всякий случай
+  # 5) Всё остальное в кавычках
   - Regex: '^".*"'
     Priority: 4
 

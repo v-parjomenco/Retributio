@@ -1,11 +1,13 @@
+#include "pch.h"
 #include "core/game.h"
+
 #include <cassert>
 #include <iostream>
-#include <optional>
 
 #include "core/config/config_loader.h"
 #include "core/config/debug_overlay_config.h"
 #include "core/resources/paths/resource_paths.h"
+#include "core/utils/message.h"
 
 namespace cfg = ::config; // глобальные дефолты движка (окно, vsync, fixed step, hotkeys...)
 namespace gcfg =

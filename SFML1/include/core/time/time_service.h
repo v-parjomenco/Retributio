@@ -49,10 +49,10 @@ namespace core::time {
       private:
         sf::Clock mClock;                // секундомер кадра
         sf::Time mDeltaTime;             // дельта времени между кадрами
-        float mFps{0.f};                 // мгновенный FPS
-        float mSmoothedFps{0.f};         // сглаженный FPS
         sf::Time mTimeSinceLastUpdate{}; // накопитель для fixed-step
         bool mInitialized{false};        // чтобы избежать скачка на первом кадре
+        float mFps{0.f};                 // мгновенный FPS
+        float mSmoothedFps{0.f};         // сглаженный FPS
     };
 
 } // namespace core::time

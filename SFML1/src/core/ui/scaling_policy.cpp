@@ -1,9 +1,9 @@
+#include "pch.h"
 #include "core/ui/scaling_policy.h"
-#include <algorithm>
 
 namespace core::ui {
 
-    void ui::UniformScalingPolicy::apply(sf::Sprite& sprite, const sf::View& view) {
+    void UniformScalingPolicy::apply(sf::Sprite& sprite, const sf::View& view) {
         // Берём View изначального размера экрана
         sf::Vector2f baseViewSize{static_cast<float>(config::WINDOW_WIDTH),
                                   static_cast<float>(config::WINDOW_HEIGHT)};
@@ -25,11 +25,12 @@ namespace core::ui {
             ratio = newUniform / mLastUniform;
         }
 
-        sf::Vector2f currentScale =
-            sprite.getScale(); // получаем текущий коэффициент масштабирования спрайта
+        // Получаем текущий коэффициент масштабирования спрайта
+        sf::Vector2f currentScale = sprite.getScale();
+
+        // Перемножаем старый коэффициент с новым и устанавливаем новый масштаб спрайта
         sprite.setScale({currentScale.x * ratio,
-                         currentScale.y * ratio}); // перемножаем старый коэффициент с новым
-                                                   // и устанавливаем новый масштаб спрайта
+                         currentScale.y * ratio}); 
 
         mLastUniform = newUniform;
     }

@@ -44,7 +44,7 @@ namespace core::utils {
             throw std::runtime_error("Ошибка конвертации UTF-8 → UTF-16");
         }
 
-        std::wstring result(required, L'\0');
+        std::wstring result(static_cast<std::wstring::size_type>(required), L'\0');
         int converted = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str.c_str(), -1,
                                             result.data(), required);
         if (converted == 0) {
@@ -90,7 +90,7 @@ namespace core::utils {
 #endif
         }
 
-        inline void logDebug(const std::string& message) {
+        inline void logDebug([[maybe_unused]] const std::string& message) {
 #ifdef _DEBUG
 #ifdef _WIN32
             showMessageBox(message, "Отладка", MB_OK | MB_ICONINFORMATION);

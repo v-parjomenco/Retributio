@@ -1,5 +1,5 @@
+#include "pch.h"
 #include "core/ui/lock_policy.h"
-#include <algorithm>
 
 namespace core::ui {
 

@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "core/ecs/components/lock_behavior_component.h"
 #include "core/ecs/components/sprite_component.h"
@@ -16,11 +16,11 @@ namespace core::ecs {
 
             for (auto& [entity, lockComp] : locks) {
                 if (auto* sprite = sprites.get(entity)) {
-                    // Ïðèìåíÿåì ïîëèòèêó ê ñïðàéòó
+                    // ÐŸÑ€Ð¸Ð¼ÐµÐ½ÑÐµÐ¼ Ð¿Ð¾Ð»Ð¸Ñ‚Ð¸ÐºÑƒ Ðº ÑÐ¿Ñ€Ð°Ð¹Ñ‚Ñƒ
                     if (lockComp.policy) {
                         lockComp.policy->apply(sprite->sprite, view);
                     }
-                    // Îáÿçàòåëüíî ñèíõðîíèçèðóåì Transform, èíà÷å RenderSystem ïåðåòð¸ò ïîçèöèþ
+                    // ÐžÐ±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ð¸Ð·Ð¸Ñ€ÑƒÐµÐ¼ Transform, Ð¸Ð½Ð°Ñ‡Ðµ RenderSystem Ð¿ÐµÑ€ÐµÑ‚Ñ€Ñ‘Ñ‚ Ð¿Ð¾Ð·Ð¸Ñ†Ð¸ÑŽ
                     if (auto* tr = transforms.get(entity)) {
                         tr->position = sprite->sprite.getPosition();
                     }

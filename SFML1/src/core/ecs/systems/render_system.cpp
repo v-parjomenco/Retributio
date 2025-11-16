@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "core/ecs/systems/render_system.h"
 
 namespace core::ecs {
