@@ -1,4 +1,5 @@
 #include "pch.h"
+
 #include "core/ui/scaling_policy.h"
 
 namespace core::ui {
@@ -29,8 +30,7 @@ namespace core::ui {
         sf::Vector2f currentScale = sprite.getScale();
 
         // Перемножаем старый коэффициент с новым и устанавливаем новый масштаб спрайта
-        sprite.setScale({currentScale.x * ratio,
-                         currentScale.y * ratio}); 
+        sprite.setScale({currentScale.x * ratio, currentScale.y * ratio});
 
         mLastUniform = newUniform;
     }

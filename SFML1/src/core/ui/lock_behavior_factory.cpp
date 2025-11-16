@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "core/ui/lock_behavior_factory.h"
 
+#include "core/ui/lock_behavior_factory.h"
 #include <cassert>
 
 #include "core/utils/message.h"

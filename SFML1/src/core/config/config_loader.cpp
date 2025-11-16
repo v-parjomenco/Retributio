@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "core/config/config_loader.h"
 
+#include "core/config/config_loader.h"
 #include <cstdlib>
 #include <fstream>
 #include <stdexcept>

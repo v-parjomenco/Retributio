@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "core/config/debug_overlay_config.h"
 
+#include "core/config/debug_overlay_config.h"
 #include <fstream>
 #include <stdexcept>
 

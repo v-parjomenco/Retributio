@@ -41,7 +41,6 @@ namespace core::ecs {
         // NOLINTNEXTLINE(performance-noexcept-move-constructor, bugprone-exception-escape)
         World& operator=(World&&) = default;
 
-
         // --------------------------- Сущности -----------------------------
         [[nodiscard]] Entity createEntity() {
             return mRegistry.createEntity();
