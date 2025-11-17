@@ -28,4 +28,7 @@ namespace core::utils::json {
     sf::Keyboard::Key parseKey(const json& data, const std::string& key,
                                sf::Keyboard::Key defaultValue);
 
+    sf::Color parseColor(const json& data, const std::string& key,
+                         const sf::Color& defaultValue);
+
 } // namespace core::utils::json

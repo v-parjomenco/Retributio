@@ -2,6 +2,49 @@
 
 #include "core/utils/json/json_utils.h"
 
+// Внутренняя утилита для парсинга цвета, её внешний API parseColor() - ниже
+namespace {
+    using core::utils::json::json;
+
+    sf::Color parseColorValue(const json& value, const sf::Color& fallback) {
+        // Для строки формата "#RRGGBB" или "#RRGGBBAA"
+        if (value.is_string()) {
+            std::string s = value.get<std::string>();
+            if (!s.empty() && s[0] == '#') {
+                s.erase(0, 1);
+
+                auto hexToByte = [](const std::string& hex) -> uint8_t {
+                    return static_cast<uint8_t>(std::stoul(hex, nullptr, 16));
+                };
+
+                try {
+                    if (s.size() == 6) {
+                        return {hexToByte(s.substr(0, 2)), hexToByte(s.substr(2, 2)),
+                                hexToByte(s.substr(4, 2)), 255};
+                    }
+                    if (s.size() == 8) {
+                        return {hexToByte(s.substr(0, 2)), hexToByte(s.substr(2, 2)),
+                                hexToByte(s.substr(4, 2)), hexToByte(s.substr(6, 2))};
+                    }
+                } catch (...) {
+                    return fallback;
+                }
+            }
+        }
+
+        // Для строки формата RGB: {"r": 255, "g": 0, "b": 0, "a": 255}
+        else if (value.is_object()) {
+            auto r = static_cast<uint8_t>(value.value("r", 255));
+            auto g = static_cast<uint8_t>(value.value("g", 255));
+            auto b = static_cast<uint8_t>(value.value("b", 255));
+            auto a = static_cast<uint8_t>(value.value("a", 255));
+            return {r, g, b, a};
+        }
+
+        return fallback;
+    }
+} // namespace
+
 namespace core::utils::json {
 
     using json = nlohmann::json;
@@ -119,15 +162,23 @@ namespace core::utils::json {
     }
 
     // Преобразование строки из JSON-объекта в клавишу SFML.
-    // Если нет поля или неверный формат, возвращает defaultValue.
     sf::Keyboard::Key parseKey(const json& data, const std::string& key,
                                sf::Keyboard::Key defaultValue) {
+        // Если нет поля или неверный формат → возвращаем defaultValue.
         if (!data.contains(key) || !data[key].is_string()) {
             return defaultValue;
         }
-
         const std::string name = data[key].get<std::string>();
         return parseKeyString(name);
+    }
+
+    // Парсинг цвета из JSON
+    sf::Color parseColor(const json& data, const std::string& key, const sf::Color& defaultValue) {
+        // Если в JSON нет "color" → возвращаем → возвращаем defaultValue.
+        if (!data.contains(key)) {
+            return defaultValue;
+        }
+        return parseColorValue(data.at(key), defaultValue);
     }
 
     // Явные инстанциации, чтобы линковщик видел шаблоны

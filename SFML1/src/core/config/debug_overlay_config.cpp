@@ -10,46 +10,6 @@
 
 using core::utils::json::json;
 
-namespace {
-
-    sf::Color parseColor(const json& value, const sf::Color& fallback) {
-        if (value.is_string()) {
-            std::string s = value.get<std::string>();
-            // Поддержка форматов: "#RRGGBB" / "#RRGGBBAA"
-            if (!s.empty() && s[0] == '#') {
-                s.erase(0, 1);
-                auto hexTo = [](const std::string& h) -> uint8_t {
-                    return static_cast<uint8_t>(std::stoul(h, nullptr, 16));
-                };
-                try {
-                    if (s.size() == 6) {
-                        return {hexTo(s.substr(0, 2)), hexTo(s.substr(2, 2)), hexTo(s.substr(4, 2)),
-                                255};
-                    } else if (s.size() == 8) {
-                        return {hexTo(s.substr(0, 2)), hexTo(s.substr(2, 2)), hexTo(s.substr(4, 2)),
-                                hexTo(s.substr(6, 2))};
-                    }
-                } catch (const std::exception& e) {
-                    core::utils::message::logDebug(
-                        std::string("[DebugOverlayConfig]\nНекорректное значение color: ") +
-                        e.what());
-                } catch (...) {
-                    core::utils::message::logDebug(
-                        "[DebugOverlayConfig]\nНекорректное значение color: неизвестная ошибка");
-                }
-            }
-        } else if (value.is_object()) {
-            auto r = static_cast<uint8_t>(value.value("r", 255));
-            auto g = static_cast<uint8_t>(value.value("g", 255));
-            auto b = static_cast<uint8_t>(value.value("b", 255));
-            auto a = static_cast<uint8_t>(value.value("a", 255));
-            return {r, g, b, a};
-        }
-        return fallback;
-    }
-
-} // namespace
-
 namespace core::config {
 
     DebugOverlayConfig loadDebugOverlayConfig(const std::string& path) {
@@ -89,9 +49,7 @@ namespace core::config {
         cfg.position = core::utils::json::parseValue<sf::Vector2f>(data, "position", cfg.position);
         cfg.characterSize =
             static_cast<unsigned>(data.value("characterSize", static_cast<int>(cfg.characterSize)));
-        if (data.contains("color")) {
-            cfg.color = parseColor(data["color"], cfg.color);
-        }
+        cfg.color = utils::json::parseColor(data, "color", cfg.color);
 
         return cfg;
     }
