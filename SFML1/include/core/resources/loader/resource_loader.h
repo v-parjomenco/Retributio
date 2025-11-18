@@ -17,16 +17,17 @@
 
 namespace core::resources::loader {
 
-
-    // ResourceLoader - среднеуровневый модуль для загрузки ресурсов с диска.
-    //
-    // - Ниже, чем ResourceManager, но выше загрузки данных библиотекой SFML.
-    // - Использует нативные методы SFML (loadFromFile) для Texture / Font / SoundBuffer.
-    // - Возвращает std::unique_ptr<Resource>, который затем можно вставить в ResourceHolder
-    // - Не управляет кэшированием и жизненным циклом
-    // (этим занимаются ResourceManager/ResourceHolder).
+    /**
+    * @brief ResourceLoader - среднеуровневый модуль для загрузки ресурсов с диска.
+    *
+    * - Ниже, чем ResourceManager, но выше загрузки данных библиотекой SFML.
+    * - Использует нативные методы SFML (loadFromFile) для Texture / Font / SoundBuffer.
+    * - Возвращает std::unique_ptr<Resource>, который затем можно вставить в ResourceHolder
+    * - Не управляет кэшированием и жизненным циклом
+    * (этим занимаются ResourceManager/ResourceHolder).
     // - Позволяет изолировать код загрузки
-    // (в будущем можно заменить на асинхронную/стриминговую загрузку).
+    * (в будущем можно заменить на асинхронную/стриминговую загрузку).
+    */
     class ResourceLoader {
       public:
         // Загружает текстуру из файла.

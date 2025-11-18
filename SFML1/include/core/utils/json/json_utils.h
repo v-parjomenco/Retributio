@@ -26,11 +26,13 @@ namespace core::utils::json {
     // Шаблонный парсер и его специализации
     // --------------------------------------------------------------------------------------------
 
-    // Универсальный шаблон для чтения значения из JSON.
-    // Если ключ присутствует и тип совместим, берём T из JSON.
-    // Если ключ отсутствует — возвращаем defaultValue.
-    // Для некоторых типов (float, std::string, sf::Vector2f, bool, unsigned)
-    // есть специализации с более "умной" логикой.
+    /**
+    * @brief Универсальный шаблон для чтения значения из JSON.
+    * Если ключ присутствует и тип совместим, берём T из JSON.
+    * Если ключ отсутствует — возвращаем defaultValue.
+    * Для некоторых типов (float, std::string, sf::Vector2f, bool, unsigned)
+    * есть специализации с более "умной" логикой.
+    */
     template <typename T>
     T parseValue(const json& data, const std::string& key, const T& defaultValue);
 
@@ -65,6 +67,45 @@ namespace core::utils::json {
                                   const std::string& key,
                                   const unsigned& defaultValue);
 
+    /**
+    * @brief Generic helper для enum-типов, задаваемых строкой в JSON.
+    *
+    * Предполагается, что:
+    *  - Enum — это enum/enum class (например, TextureID),
+    *  - mapper — функция/functor вида
+    *        std::optional<Enum>(std::string_view)
+    *    (например, textureFromString / fontFromString),
+    *  - JSON хранит строковый идентификатор (например, "Player"), а не путь.
+    *
+    * Поведение:
+    *  - если ключ отсутствует или не является строкой → возвращается defaultValue;
+    *  - если mapper(name) вернул значение → оно используется;
+    *  - если mapper(name) вернул std::nullopt → возвращается defaultValue.
+    *
+    * Важно:
+    *  - parseEnum НИЧЕГО не логирует и не показывает ошибок пользователю;
+    *    он только инкапсулирует типовой паттерн "string → enum с fallback".
+    *  - В местах, где нужен popup/лог (как в ConfigLoader), можно использовать
+    *    этот helper как building block, но добавлять сообщения об ошибках отдельно.
+    */
+    template <typename Enum, typename Mapper>
+    Enum parseEnum(const json& data, const std::string& key, Enum defaultValue, Mapper mapper) {
+        // Нет ключа или не строка — просто возвращаем дефолт.
+        if (!data.contains(key) || !data.at(key).is_string()) {
+            return defaultValue;
+        }
+
+        const std::string name = data.at(key).get<std::string>();
+
+        // Ожидаем, что mapper вернёт std::optional<Enum>.
+        if (auto idOpt = mapper(name)) {
+            return *idOpt;
+        }
+
+        // Не удалось сопоставить строку с enum — используем дефолт.
+        return defaultValue;
+    }
+
     // --------------------------------------------------------------------------------------------
     // Специализированные парсеры
     // --------------------------------------------------------------------------------------------
@@ -82,23 +123,30 @@ namespace core::utils::json {
     // Общие хелперы для парсинга и валидации JSON-конфигов
     // --------------------------------------------------------------------------------------------
 
-    //   - Используется для "критичных" конфигов (player.json и т.п.).
-    //   - При ошибке парсинга или валидации:
-    //       * показывает пользователю окно ошибки (showError),
-    //       * вызывает std::exit(EXIT_FAILURE).
-    //   - Если всё хорошо — возвращает разобранный json.
-    // moduleTag - строка вроде "ConfigLoader" / "DebugOverlayConfig" — для префикса в сообщениях.
+    /**
+    * @brief parseAndValidateCritical(...)
+    * 
+    * - Используется для "критичных" конфигов (player.json и т.п.).
+    * - При ошибке парсинга или валидации:
+    *   * показывает пользователю окно ошибки (showError),
+    *   * вызывает std::exit(EXIT_FAILURE).
+    * - Если всё хорошо — возвращает разобранный json.
+    * moduleTag - строка вроде "ConfigLoader" / "DebugOverlayConfig" — для префикса в сообщениях.
+    */
     json parseAndValidateCritical(const std::string& fileContent,
                                   const std::string& path,
                                   const char* moduleTag,
                                   const std::vector<JsonValidator::KeyRule>& rules);
 
-    // parseAndValidateNonCritical(...)
-    //   - Используется для не критичных вещей (debug overlay, вспомогательные настройки).
-    //   - При ошибке:
-    //       * пишет logDebug,
-    //       * возвращает std::nullopt (вызывающий код сам решает, что делать дальше).
-    // moduleTag - строка вроде "ConfigLoader" / "DebugOverlayConfig" — для префикса в сообщениях.
+    /**
+    * @brief parseAndValidateNonCritical(...)
+    * 
+    * - Используется для не критичных вещей (debug overlay, вспомогательные настройки).
+    * - При ошибке:
+    *   * пишет logDebug,
+    *   * возвращает std::nullopt (вызывающий код сам решает, что делать дальше).
+    * moduleTag - строка вроде "ConfigLoader" / "DebugOverlayConfig" — для префикса в сообщениях.
+    */
     std::optional<json>
     parseAndValidateNonCritical(const std::string& fileContent,
                                 const std::string& path,

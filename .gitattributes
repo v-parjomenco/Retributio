@@ -1,0 +1,11 @@
+# По умолчанию — текстовые файлы, нормализуем в LF в репозитории
+* text=auto
+
+# Код и конфиги — строго LF
+*.cpp  text eol=lf
+*.h    text eol=lf
+*.hpp  text eol=lf
+*.inl  text eol=lf
+*.json text eol=lf
+*.txt  text eol=lf
+*.md   text eol=lf

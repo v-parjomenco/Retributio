@@ -23,13 +23,14 @@ namespace core::config {
         sf::Color color{255, 0, 0, 255};    // цвет текста по умолчанию (красный)
     };
 
-    // Загружает JSON из файла и парсит данные в DebugOverlayConfig.
-    //
-    // Возможное поведение:
-    //  - Если файла нет / не читается           -> logDebug(...) + дефолт из DebugOverlayConfig.
-    //  - Если JSON некорректен или невалиден    -> logDebug(...) + дефолт из DebugOverlayConfig.
-    //  - Если отдельные поля отсутствуют        -> дефолт из DebugOverlayConfig.
-    //
+    /**
+    * @brief Загружает JSON из файла и парсит данные в DebugOverlayConfig.
+    *
+    * Возможное поведение:
+    *  - Если файла нет / не читается           -> logDebug(...) + дефолт из DebugOverlayConfig.
+    *  - Если JSON некорректен или невалиден    -> logDebug(...) + дефолт из DebugOverlayConfig.
+    *  - Если отдельные поля отсутствуют        -> дефолт из DebugOverlayConfig.
+    */
     DebugOverlayConfig loadDebugOverlayConfig(const std::string& path);
 
 } // namespace core::config

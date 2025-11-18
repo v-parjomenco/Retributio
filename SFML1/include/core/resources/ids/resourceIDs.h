@@ -1,27 +1,52 @@
+// ================================================================================================
+// File: core/resources/ids/resourceIDs.h
+// Purpose: Enum identifiers for engine resources (textures, fonts, sounds)
+// Used by: ResourceManager, ResourcePaths, id_to_string, gameplay code
+// Related headers: id_to_string.h, resource_paths.h
+// ================================================================================================
 #pragma once
 
 #include <cstdint>
 
 namespace core::resources::ids {
 
+    // --------------------------------------------------------------------------------------------
     // Текстуры
-    enum class TextureID : uint8_t { Unknown = 0, Player };
+    // --------------------------------------------------------------------------------------------
+    enum class TextureID : std::uint8_t {
+        Unknown = 0,
+        Player,
+        // TODO: add more texture IDs here (e.g. UIFrame, BackgroundMain, etc.)
+    };
 
+    // --------------------------------------------------------------------------------------------
     // Шрифты
-    enum class FontID : uint8_t { Unknown = 0, Default };
+    // --------------------------------------------------------------------------------------------
+    enum class FontID : std::uint8_t {
+        Unknown = 0,
+        Default,
+        // TODO: add more font IDs here (e.g. DebugMono, TitleFont, etc.)
+    };
 
+    // --------------------------------------------------------------------------------------------
     // Звуки
-    enum class SoundID : uint8_t { Unknown = 0 };
+    // --------------------------------------------------------------------------------------------
+    enum class SoundID : std::uint8_t {
+        Unknown = 0,
+        // TODO: add sound IDs when you start using sounds in resources.json
+    };
 
-    // Утилиты для логирования/ошибок — inline функции, возвращающие читаемую строку
-    // (не меняют API, не добавляют зависимостей, бесплатная помощь при дебаге)
+    // --------------------------------------------------------------------------------------------
+    // toString(...) — человекочитаемые имена для логов и ошибок
+    // --------------------------------------------------------------------------------------------
+
     inline const char* toString(TextureID id) noexcept {
         switch (id) {
         case TextureID::Player:
             return "Player";
         case TextureID::Unknown:
         default:
-            return "Unknown";
+            return "UnknownTexture";
         }
     }
 
@@ -31,7 +56,7 @@ namespace core::resources::ids {
             return "Default";
         case FontID::Unknown:
         default:
-            return "Unknown";
+            return "UnknownFont";
         }
     }
 
@@ -39,7 +64,7 @@ namespace core::resources::ids {
         switch (id) {
         case SoundID::Unknown:
         default:
-            return "Unknown";
+            return "UnknownSound";
         }
     }
 

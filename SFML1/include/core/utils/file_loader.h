@@ -1,11 +1,11 @@
-// ============================================================================
+// ================================================================================================
 // file_loader.h - Low-level file I/O utilities
 // Centralized file loading for the entire engine.
 // All file I/O should go through this module to:
 // - Enable future async loading
 // - Add error handling in one place
 // - Support virtual file systems later (for modding)
-// ============================================================================
+// ================================================================================================
 
 #pragma once
 

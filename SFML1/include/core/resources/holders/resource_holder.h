@@ -11,10 +11,11 @@
 
 namespace core::resources::holders {
 
-    // Универсальный хранитель ресурсов.
-    // Хранит ресурсы как std::unique_ptr<Resource> в unordered_map<Identifier, unique_ptr<Resource>>.
-    // Позволяет вызывать openFromFile / другие методы с произвольными параметрами.
-
+    /**
+    * @brief Универсальный хранитель ресурсов.
+    * Хранит ресурсы как std::unique_ptr<Resource> в unordered_map<Identifier, unique_ptr<Resource>>.
+    * Позволяет вызывать openFromFile / другие методы с произвольными параметрами.
+    */
     template <typename Resource, typename Identifier> class ResourceHolder {
       public:
         ResourceHolder() = default;

@@ -7,50 +7,60 @@
 
 namespace core::resources {
 
+    // --------------------------------------------------------------------------------------------
     // Текстуры
+    // --------------------------------------------------------------------------------------------
 
-    // Статический ID, из enum class в resourceIDs
-    //
-    // Используется для всего, что известно заранее, т.е. базовых ресурсов игры (иконок, фона, GUI, спрайтов врагов, и т.д.)
-    // Путь берётся из ResourcePaths::get(id) — то есть, из JSON - файла resources.json, где каждому enum присвоен путь;
-    // Безопасно. В случае ошибки, например, опечатки: (TextureID::Playre), компилятор сразу об этом скажет.
-
-    // Для базовых ресуросв движка
+    /**
+    * @brief Статический ID из enum class в resourceIDs.
+    *
+    * Это основной, «движковый» путь доступа к ресурсам:
+    *  - код оперирует TextureID (например, TextureID::Player),
+    *  - фактический путь берётся из ResourcePaths::get(id),
+    *  - сами пути описаны data/definitions/resources.json.
+    *
+    * При опечатке в идентификаторе (TextureID::Playre) ошибка будет на этапе компиляции,
+    * а не в рантайме.
+    */
     const types::TextureResource& ResourceManager::getTexture(ids::TextureID id, bool smooth) {
         if (!mTextures.contains(id)) {
-            const std::string path = paths::ResourcePaths::get(id); // путь берём из JSON
+            const std::string path = paths::ResourcePaths::get(id); // путь берём из JSON-реестра
             mTextures.load(id, path);
+            // Флаг сглаживания применяется только при первой загрузке ресурса.
             mTextures.get(id).setSmooth(smooth);
         }
         return mTextures.get(id);
     }
 
-    // Динамический ID, из JSON
-    //
-    // Используется, когда ресурсы уже описаны в JSON, но ключи - строки.
-    // Например, есть динамический раздел "enemy_boss": "assets/textures/enemies/boss.png";
-    // В этом случае id — это ключ, а не путь, но путь из этого ключа можно получить через ResourcePaths::get(id).
-    // Просто метод getTexture(string) сейчас напрямую вызывает load(id, id),
-    // т.к. в текущей реализации JSON не содержит «вложенных» структур.
-
-    // Для кастомных JSON, с ключами - строками
+    /**
+    * @brief Динамический «ID» в виде строки.
+    *
+    * Используется для ресурсов, которые:
+    *  - не описаны в enum'ах (моды, редакторы, прототипы),
+    *  - загружаются по строковому ключу/пути в рантайме.
+    *
+    * В текущей реализации строка интерпретируется как прямой путь к файлу.
+    * Это удобно для быстрых экспериментов, но не является каноническим путём движка
+    * (основная система — TextureID + ResourcePaths).
+    */
     const types::TextureResource& ResourceManager::getTexture(const std::string& id, bool smooth) {
         if (!mDynamicTextures.contains(id)) {
-            mDynamicTextures.load(id, id); // id = путь к файлу
+            mDynamicTextures.load(id, id); // здесь id = путь к файлу
             mDynamicTextures.get(id).setSmooth(smooth);
         }
         return mDynamicTextures.get(id);
     }
 
-    // Получение текстуры по явному пути (путь = строка к файлу)
-    //
-    // Низкоуровневая загрузка «по прямому пути» (runtime).
-    // Используется, если путь задан в другом JSON (например, player.json),
-    // но ты не знаешь заранее, какой именно спрайт указал дизайнер или мод;
-    // это bypass(«обход») всей системы enum / ResourcePaths, чтобы просто взять текстуру по реальному файлу;
-    // в кэше всё равно хранится в mDynamicTextures, поэтому второй раз не загрузится.
-
-    // Для данных, загружаемых из внешних конфигов (runtime).
+    /**
+    * @brief Получение текстуры по явно переданному пути (path = строка к файлу).
+    *
+    * Это низкоуровневая загрузка «по прямому пути» (runtime):
+    *  - используется, если путь приходит из внешнего источника (мод, редактор, сетевые данные),
+    *  - полностью обходит систему enum / ResourcePaths.
+    *
+    * Рекомендуется для кода «на краю» (инструменты, моды), а не для ядра движка:
+    * в самом движке предпочтителен путь через TextureID и ResourcePaths.
+    */
     const types::TextureResource& ResourceManager::getTextureByPath(const std::string& path,
                                                                     bool smooth) {
         // Если ресурс с таким путём уже загружен (в динамическом контейнере) — вернём его
@@ -63,7 +73,8 @@ namespace core::resources {
                         "[ResourceManager::getTextureByPath]\nНе удалось загрузить текстуру: "} +
                     path);
             }
-            // Вставляем уже загруженный ресурс в ResourceHolder, чтобы избежать двойной загрузки.
+            // Вставляем уже загруженный ресурс в ResourceHolder, чтобы избежать двойной загрузки с
+            // диска.
             mDynamicTextures.insert(path, std::move(texPtr));
             // NB: ResourceLoader уже применил флаг smooth.
             // setSmooth вызывается только для ресурсов, загружаемых через ResourceHolder напрямую.
@@ -71,27 +82,45 @@ namespace core::resources {
         return mDynamicTextures.get(path);
     }
 
+    // --------------------------------------------------------------------------------------------
     // Шрифты
-    //
-    // Статический ID, из enum class в resourceIDs
+    // --------------------------------------------------------------------------------------------
+
+    /**
+    * @brief Статический ID, из enum class в resourceIDs.
+    * 
+    * Канонический путь: FontID -> ResourcePaths::get(FontID) -> путь -> ResourceHolder.
+    */
     const types::FontResource& ResourceManager::getFont(ids::FontID id) {
         if (!mFonts.contains(id)) {
-            const std::string path = paths::ResourcePaths::get(id); // путь берём из JSON
+            const std::string path = paths::ResourcePaths::get(id); // путь берём из JSON-реестра
             mFonts.load(id, path);
         }
         return mFonts.get(id);
     }
-    // Динамический ID, из JSON
+
+    /**
+    * @brief Динамический шрифт по строковому «ID».
+    *
+    * Как и для текстур, строка в текущей реализации интерпретируется как путь к файлу.
+    * Подходит для модов/инструментов, но не заменяет enum-базовую систему.
+    */
     const types::FontResource& ResourceManager::getFont(const std::string& id) {
         if (!mDynamicFonts.contains(id)) {
-            mDynamicFonts.load(id, id); // id = путь к файлу
+            mDynamicFonts.load(id, id); // здесь id = путь к файлу
         }
         return mDynamicFonts.get(id);
     }
 
+    // --------------------------------------------------------------------------------------------
     // Звуки
+    // --------------------------------------------------------------------------------------------
 
-    // Статический ID, из enum class в resourceIDs
+    /**
+    * @brief Статический ID, из enum class в resourceIDs.
+    * 
+    * Аналогично текстурам/шрифтам: SoundID -> ResourcePaths::get(SoundID) -> путь.
+    */
     const types::SoundBufferResource& ResourceManager::getSound(ids::SoundID id) {
         if (!mSounds.contains(id)) {
             const std::string path = paths::ResourcePaths::get(id);
@@ -99,10 +128,15 @@ namespace core::resources {
         }
         return mSounds.get(id);
     }
-    // Динамический ID, из JSON
+
+    /**
+    * @brief Динамический звук по строковому «ID»
+    * 
+    * (в текущей реализации — прямой путь).
+    */
     const types::SoundBufferResource& ResourceManager::getSound(const std::string& id) {
         if (!mDynamicSounds.contains(id)) {
-            mDynamicSounds.load(id, id); // id = путь к файлу
+            mDynamicSounds.load(id, id); // здесь id = путь к файлу
         }
         return mDynamicSounds.get(id);
     }

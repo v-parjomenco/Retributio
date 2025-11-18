@@ -18,13 +18,28 @@
 
 namespace core::config {
 
-    // Высокоуровневая, уже прошедшая парсинг конфигурация для сущности игрока
-    // JSON-данные лишь заполняют эту структуру; значения по умолчанию берутся из config.h.
+    /**
+     * @brief Высокоуровневая, уже прошедшая парсинг конфигурация для сущности игрока.
+     *
+     * JSON-данные лишь заполняют эту структуру; значения по умолчанию берутся из config.h
+     * и/или из дефолтных значений полей.
+     *
+     * ВАЖНО:
+     *  - Путь к файлу текстуры больше нигде не хранится в геймплейных конфигах;
+     *    единственный источник путей — resources.json (см. ResourcePaths).
+     *  - Здесь мы храним только TextureID (например, TextureID::Player).
+     */
     struct PlayerConfig {
-        // Базовый путь к текстуре игрока
-        std::string texturePath = ::config::PLAYER_TEXTURE;
+        /**
+        * @brief Идентификатор текстуры игрока (enum class TextureID), а не прямой путь к файлу.
+        * 
+        * Строка "texture" из player.json → маппится в TextureID (через textureFromString),
+        * а реальный путь берётся из resources.json через ResourcePaths.
+        */
+        core::resources::ids::TextureID textureId = core::resources::ids::TextureID::Player;
         // Коэффициент масштабирования спрайта игрока
         sf::Vector2f scale{1.f, 1.f};
+
         // Параметры движения игрока
         float speed = ::config::PLAYER_SPEED;
         float acceleration = ::config::PLAYER_ACCELERATION;
@@ -38,36 +53,39 @@ namespace core::config {
 
         // Управление с клавиатуры (может переопределяться в JSON)
         struct Controls {
-            sf::Keyboard::Key up = ::config::DEFAULT_KEY_UP;
-            sf::Keyboard::Key down = ::config::DEFAULT_KEY_DOWN;
-            sf::Keyboard::Key left = ::config::DEFAULT_KEY_LEFT;
+            sf::Keyboard::Key up    = ::config::DEFAULT_KEY_UP;
+            sf::Keyboard::Key down  = ::config::DEFAULT_KEY_DOWN;
+            sf::Keyboard::Key left  = ::config::DEFAULT_KEY_LEFT;
             sf::Keyboard::Key right = ::config::DEFAULT_KEY_RIGHT;
         } controls;
     };
 
-    // Высокоуровневый загрузчик, преобразующий информацию в JSON-файле в PlayerConfig.
-    // 
-    // Обязанности:
-    //  - Использует FileLoader, чтобы прочесть JSON-файл как текст.
-    //  - Строит дерево Json из текста с помощью json::parse от nlohmann.
-    //  - С помощью JsonValidator валидирует структуру JSON-файла.
-    //  - Превращает поля JSON-файла в поля конфигурации игрока PlayerConfig с помощью json_utils.
-    //
-    // Этот загрузчик НЕ:
-    //  - имеет дел с низкоуровневой загрузкой (ей занимается FileLoader),
-    //  - знает ничего о рендеринге, ECS и прочем.
+    /**
+     * @brief Высокоуровневый загрузчик, преобразующий JSON-файл в PlayerConfig.
+     *
+     * Обязанности:
+     *  - Использует FileLoader, чтобы прочесть JSON-файл как текст.
+     *  - Строит дерево Json из текста с помощью json::parse от nlohmann.
+     *  - С помощью JsonValidator валидирует структуру JSON-файла (parseAndValidateCritical).
+     *  - Превращает поля JSON-файла в поля PlayerConfig с помощью json_utils.
+     *
+     * НЕ:
+     *  - занимается низкоуровневой загрузкой ресурсов (диском/Texture/Font),
+     *  - знает что-либо о рендеринге, ECS и прочем.
+     */
     class ConfigLoader {
       public:
-        // Загружает JSON из файла и парсит данные в PlayerConfig
-        //
-        // Возможное поведение:
-        //  - Если файл не может быть прочитан
-        //      -> showError(...) + возврат значения PlayerConfig по умолчанию.
-        //  - Если информация в JSON невалидна или искажена 
-        //      -> showError(...) + std::exit(EXIT_FAILURE).
-        //  - Если структура JSON неверна
-        //      -> showError(...) + std::exit(EXIT_FAILURE).
-        //
+        /**
+         * @brief Загружает JSON из файла и парсит данные в PlayerConfig.
+         *
+         * Поведение:
+         *  - Если файл не может быть прочитан:
+         *      -> showError(...) + возврат значения PlayerConfig по умолчанию.
+         *  - Если информация в JSON невалидна или искажена:
+         *      -> showError(...) + std::exit(EXIT_FAILURE).
+         *  - Если структура JSON неверна:
+         *      -> showError(...) + std::exit(EXIT_FAILURE).
+         */
         static PlayerConfig loadPlayerConfig(const std::string& path);
     };
 

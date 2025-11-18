@@ -1,16 +1,29 @@
+// ================================================================================================
+// File: core/resources/ids/id_to_string.h
+// Purpose: String ↔ enum helpers for resource IDs (TextureID, FontID, SoundID)
+// Used by: ResourcePaths, logging, debug tools
+// Related headers: resourceIDs.h, resource_paths.h
+// ================================================================================================
 #pragma once
 
+#include <optional>
 #include <string>
+#include <string_view>
 
 #include "core/resources/ids/resourceIDs.h"
 
 namespace core::resources::ids {
-    // Универсальная функция — по умолчанию возвращает "Неизвестный ID"
+    // --------------------------------------------------------------------------------------------
+    // Универсальный хелпер для логов: idToString(T)
+    // По умолчанию возвращает "Неизвестный ID", а для enum'ов использует toString(...) из
+    // resourceIDs.h. Для std::string возвращает саму строку.
+    // --------------------------------------------------------------------------------------------
     template <typename Identifier> inline std::string idToString(const Identifier&) {
         return u8"Неизвестный ID";
     }
 
     // Специализации для ожидаемых типов ID (enum'ы)
+
     template <> inline std::string idToString<TextureID>(const TextureID& id) {
         return std::string(toString(id));
     }
@@ -27,4 +40,32 @@ namespace core::resources::ids {
     template <> inline std::string idToString<std::string>(const std::string& id) {
         return id;
     }
+
+    // --------------------------------------------------------------------------------------------
+    // fromString(...) — парсинг строковых ID из JSON (resources.json), т.е. string -> enum
+    // Возвращают std::optional<Enum>: nullopt, если имя не распознано.
+    // --------------------------------------------------------------------------------------------
+    inline std::optional<TextureID> textureFromString(std::string_view name) {
+        if (name == "Player") {
+            return TextureID::Player;
+        }
+        // TODO: extend as you add more TextureID values
+        return std::nullopt;
+    }
+
+    inline std::optional<FontID> fontFromString(std::string_view name) {
+        if (name == "Default") {
+            return FontID::Default;
+        }
+        // TODO: extend as you add more FontID values
+        return std::nullopt;
+    }
+
+    inline std::optional<SoundID> soundFromString(std::string_view name) {
+        // Сейчас в resources.json звуков может не быть — возвращаем пусто.
+        // Когда будем добавлять звуки, нужно расширишь этот switch-эквивалент.
+        (void) name;
+        return std::nullopt;
+    }
+
 } // namespace core::resources::ids

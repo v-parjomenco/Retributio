@@ -41,9 +41,9 @@ namespace core::ecs {
             for (const auto& [entity, cfgComp] : configs) {
                 const auto& cfg = cfgComp.config;
 
-                // Текстура
-                const sf::Texture& texture =
-                    mResources.getTextureByPath(cfg.texturePath, true).get();
+                // Текстура игрока по TextureID из PlayerConfig.
+                // Путь для неё берётся из ResourcePaths::get(TextureID) внутри ResourceManager.
+                const sf::Texture& texture = mResources.getTexture(cfg.textureId, true).get();
 
                 // Спрайт
                 sf::Sprite tempSprite(texture);

@@ -3,18 +3,19 @@
 #include "core/config/config_loader.h"
 
 #include "core/config/config_keys.h"
+#include "core/resources/ids/id_to_string.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_utils.h"
 #include "core/utils/message.h"
 
 namespace {
 
-    // Локальные псевдонимы, чтобы не засорять глобальное пространство имён.
     using core::utils::FileLoader;
 
     namespace message = core::utils::message;
     namespace keys = core::config::keys;
     namespace json_utils = core::utils::json;
+    namespace rids = core::resources::ids;
 
     using Json          = json_utils::json;
 
@@ -24,11 +25,12 @@ namespace core::config {
 
     PlayerConfig ConfigLoader::loadPlayerConfig(const std::string& path) {
 
-        // Низкоуровневое чтение файла через FileLoader.
-        // На этом шаге нас интересуют только два факта:
-        //  - получилось ли прочитать файл целиком;
-        //  - если нет —> логируем это в debug и показываем пользователю окно об ошибке.
-        //
+        /**
+        * @brief Низкоуровневое чтение файла через FileLoader.
+        * На этом шаге нас интересуют только два факта:
+        *  - получилось ли прочитать файл целиком;
+        *  - если нет —> логируем это в debug и показываем пользователю окно об ошибке.
+        */
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
             // FileLoader уже залогировал низкоуровневую проблему с файлом,
@@ -36,21 +38,23 @@ namespace core::config {
             message::showError("[ConfigLoader]\nНе удалось открыть конфигурацию игрока: " + path +
                                ".\nБудут использованы значения по умолчанию.");
 
-            return PlayerConfig{}; // безопасный дефолт из config.h
+            return PlayerConfig{}; // безопасный дефолт из config.h + базовых ID
         }
 
         const std::string& fileContent = *fileContentOpt;
 
-        // Общий helper: парсинг + валидация для "критичного" конфига.
-        // В случае любой ошибки:
-        //  - пользователь увидит showError,
-        //  - приложение завершится через std::exit(EXIT_FAILURE).
+        /**
+        * @brief Общий хелпер: парсинг + валидация для "критичного" конфига.
+        * В случае любой ошибки:
+        *  - пользователь увидит showError,
+        *  - приложение завершится через std::exit(EXIT_FAILURE).
+        */
         Json data = json_utils::parseAndValidateCritical(
             fileContent,
             path,
             "ConfigLoader",
             {
-                // Обязательный: путь к текстуре
+                // Обязательный: строковый ID текстуры (например, "Player")
                 {keys::Player::TEXTURE, {Json::value_t::string}},
 
                 // Масштаб может быть:
@@ -75,17 +79,36 @@ namespace core::config {
 
         // Заполнение PlayerConfig на основе JSON-данных, считанных с помощью json_utils
 
-        PlayerConfig cfg; // создаём со значениями по умолчанию из config.h
+        PlayerConfig cfg; // создаём со значениями по умолчанию из config.h и enum'ов
 
         //  - если ключ есть и валиден → используем значение из JSON,
         //  - если ключа нет → оставляем значение по умолчанию из структуры PlayerConfig.
 
-        // Путь к текстуре игрока
-        cfg.texturePath =
-            json_utils::parseValue<std::string>(data, keys::Player::TEXTURE, cfg.texturePath);
+        // ------------------------------------------------------------------------------------
+        // Текстура: строковый ID ("Player" из player.json) → enum TextureID
+        // ------------------------------------------------------------------------------------
+        {
+            // Читаем строковый идентификатор текстуры, например "Player".
+            // В JSON это НЕ путь, а логическое имя, которое должно совпадать
+            // с именем в resources.json и с toString(TextureID).
+            const std::string defaultTextureIdStr = rids::toString(cfg.textureId);
+            const std::string textureIdStr = json_utils::parseValue<std::string>(
+                data, keys::Player::TEXTURE, defaultTextureIdStr);
+
+            if (auto idOpt = rids::textureFromString(textureIdStr)) {
+                cfg.textureId = *idOpt;
+            } else {
+                message::showError("[ConfigLoader]\nНеизвестный texture ID: " + textureIdStr +
+                                   ". Применено значение по умолчанию (" + defaultTextureIdStr +
+                                   ").");
+                // cfg.textureId уже содержит дефолт из config.h — оставляем его без изменений.
+            }
+        }
+
         // Коэффициент масштабирования спрайта игрока
         cfg.scale =
             json_utils::parseValue<sf::Vector2f>(data, keys::Player::SCALE, cfg.scale);
+
         // Параметры движения игрока
         cfg.speed =
             json_utils::parseValue<float>(data, keys::Player::SPEED, cfg.speed);
@@ -93,6 +116,7 @@ namespace core::config {
             json_utils::parseValue<float>(data, keys::Player::ACCELERATION, cfg.acceleration);
         cfg.friction = 
             json_utils::parseValue<float>(data, keys::Player::FRICTION, cfg.friction);
+
         // Параметры привязки и поведения камеры/экрана
         cfg.anchor =
             json_utils::parseValue<std::string>(data, keys::Player::ANCHOR, cfg.anchor);

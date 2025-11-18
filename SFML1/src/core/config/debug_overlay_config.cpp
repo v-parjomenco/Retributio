@@ -24,9 +24,11 @@ namespace core::config {
     DebugOverlayConfig loadDebugOverlayConfig(const std::string& path) {
         DebugOverlayConfig cfg; // стартуем с дефолтных значений
 
-        // Низкоуровневое чтение файла через FileLoader.
-        // Debug overlay — вспомогательный модуль, поэтому при ошибках файла
-        // мы не останавливаем игру, а просто работаем с дефолтными настройками.
+        /**
+        * @brief Низкоуровневое чтение файла через FileLoader.
+        * Debug overlay — вспомогательный модуль, поэтому при ошибках файла
+        * мы не останавливаем игру, а просто работаем с дефолтными настройками.
+        */
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
             // FileLoader уже залогировал низкоуровневую проблему с файлом,
@@ -38,10 +40,12 @@ namespace core::config {
 
         const std::string& fileContent = *fileContentOpt;
 
-        // Общий helper: парсинг + валидация для НЕ критичного конфига.
-        // При любой ошибке:
-        //  - в лог пишется debug-сообщение,
-        //  - возвращаем std::nullopt.
+        /**
+        * @brief Общий helper: парсинг + валидация для НЕ критичного конфига.
+        * При любой ошибке:
+        *  - в лог пишется debug-сообщение,
+        *  - возвращаем std::nullopt.
+        */
         auto dataOpt = json_utils::parseAndValidateNonCritical(
             fileContent,
             path,
@@ -72,9 +76,11 @@ namespace core::config {
 
         const Json& data = *dataOpt;
 
-        // Заполнение полей на основе JSON-данных, считанных с помощью json_utils
+        // ----------------------------------------------------------------------------------------
+        // Заполнение полей на основе JSON-данных, считанных с помощью json_utils:
         //  - если ключ есть и валиден → используем значение из JSON,
         //  - если ключа нет → оставляем значение по умолчанию из структуры DebugOverlayConfig.
+        // ----------------------------------------------------------------------------------------
 
         // enabled (bool, если значение с JSON-файла не получено —> остаётся по умолчанию "true")
         cfg.enabled =

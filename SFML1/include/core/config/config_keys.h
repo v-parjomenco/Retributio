@@ -1,10 +1,18 @@
+// ================================================================================================
+// File: core/config/config_keys.h
+// Purpose: Centralized keys for JSON configurations. Used by all parsing systems.
+// Used by: ConfigLoader, DebugOverlayConfig, ResourcePaths, UI, ECS, etc.
+// Related headers: config_loader.h, debug_overlay_config.h, resource_paths.h
+// ================================================================================================
 #pragma once
 
 #include <string>
 
 namespace core::config::keys {
 
+    // --------------------------------------------------------------------------------------------
     // Общие ключи, встречающиеся во многих JSON
+    // --------------------------------------------------------------------------------------------
     namespace Common {
         inline constexpr const char* TEXTURE = "texture";
         inline constexpr const char* SCALE = "scale";
@@ -17,7 +25,9 @@ namespace core::config::keys {
         inline constexpr const char* LOCK_BEHAVIOR = "lock_behavior";
     } // namespace Common
 
-    // Ключи для конфигурации игрока
+    // --------------------------------------------------------------------------------------------
+    // Ключи для конфигурации игрока (assets/config/player.json)
+    // --------------------------------------------------------------------------------------------
     namespace Player {
         inline constexpr const char* TEXTURE = Common::TEXTURE;
         inline constexpr const char* SCALE = Common::SCALE;
@@ -36,39 +46,50 @@ namespace core::config::keys {
         inline constexpr const char* CONTROL_RIGHT = "right";
     } // namespace Player
 
-    // Ключи для интерфейса (на будущее)
+    // --------------------------------------------------------------------------------------------
+    // Ключи для интерфейса (UI-конфиги, на будущее)
+    // --------------------------------------------------------------------------------------------
     namespace UI {
         inline constexpr const char* FONT = "font";
         inline constexpr const char* FONT_SIZE = "font_size";
         inline constexpr const char* COLOR = "color";
     } // namespace UI
 
+    // --------------------------------------------------------------------------------------------
     // Ключи для мира (terrain, lighting, weather и т.д., на будущее)
+    // --------------------------------------------------------------------------------------------
     namespace World {
         inline constexpr const char* MAP_SIZE = "map_size";
         inline constexpr const char* GRAVITY = "gravity";
         inline constexpr const char* BACKGROUND = "background";
     } // namespace World
 
+    // --------------------------------------------------------------------------------------------
     // Ключи для будущих конфигураций сущностей (Entity configs)
+    // --------------------------------------------------------------------------------------------
     namespace Entity {
         inline constexpr const char* NAME = "name";
         inline constexpr const char* TYPE = "type";
         inline constexpr const char* COMPONENTS = "components";
     } // namespace Entity
 
-    // Ключи настроек текста для debug overlay
+    // --------------------------------------------------------------------------------------------
+    // Ключи настроек текста для debug overlay (assets/config/debug_overlay.json)
+    // --------------------------------------------------------------------------------------------
     namespace DebugOverlay {
-            inline constexpr const char* ENABLED = "enabled";
-            inline constexpr const char* POSITION = "position";
-            inline constexpr const char* CHARACTER_SIZE = "characterSize";
-            inline constexpr const char* COLOR = "color";
-     } // namespace DebugOverlay
+        inline constexpr const char* ENABLED = "enabled";
+        inline constexpr const char* POSITION = "position";
+        inline constexpr const char* CHARACTER_SIZE = "characterSize";
+        inline constexpr const char* COLOR = "color";
+    } // namespace DebugOverlay
+
+    // --------------------------------------------------------------------------------------------
+    // Ключи для реестра ресурсов (data/definitions/resources.json)
+    // --------------------------------------------------------------------------------------------
+    namespace ResourceRegistry {
+        inline constexpr const char* TEXTURES = "textures";
+        inline constexpr const char* FONTS = "fonts";
+        inline constexpr const char* SOUNDS = "sounds";
+    } // namespace ResourceRegistry
 
 } // namespace core::config::keys
-
-// -----------------------------------------------------------------------------
-// config_keys.h
-// Централизованные ключи для JSON-конфигураций.
-// Используется всеми системами парсинга (ConfigLoader, UI, ECS и т.д.).
-// -----------------------------------------------------------------------------

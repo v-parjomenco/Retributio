@@ -11,7 +11,7 @@
 
 namespace cfg = ::config; // глобальные дефолты движка (окно, vsync, fixed step, hotkeys...)
 namespace gcfg =
-    ::core::config; // игровые JSON-конфиги/лоадеры (PlayerConfig, DebugOverlayConfig...)
+    ::core::config;       // игровые JSON-конфиги/лоадеры (PlayerConfig, DebugOverlayConfig...)
 
 namespace core {
 

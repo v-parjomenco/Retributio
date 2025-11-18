@@ -11,15 +11,17 @@ namespace {
     using core::utils::json::json;
     namespace message = core::utils::message;
 
-    // @brief Внутренняя утилита: парсинг JSON-значения в sf::Color.
-    //
-    // Поддерживает:
-    //  - строку "#RRGGBB"  (альфа-канал = 255)
-    //  - строку "#RRGGBBAA"
-    //  - объект { "r": ..., "g": ..., "b": ..., "a": ... }
-    //
-    // При любой ошибке возвращает fallback.
-    // Внешний API для пользователей — core::utils::json::parseColor(...).
+    /**
+    * @brief Внутренняя утилита: парсинг JSON-значения в sf::Color.
+    *
+    * Поддерживает:
+    *  - строку "#RRGGBB"  (альфа-канал = 255)
+    *  - строку "#RRGGBBAA"
+    *  - объект { "r": ..., "g": ..., "b": ..., "a": ... }
+    *
+    * При любой ошибке возвращает fallback.
+    * Внешний API для пользователей — core::utils::json::parseColor(...).
+    */
     sf::Color parseColorValue(const json& value, const sf::Color& fallback) {
         // Для строки формата "#RRGGBB" или "#RRGGBBAA"
         if (value.is_string()) {
@@ -63,10 +65,12 @@ namespace {
         return fallback;
     }
 
-    // Внутренний парсер.
-    // Преобразует строковое имя клавиши (напр. "W", "Left") в sf::Keyboard::Key.
-    // Используется в parseKey и ConfigLoader при обработке controls.
-    // Внешний API для пользователей — core::utils::json::parseKey(...).
+    /**
+    * @brief Внутренний парсер.
+    * Преобразует строковое имя клавиши (напр. "W", "Left") в sf::Keyboard::Key.
+    * Используется в parseKey и ConfigLoader при обработке controls.
+    * Внешний API для пользователей — core::utils::json::parseKey(...).
+    */
     sf::Keyboard::Key parseKeyString(const std::string& name) {
         using K = sf::Keyboard::Key;
 
@@ -262,12 +266,14 @@ namespace core::utils::json {
                                   const char* moduleTag,
                                   const std::vector<JsonValidator::KeyRule>& rules) {
         json data;
-
-        // Парсинг JSON из строки.
-        // Здесь мы переходим с уровня "просто текст" на уровень "структурированные данные".
         try {
-            // Разбираем JSON-текст в дерево nlohmann::json.
-            // json::parse может бросить json::parse_error или другие std::exception-подобные.
+            /**
+            * @brief Парсинг JSON из строки.
+            * 
+            * Здесь мы переходим с уровня "просто текст" на уровень "структурированные данные".
+            * Разбираем JSON-текст в дерево nlohmann::json.
+            * json::parse может бросить json::parse_error или другие std::exception-подобные.
+            */
             data = json::parse(fileContent);
         } catch (const std::exception& e) {
             message::showError("[" + std::string(moduleTag) +
@@ -279,12 +285,15 @@ namespace core::utils::json {
             std::exit(EXIT_FAILURE);
         }
 
-        // Валидация структуры JSON
         try {
-            // JsonValidator смотрит только на:
-            //  - какие ключи есть/нет,
-            //  - какие у них типы (string / number / object / array / ...).
-            // Он НЕ знает о семантике (что именно означает "speed" или "anchor").
+            /**
+            * @brief Валидация структуры JSON
+            *
+            * JsonValidator смотрит только на:
+            *  - какие ключи есть/нет,
+            *  - какие у них типы (string / number / object / array / ...).
+            * Он НЕ знает о семантике (что именно означает "speed" или "anchor").
+            */
             JsonValidator::validate(data, rules);
         } catch (const std::exception& e) {
             message::showError("[" + std::string(moduleTag) +
@@ -301,12 +310,14 @@ namespace core::utils::json {
                                 const std::vector<JsonValidator::KeyRule>& rules) {
 
         json data;
-
-        // Парсинг JSON из строки.
-        // Здесь мы переходим с уровня "просто текст" на уровень "структурированные данные".
         try {
-            // Разбираем JSON-текст в дерево nlohmann::json.
-            // json::parse может бросить json::parse_error или другие std::exception-подобные.
+            /**
+            * @brief Парсинг JSON из строки.
+            *
+            * Здесь мы переходим с уровня "просто текст" на уровень "структурированные данные". 
+            * Разбираем JSON-текст в дерево nlohmann::json.
+            * json::parse может бросить json::parse_error или другие std::exception-подобные.
+            */
             data = json::parse(fileContent);
         } catch (const std::exception& e) {
             message::logDebug("[" + std::string(moduleTag) + "]\nНеверный JSON в файле " + path +
@@ -318,10 +329,13 @@ namespace core::utils::json {
             return std::nullopt;
         }
 
-        // Валидация структуры:
-        // Все поля необязательны (required = false),
-        // но если они присутствуют, тип должен соответствовать ожиданиям.
         try {
+            /**
+            * @brief Валидация структуры:
+            *
+            * Все поля необязательны (required = false),
+            * но если они присутствуют, тип должен соответствовать ожиданиям.
+            */
             JsonValidator::validate(data, rules);
         } catch (const std::exception& e) {
             message::logDebug("[" + std::string(moduleTag) + "]\nВалидация: " + e.what());
