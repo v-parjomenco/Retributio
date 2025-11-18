@@ -17,7 +17,7 @@ namespace {
     namespace json_utils = core::utils::json;
     namespace rids = core::resources::ids;
 
-    using Json          = json_utils::json;
+    using Json = json_utils::json;
 
 } // namespace
 
