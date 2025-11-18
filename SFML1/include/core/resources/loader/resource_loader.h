@@ -1,3 +1,11 @@
+// ================================================================================================
+// File: core/resources/loader/resource_loader.h
+// Purpose: Mid-level resource loader for SFML resources (textures, fonts, sounds)
+// Used by: ResourceManager / ResourceHolder
+// Related headers: core/resources/types/texture_resource.h,
+//                  core/resources/types/font_resource.h,
+//                  core/resources/types/soundbuffer_resource.h
+// ================================================================================================
 #pragma once
 
 #include <memory>
@@ -9,22 +17,28 @@
 
 namespace core::resources::loader {
 
-    /*
-     ResourceLoader - низкоуровневый модуль для загрузки ресурсов с диска.
-     - Возвращает std::unique_ptr<Resource>, который затем можно вставить в ResourceHolder
-     - Не управляет кэшированием/идентификаторами — этим занимается ResourceManager / ResourceHolder.
-     - Позволяет изолировать код загрузки (и в будущем - сделать его асинхронным).
-    */
+
+    // ResourceLoader - среднеуровневый модуль для загрузки ресурсов с диска.
+    //
+    // - Ниже, чем ResourceManager, но выше загрузки данных библиотекой SFML.
+    // - Использует нативные методы SFML (loadFromFile) для Texture / Font / SoundBuffer.
+    // - Возвращает std::unique_ptr<Resource>, который затем можно вставить в ResourceHolder
+    // - Не управляет кэшированием и жизненным циклом
+    // (этим занимаются ResourceManager/ResourceHolder).
+    // - Позволяет изолировать код загрузки
+    // (в будущем можно заменить на асинхронную/стриминговую загрузку).
     class ResourceLoader {
       public:
-        // Возвращает unique_ptr на загруженный TextureResource или nullptr, если загрузка не удалась.
+        // Загружает текстуру из файла.
+        // Возвращает unique_ptr<TextureResource> или nullptr при ошибке.
         static std::unique_ptr<types::TextureResource> loadTexture(const std::string& path,
                                                                    bool smooth = true);
-
-        // Возвращает уникальный указатель на загруженный FontResource или nullptr при ошибке.
+        // Загружает шрифт из файла.
+        // Возвращает unique_ptr<FontResource> или nullptr при ошибке.
         static std::unique_ptr<types::FontResource> loadFont(const std::string& path);
 
-        // Возвращает уникальный указатель на загруженный SoundBufferResource или nullptr при ошибке.
+        // Загружает звуковой буфер из файла.
+        // Возвращает unique_ptr<SoundBufferResource> или nullptr при ошибке.
         static std::unique_ptr<types::SoundBufferResource> loadSoundBuffer(const std::string& path);
     };
 

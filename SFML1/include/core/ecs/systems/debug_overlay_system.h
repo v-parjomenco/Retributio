@@ -1,11 +1,11 @@
-// ============================================================================
+// ================================================================================================
 // File: core/ecs/systems/debug_overlay_system.h
 // Role: Lightweight ECS system to render debug overlay (FPS etc.)
 // Notes:
 //  - Reads data from services (e.g., TimeService), renders via SFML
 //  - Data-driven friendly: font comes from ResourceManager; later add JSON config
 //  - Can be toggled on/off at runtime
-// ============================================================================
+// ================================================================================================
 
 // TODO:
 //

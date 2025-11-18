@@ -212,6 +212,7 @@
     <ClCompile Include="src\core\ui\lock_behavior_factory.cpp" />
     <ClCompile Include="src\core\ui\lock_policy.cpp" />
     <ClCompile Include="src\core\ui\scaling_policy.cpp" />
+    <ClCompile Include="src\core\utils\file_loader.cpp" />
     <ClCompile Include="src\core\utils\json\json_utils.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -270,6 +271,7 @@
     <ClInclude Include="include\core\ui\lock_behavior_factory.h" />
     <ClInclude Include="include\core\ui\lock_policy.h" />
     <ClInclude Include="include\core\ui\scaling_policy.h" />
+    <ClInclude Include="include\core\utils\file_loader.h" />
     <ClInclude Include="include\core\utils\json\json_utils.h" />
     <ClInclude Include="include\core\utils\json\json_validator.h" />
     <ClInclude Include="include\core\utils\message.h" />

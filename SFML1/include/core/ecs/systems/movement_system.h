@@ -1,9 +1,9 @@
-﻿// =====================================================
+﻿// ================================================================================================
 // File: core/ecs/systems/movement_system.h
 // Purpose: position += velocity * dt
 // Used by: Game update loop via World/SystemManager
 // Related headers: movement_system.cpp, transform_component.h, velocity_component.h
-// =====================================================
+// ================================================================================================
 #pragma once
 
 #include "core/ecs/components/transform_component.h"

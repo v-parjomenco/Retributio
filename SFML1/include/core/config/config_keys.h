@@ -57,6 +57,14 @@ namespace core::config::keys {
         inline constexpr const char* COMPONENTS = "components";
     } // namespace Entity
 
+    // Ключи настроек текста для debug overlay
+    namespace DebugOverlay {
+            inline constexpr const char* ENABLED = "enabled";
+            inline constexpr const char* POSITION = "position";
+            inline constexpr const char* CHARACTER_SIZE = "characterSize";
+            inline constexpr const char* COLOR = "color";
+     } // namespace DebugOverlay
+
 } // namespace core::config::keys
 
 // -----------------------------------------------------------------------------

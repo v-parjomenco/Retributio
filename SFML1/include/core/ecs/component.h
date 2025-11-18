@@ -1,9 +1,9 @@
-// =====================================================
+// ================================================================================================
 // File: core/ecs/component.h
 // Purpose: Base tag/interface for ECS components
 // Used by: ComponentStorage<T>, World
 // Related headers: component_storage.h, world.h
-// =====================================================
+// ================================================================================================
 #pragma once
 
 namespace core::ecs {

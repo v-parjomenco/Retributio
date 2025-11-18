@@ -1,4 +1,4 @@
-// ============================================================================
+// ================================================================================================
 // File: core/time/time_service.h
 // Role: Central frame timing service for the game loop (outside ECS)
 // Owned by: Game (engine/core layer)
@@ -6,7 +6,7 @@
 //  - Provides tick(), fixed-step gating, and FPS (instant & smoothed)
 //  - ECS systems receive dt as a parameter; they don't own timing
 //  - This matches common AAA engine practice (deterministic systems)
-// ============================================================================
+// ================================================================================================
 
 #pragma once
 #include <SFML/System/Clock.hpp>

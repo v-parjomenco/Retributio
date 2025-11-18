@@ -1,10 +1,10 @@
-// =====================================================
+// ================================================================================================
 // File: core/ecs/component_storage.h
 // Purpose: Per-type component storage (unordered_map<Entity,T> placeholder)
 // Used by: World
 // Related headers: entity.h, world.h
 // Notes: Will be swapped to SparseSet later without API changes.
-// =====================================================
+// ================================================================================================
 
 #pragma once
 
@@ -17,7 +17,8 @@
 namespace core::ecs {
 
     // Базовый интерфейс для хранилища любого типа компонентов (type-erasure)
-    // Нужен, чтобы World мог хранить разные ComponentStorage<T> в одном unordered_map и объединять в одну структуру
+    // Нужен, чтобы World мог хранить разные ComponentStorage<T> в одном unordered_map
+    // и объединять в одну структуру
     class IComponentStorage {
       public:
         virtual ~IComponentStorage() = default;

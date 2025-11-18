@@ -210,6 +210,9 @@
     <ClCompile Include="src\pch.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\utils\file_loader.cpp">
+      <Filter>src\core\utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\config.h">
@@ -364,6 +367,9 @@
     </ClInclude>
     <ClInclude Include="include\pch.h">
       <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\utils\file_loader.h">
+      <Filter>include\core\utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

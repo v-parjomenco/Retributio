@@ -1,9 +1,9 @@
-// =====================================================
+// ================================================================================================
 // File: core/ecs/components/transform_component.h
 // Purpose: Stores entity world-space position
 // Used by: MovementSystem, RenderSystem
 // Related headers: velocity_component.h
-// =====================================================
+// ================================================================================================
 #pragma once
 
 #include <SFML/System/Vector2.hpp>
