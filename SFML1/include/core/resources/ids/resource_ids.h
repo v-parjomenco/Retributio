@@ -1,8 +1,8 @@
 // ================================================================================================
-// File: core/resources/ids/resourceIDs.h
+// File: core/resources/ids/resource_ids.h
 // Purpose: Enum identifiers for engine resources (textures, fonts, sounds)
 // Used by: ResourceManager, ResourcePaths, id_to_string, gameplay code
-// Related headers: id_to_string.h, resource_paths.h
+// Related headers: resource_id_utils.h, resource_paths.h
 // ================================================================================================
 #pragma once
 

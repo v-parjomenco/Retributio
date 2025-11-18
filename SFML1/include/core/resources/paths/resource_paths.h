@@ -2,20 +2,20 @@
 // File: core/resources/paths/resource_paths.h
 // Purpose: Maps resource enum IDs (TextureID / FontID / SoundID) to file system paths
 // Used by: ResourceManager (static resources known at engine start)
-// Related headers: resourceIDs.h, id_to_string.h, config_keys.h
+// Related headers: resource_ids.h, resource_id_utils.h, config_keys.h
 // ================================================================================================
 #pragma once
 
 #include <string>
 #include <unordered_map>
 
-#include "core/resources/ids/resourceIDs.h"
+#include "core/resources/ids/resource_ids.h"
 
 namespace core::resources::paths {
 
     /**
     * @brief Централизованное хранилище путей к ресурсам по их enum-идентификаторам.
-    * Использует data/definitions/resources.json:
+    * Использует assets/config/resources.json:
     * {
     *   "textures": { "Player": "assets/images/player4.png", ... },
     *   "fonts":    { "Default": "assets/fonts/Wolgadeutsche.otf", ... },
@@ -28,7 +28,7 @@ namespace core::resources::paths {
 
         /**
         * @brief Загружает реестр ресурсов из JSON-файла.
-        * @param filename Путь к JSON (обычно data/definitions/resources.json)
+        * @param filename Путь к JSON (обычно assets/config/resources.json)
         *
         * При критических ошибках формата/чтения:
         *  - выводит понятное сообщение пользователю;

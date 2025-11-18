@@ -84,7 +84,7 @@ namespace core::config::keys {
     } // namespace DebugOverlay
 
     // --------------------------------------------------------------------------------------------
-    // Ключи для реестра ресурсов (data/definitions/resources.json)
+    // Ключи для реестра ресурсов (assets/config/resources.json)
     // --------------------------------------------------------------------------------------------
     namespace ResourceRegistry {
         inline constexpr const char* TEXTURES = "textures";

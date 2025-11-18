@@ -17,7 +17,7 @@ namespace core::resources {
     * Это основной, «движковый» путь доступа к ресурсам:
     *  - код оперирует TextureID (например, TextureID::Player),
     *  - фактический путь берётся из ResourcePaths::get(id),
-    *  - сами пути описаны data/definitions/resources.json.
+    *  - сами пути описаны assets/config/resources.json.
     *
     * При опечатке в идентификаторе (TextureID::Playre) ошибка будет на этапе компиляции,
     * а не в рантайме.

@@ -19,7 +19,7 @@ namespace core {
         : mWindow(sf::VideoMode({cfg::WINDOW_WIDTH, cfg::WINDOW_HEIGHT}), cfg::WINDOW_TITLE) {
 
         // Загружаем ресурсы/пути из JSON
-        core::resources::paths::ResourcePaths::loadFromJSON("data/definitions/resources.json");
+        core::resources::paths::ResourcePaths::loadFromJSON("assets/config/resources.json");
 
         // Применяем настройки рендеринга из config.h
         if constexpr (cfg::ENABLE_VSYNC) {

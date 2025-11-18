@@ -13,7 +13,7 @@
 #include <SFML/Window/Keyboard.hpp>
 
 #include "core/config.h"
-#include "core/resources/ids/resourceIDs.h"
+#include "core/resources/ids/resource_ids.h"
 #include "core/ui/anchor_utils.h"
 
 namespace core::config {
@@ -26,7 +26,7 @@ namespace core::config {
      *
      * ВАЖНО:
      *  - Путь к файлу текстуры больше нигде не хранится в геймплейных конфигах;
-     *    единственный источник путей — resources.json (см. ResourcePaths).
+     *    единственный источник путей — assets/config/resources.json (см. ResourcePaths).
      *  - Здесь мы храним только TextureID (например, TextureID::Player).
      */
     struct PlayerConfig {
@@ -34,7 +34,7 @@ namespace core::config {
         * @brief Идентификатор текстуры игрока (enum class TextureID), а не прямой путь к файлу.
         * 
         * Строка "texture" из player.json → маппится в TextureID (через textureFromString),
-        * а реальный путь берётся из resources.json через ResourcePaths.
+        * а реальный путь берётся из assets/config/resources.json через ResourcePaths.
         */
         core::resources::ids::TextureID textureId = core::resources::ids::TextureID::Player;
         // Коэффициент масштабирования спрайта игрока

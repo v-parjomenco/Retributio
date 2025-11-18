@@ -5,8 +5,8 @@
 #include <stdexcept>
 #include <string>
 
-#include "core/resources/ids/resourceIDs.h"
-#include "core/resources/ids/id_to_string.h"
+#include "core/resources/ids/resource_ids.h"
+#include "core/resources/ids/resource_id_utils.h"
 
 namespace core::resources::holders {
     // Загружаем ресурс из файла, с произвольными дополнительными параметрами,

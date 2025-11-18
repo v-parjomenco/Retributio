@@ -3,7 +3,7 @@
 #include "core/config/config_loader.h"
 
 #include "core/config/config_keys.h"
-#include "core/resources/ids/id_to_string.h"
+#include "core/resources/ids/resource_id_utils.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_utils.h"
 #include "core/utils/message.h"

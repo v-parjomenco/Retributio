@@ -299,7 +299,7 @@
     <ClInclude Include="include\core\resources\holders\resource_holder.h">
       <Filter>include\core\resources\holders</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\resources\ids\resourceIDs.h">
+    <ClInclude Include="include\core\resources\ids\resource_ids.h">
       <Filter>include\core\resources\ids</Filter>
     </ClInclude>
     <ClInclude Include="include\core\resources\paths\resource_paths.h">
@@ -350,7 +350,7 @@
     <ClInclude Include="include\core\utils\json\json_validator.h">
       <Filter>include\core\utils\json</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\resources\ids\id_to_string.h">
+    <ClInclude Include="include\core\resources\ids\resource_id_utils.h">
       <Filter>include\core\resources\ids</Filter>
     </ClInclude>
     <ClInclude Include="include\core\time\time_service.h">
@@ -376,13 +376,13 @@
     <None Include="assets\config\player.json">
       <Filter>assets\config</Filter>
     </None>
-    <None Include="data\definitions\resources.json">
-      <Filter>data\definitions</Filter>
-    </None>
     <None Include="include\core\resources\holders\resource_holder.inl">
       <Filter>include\core\resources\holders</Filter>
     </None>
     <None Include="assets\config\debug_overlay.json">
+      <Filter>assets\config</Filter>
+    </None>
+    <None Include="assets\config\resources.json">
       <Filter>assets\config</Filter>
     </None>
   </ItemGroup>

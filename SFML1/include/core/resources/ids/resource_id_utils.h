@@ -1,8 +1,8 @@
 // ================================================================================================
-// File: core/resources/ids/id_to_string.h
+// File: core/resources/ids/resource_id_utils.h
 // Purpose: String ↔ enum helpers for resource IDs (TextureID, FontID, SoundID)
 // Used by: ResourcePaths, logging, debug tools
-// Related headers: resourceIDs.h, resource_paths.h
+// Related headers: resource_ids.h, resource_paths.h
 // ================================================================================================
 #pragma once
 
@@ -10,13 +10,13 @@
 #include <string>
 #include <string_view>
 
-#include "core/resources/ids/resourceIDs.h"
+#include "core/resources/ids/resource_ids.h"
 
 namespace core::resources::ids {
     // --------------------------------------------------------------------------------------------
     // Универсальный хелпер для логов: idToString(T)
     // По умолчанию возвращает "Неизвестный ID", а для enum'ов использует toString(...) из
-    // resourceIDs.h. Для std::string возвращает саму строку.
+    // resource_ids.h. Для std::string возвращает саму строку.
     // --------------------------------------------------------------------------------------------
     template <typename Identifier> inline std::string idToString(const Identifier&) {
         return u8"Неизвестный ID";

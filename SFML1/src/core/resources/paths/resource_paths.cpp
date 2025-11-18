@@ -5,7 +5,7 @@
 #include <stdexcept> // для std::runtime_error
 
 #include "core/config/config_keys.h"
-#include "core/resources/ids/id_to_string.h"
+#include "core/resources/ids/resource_id_utils.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_utils.h"
 #include "core/utils/json/json_validator.h"
@@ -31,7 +31,7 @@ namespace {
     using core::resources::ids::toString;
 
     // --------------------------------------------------------------------------------------------
-    // Валидация верхнего уровня JSON-структуры resources.json
+    // Валидация верхнего уровня JSON-структуры assets/config/resources.json
     // --------------------------------------------------------------------------------------------
 
     void validateResourceRegistry(const Json& data) {

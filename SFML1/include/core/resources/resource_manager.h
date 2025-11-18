@@ -3,7 +3,7 @@
 // Purpose: High-level interface for loading and caching engine resources
 //          (textures, fonts, sounds) on top of ResourceHolder + ResourcePaths.
 // Used by: Game, ECS systems (PlayerInitSystem, DebugOverlaySystem, UI, etc.)
-// Related headers: i_resource.h, resource_holder.h, resourceIDs.h, resource_paths.h
+// Related headers: i_resource.h, resource_holder.h, resource_ids.h, resource_paths.h
 // ================================================================================================
 #pragma once
 
@@ -13,7 +13,7 @@
 #include <SFML/Graphics.hpp>
 
 #include "core/resources/holders/resource_holder.h"
-#include "core/resources/ids/resourceIDs.h"
+#include "core/resources/ids/resource_ids.h"
 #include "core/resources/paths/resource_paths.h"
 #include "core/resources/types/font_resource.h"
 #include "core/resources/types/soundbuffer_resource.h"
@@ -28,7 +28,7 @@ namespace core::resources {
      *  - Предоставляет простой API для запроса ресурсов по enum-ID
      *    (TextureID / FontID / SoundID).
      *  - Использует ResourcePaths, чтобы сопоставить enum-ID с реальным путём на диске
-     *    (через data/definitions/resources.json).
+     *    (через assets/config/resources.json).
      *  - Кэширует загруженные ресурсы и гарантирует, что каждый файл грузится с диска
      *    не более одного раза.
      *
@@ -52,7 +52,7 @@ namespace core::resources {
         /**
          * @brief Каноничный способ получить текстуру: по статическому enum-ID.
          *
-         *  - Путь берётся через ResourcePaths::get(TextureID) из resources.json.
+         *  - Путь берётся через ResourcePaths::get(TextureID) из assets/config/resources.json.
          *  - Ресурс кэшируется во внутреннем ResourceHolder (mTextures).
          *
          * @param id     Идентификатор текстуры (например, TextureID::Player).
