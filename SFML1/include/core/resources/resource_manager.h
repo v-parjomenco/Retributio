@@ -28,7 +28,7 @@ namespace core::resources {
      *  - Предоставляет простой API для запроса ресурсов по enum-ID
      *    (TextureID / FontID / SoundID).
      *  - Использует ResourcePaths, чтобы сопоставить enum-ID с реальным путём на диске
-     *    (через assets/config/resources.json).
+     *    (через assets/game/skyguard/config/resources.json).
      *  - Кэширует загруженные ресурсы и гарантирует, что каждый файл грузится с диска
      *    не более одного раза.
      *
@@ -52,7 +52,7 @@ namespace core::resources {
         /**
          * @brief Каноничный способ получить текстуру: по статическому enum-ID.
          *
-         *  - Путь берётся через ResourcePaths::get(TextureID) из assets/config/resources.json.
+         *  - Путь берётся через ResourcePaths::get(TextureID) из assets/game/skyguard/config/resources.json.
          *  - Ресурс кэшируется во внутреннем ResourceHolder (mTextures).
          *
          * @param id     Идентификатор текстуры (например, TextureID::Player).

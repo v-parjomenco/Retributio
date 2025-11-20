@@ -26,7 +26,7 @@ namespace core::config::keys {
     } // namespace Common
 
     // --------------------------------------------------------------------------------------------
-    // Ключи для конфигурации игрока (assets/config/player.json)
+    // Ключи для конфигурации игрока (assets/game/skyguard/config/player.json)
     // --------------------------------------------------------------------------------------------
     namespace Player {
         inline constexpr const char* TEXTURE = Common::TEXTURE;
@@ -74,7 +74,7 @@ namespace core::config::keys {
     } // namespace Entity
 
     // --------------------------------------------------------------------------------------------
-    // Ключи настроек текста для debug overlay (assets/config/debug_overlay.json)
+    // Ключи настроек текста для debug overlay (assets/core/config/debug_overlay.json)
     // --------------------------------------------------------------------------------------------
     namespace DebugOverlay {
         inline constexpr const char* ENABLED = "enabled";
@@ -84,7 +84,7 @@ namespace core::config::keys {
     } // namespace DebugOverlay
 
     // --------------------------------------------------------------------------------------------
-    // Ключи для реестра ресурсов (assets/config/resources.json)
+    // Ключи для реестра ресурсов (assets/game/skyguard/config/resources.json)
     // --------------------------------------------------------------------------------------------
     namespace ResourceRegistry {
         inline constexpr const char* TEXTURES = "textures";

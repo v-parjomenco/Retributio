@@ -15,10 +15,10 @@ namespace core::resources::paths {
 
     /**
     * @brief Централизованное хранилище путей к ресурсам по их enum-идентификаторам.
-    * Использует assets/config/resources.json:
+    * Использует assets/game/skyguard/config/resources.json:
     * {
-    *   "textures": { "Player": "assets/images/player4.png", ... },
-    *   "fonts":    { "Default": "assets/fonts/Wolgadeutsche.otf", ... },
+    *   "textures": { "Player": "assets/game/skyguard/images/su-57.png", ... },
+    *   "fonts":    { "Default": "assets/core/fonts/Wolgadeutsche.otf", ... },
     *   "sounds":   { ... }
     * }
     * Загрузка выполняется один раз при старте игры (или сцены).
@@ -28,7 +28,7 @@ namespace core::resources::paths {
 
         /**
         * @brief Загружает реестр ресурсов из JSON-файла.
-        * @param filename Путь к JSON (обычно assets/config/resources.json)
+        * @param filename Путь к JSON (обычно assets/game/skyguard/config/resources.json)
         *
         * При критических ошибках формата/чтения:
         *  - выводит понятное сообщение пользователю;

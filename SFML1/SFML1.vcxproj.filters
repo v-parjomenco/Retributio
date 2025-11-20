@@ -25,41 +25,17 @@
     <Filter Include="include\core">
       <UniqueIdentifier>{9aef76b6-d00c-450e-80af-0192eb5b8991}</UniqueIdentifier>
     </Filter>
-    <Filter Include="include\graphics">
-      <UniqueIdentifier>{64e3d32f-24ba-488c-a220-38ae1abab74d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="include\utils">
-      <UniqueIdentifier>{c9b0edfe-1561-49ab-94c6-6285a375f017}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="include\entities">
-      <UniqueIdentifier>{9b43f4e2-c6df-43dc-adc6-3733ea92f2cf}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="src\entities">
-      <UniqueIdentifier>{6d625bb9-40ea-45dc-8050-b46308439134}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="src\utils">
-      <UniqueIdentifier>{0356d90c-66fb-4978-968e-6935bf837b8c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="include\third_party">
       <UniqueIdentifier>{a4b6391a-fbd9-4df8-8c13-f11daa9def5c}</UniqueIdentifier>
     </Filter>
     <Filter Include="assets">
       <UniqueIdentifier>{61620380-0e66-4572-b0c4-5abad7c7b71e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="assets\config">
-      <UniqueIdentifier>{5564a9a1-e55e-4be5-996a-526f8e122d39}</UniqueIdentifier>
-    </Filter>
     <Filter Include="include\core\resources">
       <UniqueIdentifier>{084bcfe5-19b4-4f3e-89f7-b9106804ccbc}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\core\resources">
       <UniqueIdentifier>{b440ae58-8cbc-4611-b473-67b161379286}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="data">
-      <UniqueIdentifier>{dfacf5a0-50eb-40d8-be62-980899b48dbd}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="data\definitions">
-      <UniqueIdentifier>{9c33457c-cd8a-4514-b69d-79f92384e630}</UniqueIdentifier>
     </Filter>
     <Filter Include="include\core\ecs">
       <UniqueIdentifier>{99e88256-c0fd-4b02-bb4d-5bb29e941139}</UniqueIdentifier>
@@ -69,9 +45,6 @@
     </Filter>
     <Filter Include="include\core\ecs\systems">
       <UniqueIdentifier>{eb950d45-0eed-43bf-953d-e953b3f48973}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="src\graphics">
-      <UniqueIdentifier>{814cc160-ae31-4feb-8bf1-b9b25c9815c0}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\core\ecs">
       <UniqueIdentifier>{ab02906d-f0b6-4388-b9e0-61fb9db7abf3}</UniqueIdentifier>
@@ -87,12 +60,6 @@
     </Filter>
     <Filter Include="src\core\resources\loader">
       <UniqueIdentifier>{5573e816-c0d4-411a-a258-ec3ca4841165}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="include\core\ecs\detail">
-      <UniqueIdentifier>{b2c23598-5e15-408d-b2e2-a19cc500e3e1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="src\core\ecs\detail">
-      <UniqueIdentifier>{ea075cd8-7422-4c75-8290-13783b2d6e98}</UniqueIdentifier>
     </Filter>
     <Filter Include="include\core\resources\holders">
       <UniqueIdentifier>{c2fce24f-e7ac-4611-9a91-6eb19938f9b6}</UniqueIdentifier>
@@ -156,6 +123,78 @@
     </Filter>
     <Filter Include="src\core\compiler">
       <UniqueIdentifier>{fc04f2a3-fe5f-4162-b0a0-fac0ce93b5fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets\core">
+      <UniqueIdentifier>{41a9d370-ee49-4ccf-b147-a465b211f100}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets\game">
+      <UniqueIdentifier>{1e8b8dd0-999c-4b9e-a531-31512486457b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets\core\config">
+      <UniqueIdentifier>{5564a9a1-e55e-4be5-996a-526f8e122d39}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets\core\fonts">
+      <UniqueIdentifier>{1d93569f-72f5-49e1-8526-b71d5d7444bb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets\game\skyguard">
+      <UniqueIdentifier>{7b961c35-15f1-419d-bfc4-25ed7b26f3da}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets\game\skyguard\config">
+      <UniqueIdentifier>{22f8f816-2b34-43dc-9f86-9f7634b82768}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets\game\skyguard\images">
+      <UniqueIdentifier>{74fb210a-dee2-4696-afbd-3bb604195f4b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets\game\skyguard\sounds">
+      <UniqueIdentifier>{5fe7d0f0-9498-4c58-b184-065f40456af9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\config\properties">
+      <UniqueIdentifier>{a9f60576-485b-44bb-bf6a-601d2b0930d5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\config\properties">
+      <UniqueIdentifier>{49b19207-1d35-488b-992d-5c48737c62aa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game">
+      <UniqueIdentifier>{5e5947e4-526e-4425-8314-973de362dd49}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard">
+      <UniqueIdentifier>{5f5ebe1d-1025-40c3-90cc-11886f44fe65}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\config">
+      <UniqueIdentifier>{a90b4a6d-1c48-4fab-9fe9-2c67f5b8e5f1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\config\blueprints">
+      <UniqueIdentifier>{60ce0923-1041-48af-839e-b5ed45a77878}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\game">
+      <UniqueIdentifier>{a9570109-d35a-49aa-a242-e089e20ea149}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\game\skyguard">
+      <UniqueIdentifier>{9cc7b449-2a5a-4b46-867e-6c8362c6ceb2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\game\skyguard\config">
+      <UniqueIdentifier>{130fad18-5a7e-439c-ba5e-d8fbe488e001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\game\skyguard\config\blueprints">
+      <UniqueIdentifier>{55f07114-26a0-44ba-b9dd-f3a3c9bdb145}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\ecs">
+      <UniqueIdentifier>{b68b47cd-8a9d-49c5-85ef-afac2a9fa2d3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\ecs\components">
+      <UniqueIdentifier>{86a48b15-948e-44dd-9bb5-9922d17f4475}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\ecs\systems">
+      <UniqueIdentifier>{62a29cad-e260-4389-97b2-ee8c438b8ac1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\game\skyguard\ecs">
+      <UniqueIdentifier>{3b193a79-53b9-4010-8a58-18d17ce0fd8c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\game\skyguard\ecs\components">
+      <UniqueIdentifier>{e76bc69d-2c98-4551-ba77-3dca55283433}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\game\skyguard\ecs\systems">
+      <UniqueIdentifier>{cdf6a807-9afb-46c4-a1d9-ffb3f58c3945}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -371,19 +410,34 @@
     <ClInclude Include="include\core\utils\file_loader.h">
       <Filter>include\core\utils</Filter>
     </ClInclude>
+    <ClInclude Include="include\core\config\properties\sprite_properties.h">
+      <Filter>include\core\config\properties</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config\properties\movement_properties.h">
+      <Filter>include\core\config\properties</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config\properties\anchor_properties.h">
+      <Filter>include\core\config\properties</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config\properties\controls_properties.h">
+      <Filter>include\core\config\properties</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\blueprints\player_blueprint.h">
+      <Filter>include\game\skyguard\config\blueprints</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="assets\config\player.json">
-      <Filter>assets\config</Filter>
-    </None>
     <None Include="include\core\resources\holders\resource_holder.inl">
       <Filter>include\core\resources\holders</Filter>
     </None>
-    <None Include="assets\config\debug_overlay.json">
-      <Filter>assets\config</Filter>
+    <None Include="assets\core\config\debug_overlay.json">
+      <Filter>assets\core\config</Filter>
     </None>
-    <None Include="assets\config\resources.json">
-      <Filter>assets\config</Filter>
+    <None Include="assets\game\skyguard\config\player.json">
+      <Filter>assets\game\skyguard\config</Filter>
+    </None>
+    <None Include="assets\game\skyguard\config\resources.json">
+      <Filter>assets\game\skyguard\config</Filter>
     </None>
   </ItemGroup>
 </Project>

@@ -1,0 +1,9 @@
+{
+  "textures": {
+    "Player": "assets/game/skyguard/images/0000su-57.png"
+  },
+  "fonts": {
+    "Default": "assets/core/fonts/Wolgadeutsche.otf"
+  },
+  "sounds": {}
+}

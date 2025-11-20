@@ -4,6 +4,7 @@
 
 #include "core/config/config_keys.h"
 #include "core/resources/ids/resource_id_utils.h"
+#include "core/ui/anchor_utils.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_utils.h"
 #include "core/utils/message.h"
@@ -23,7 +24,7 @@ namespace {
 
 namespace core::config {
 
-    PlayerConfig ConfigLoader::loadPlayerConfig(const std::string& path) {
+    blueprints::PlayerBlueprint ConfigLoader::loadPlayerConfig(const std::string& path) {
 
         /**
         * @brief Низкоуровневое чтение файла через FileLoader.
@@ -38,7 +39,7 @@ namespace core::config {
             message::showError("[ConfigLoader]\nНе удалось открыть конфигурацию игрока: " + path +
                                ".\nБудут использованы значения по умолчанию.");
 
-            return PlayerConfig{}; // безопасный дефолт из config.h + базовых ID
+            return blueprints::PlayerBlueprint{}; // дефолт из PlayerBlueprint+properties
         }
 
         const std::string& fileContent = *fileContentOpt;
@@ -77,12 +78,9 @@ namespace core::config {
                 {keys::Player::CONTROLS, {Json::value_t::object}, false},
             });
 
-        // Заполнение PlayerConfig на основе JSON-данных, считанных с помощью json_utils
-
-        PlayerConfig cfg; // создаём со значениями по умолчанию из config.h и enum'ов
-
-        //  - если ключ есть и валиден → используем значение из JSON,
-        //  - если ключа нет → оставляем значение по умолчанию из структуры PlayerConfig.
+        // Используем PlayerBlueprint, в котором лежат properties::Sprite/Movement/Anchor/Controls
+        blueprints::PlayerBlueprint
+            cfg; // создаём со значениями по умолчанию из properties + config.h
 
         // ------------------------------------------------------------------------------------
         // Текстура: строковый ID ("Player" из player.json) → enum TextureID
@@ -91,42 +89,42 @@ namespace core::config {
             // Читаем строковый идентификатор текстуры, например "Player".
             // В JSON это НЕ путь, а логическое имя, которое должно совпадать
             // с именем в resources.json и с toString(TextureID).
-            const std::string defaultTextureIdStr = rids::toString(cfg.textureId);
+            const std::string defaultTextureIdStr = rids::toString(cfg.sprite.textureId);
+
             const std::string textureIdStr = json_utils::parseValue<std::string>(
                 data, keys::Player::TEXTURE, defaultTextureIdStr);
 
             if (auto idOpt = rids::textureFromString(textureIdStr)) {
-                cfg.textureId = *idOpt;
+                cfg.sprite.textureId = *idOpt;
             } else {
                 message::showError("[ConfigLoader]\nНеизвестный texture ID: " + textureIdStr +
                                    ". Применено значение по умолчанию (" + defaultTextureIdStr +
                                    ").");
-                // cfg.textureId уже содержит дефолт из config.h — оставляем его без изменений.
+                // cfg.sprite.textureId уже содержит дефолт — оставляем его без изменений.
             }
         }
 
         // Коэффициент масштабирования спрайта игрока
-        cfg.scale =
-            json_utils::parseValue<sf::Vector2f>(data, keys::Player::SCALE, cfg.scale);
+        cfg.sprite.scale =
+            json_utils::parseValue<sf::Vector2f>(data, keys::Player::SCALE, cfg.sprite.scale);
 
         // Параметры движения игрока
-        cfg.speed =
-            json_utils::parseValue<float>(data, keys::Player::SPEED, cfg.speed);
-        cfg.acceleration =
-            json_utils::parseValue<float>(data, keys::Player::ACCELERATION, cfg.acceleration);
-        cfg.friction = 
-            json_utils::parseValue<float>(data, keys::Player::FRICTION, cfg.friction);
+        cfg.movement.speed =
+            json_utils::parseValue<float>(data, keys::Player::SPEED, cfg.movement.speed);
+        cfg.movement.acceleration = json_utils::parseValue<float>(data, keys::Player::ACCELERATION,
+                                                                  cfg.movement.acceleration);
+        cfg.movement.friction =
+            json_utils::parseValue<float>(data, keys::Player::FRICTION, cfg.movement.friction);
 
         // Параметры привязки и поведения камеры/экрана
-        cfg.anchor =
-            json_utils::parseValue<std::string>(data, keys::Player::ANCHOR, cfg.anchor);
-        cfg.startPosition = json_utils::parseValue<sf::Vector2f>(
-            data, keys::Player::START_POSITION, cfg.startPosition);
-        cfg.scaling =
-            json_utils::parseValue<std::string>(data, keys::Player::SCALING, cfg.scaling);
-        cfg.lockBehavior =
-            json_utils::parseValue<std::string>(
-            data, keys::Player::LOCK_BEHAVIOR, cfg.lockBehavior);
+        cfg.anchor.anchorName =
+            json_utils::parseValue<std::string>(data, keys::Player::ANCHOR, cfg.anchor.anchorName);
+        cfg.anchor.startPosition = json_utils::parseValue<sf::Vector2f>(
+            data, keys::Player::START_POSITION, cfg.anchor.startPosition);
+        cfg.anchor.scaling =
+            json_utils::parseValue<std::string>(data, keys::Player::SCALING, cfg.anchor.scaling);
+        cfg.anchor.lockBehavior = json_utils::parseValue<std::string>(
+            data, keys::Player::LOCK_BEHAVIOR, cfg.anchor.lockBehavior);
 
         // Обработка блока управляющих клавиш (если он есть)
         // Здесь мы находим конкретные кнопки движения, которые могут быть переопределены в JSON.
@@ -149,28 +147,28 @@ namespace core::config {
         }
 
         // scaling может быть только "Uniform" или "None"
-        if (cfg.scaling != "Uniform" && cfg.scaling != "None") {
+        if (cfg.anchor.scaling != "Uniform" && cfg.anchor.scaling != "None") {
             message::showError(
-                std::string("[ConfigLoader]\nНеизвестное значение scaling: ") + cfg.scaling +
-                ". Применено значение по умолчанию (None).");
-            cfg.scaling = "None";
+                std::string("[ConfigLoader]\nНеизвестное значение scaling: ") + cfg.anchor.scaling
+                + ". Применено значение по умолчанию (None).");
+            cfg.anchor.scaling = "None";
         }
 
         // lockBehavior может быть только "ScreenLock" или "WorldLock"
-        if (cfg.lockBehavior != "ScreenLock" && cfg.lockBehavior != "WorldLock") {
+        if (cfg.anchor.lockBehavior != "ScreenLock" && cfg.anchor.lockBehavior != "WorldLock") {
             message::showError(
                 std::string("[ConfigLoader]\nНеизвестное значение lock_behavior: ") +
-                cfg.lockBehavior + ". Применено значение по умолчанию (WorldLock).");
-            cfg.lockBehavior = "WorldLock";
+                cfg.anchor.lockBehavior + ". Применено значение по умолчанию (WorldLock).");
+            cfg.anchor.lockBehavior = "WorldLock";
         }
 
         // anchor должен конвертироваться в валидный AnchorType
-        if (core::ui::anchors::fromString(cfg.anchor) == core::ui::AnchorType::None &&
-            cfg.anchor != "None") {
+        if (core::ui::anchors::fromString(cfg.anchor.anchorName) == core::ui::AnchorType::None &&
+            cfg.anchor.anchorName != "None") {
             message::showError(
-                std::string("[ConfigLoader]\nНеизвестное значение anchor: ") + cfg.anchor +
-                ". Применено значение по умолчанию (None).");
-            cfg.anchor = "None";
+                std::string("[ConfigLoader]\nНеизвестное значение anchor: ") 
+                + cfg.anchor.anchorName + ". Применено значение по умолчанию (None).");
+            cfg.anchor.anchorName = "None";
         }
 
         // Возвращаем полностью собранный PlayerConfig

@@ -1,3 +1,11 @@
+// ================================================================================================
+// File: core/compiler/warnings.h
+// Purpose: Centralized MSVC /Wall warning configuration for the engine.
+// Used by: pch.h (indirectly by all translation units on MSVC builds)
+// Notes:
+//  - Disables noisy system/CRT warnings while keeping game code strict.
+//  - Wrapped in _MSC_VER so other compilers ignore it cleanly.
+// ================================================================================================
 #pragma once
 
 #ifdef _MSC_VER

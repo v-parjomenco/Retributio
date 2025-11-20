@@ -231,6 +231,10 @@
     <ClInclude Include="include\core\config\config_keys.h" />
     <ClInclude Include="include\core\config\config_loader.h" />
     <ClInclude Include="include\core\config\debug_overlay_config.h" />
+    <ClInclude Include="include\core\config\properties\anchor_properties.h" />
+    <ClInclude Include="include\core\config\properties\controls_properties.h" />
+    <ClInclude Include="include\core\config\properties\movement_properties.h" />
+    <ClInclude Include="include\core\config\properties\sprite_properties.h" />
     <ClInclude Include="include\core\ecs\component.h" />
     <ClInclude Include="include\core\ecs\components\keyboard_control_component.h" />
     <ClInclude Include="include\core\ecs\components\lock_behavior_component.h" />
@@ -275,14 +279,15 @@
     <ClInclude Include="include\core\utils\json\json_utils.h" />
     <ClInclude Include="include\core\utils\json\json_validator.h" />
     <ClInclude Include="include\core\utils\message.h" />
+    <ClInclude Include="include\game\skyguard\config\blueprints\player_blueprint.h" />
     <ClInclude Include="include\pch.h" />
     <ClInclude Include="include\third_party\json.hpp" />
     <ClInclude Include="include\third_party\json_silent.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="assets\config\debug_overlay.json" />
-    <None Include="assets\config\player.json" />
-    <None Include="assets\config\resources.json" />
+    <None Include="assets\core\config\debug_overlay.json" />
+    <None Include="assets\game\skyguard\config\player.json" />
+    <None Include="assets\game\skyguard\config\resources.json" />
     <None Include="include\core\resources\holders\resource_holder.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
@@ -290,7 +295,7 @@
   </ImportGroup>
   <ProjectExtensions>
     <VisualStudio>
-      <UserProperties assets_4config_4player_1json__JsonSchema="https://alec016.github.io/Custom-Machinery/Json%20Schema/src/main/resources/schemas/custom_machinery_recipe.json" />
+      <UserProperties />
     </VisualStudio>
   </ProjectExtensions>
 </Project>

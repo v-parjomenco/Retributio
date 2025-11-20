@@ -1,3 +1,11 @@
+// ================================================================================================
+// File: core/ecs/systems/player_init_system.h
+// Purpose: One-shot system that turns PlayerBlueprint into runtime ECS components
+// Used by: World (systems wiring in Game)
+// Related headers: core/ecs/components/player_config_component.h,
+//                  core/resources/resource_manager.h,
+//                  core/ui/anchor_policy.h, core/ui/lock_behavior_factory.h
+// ================================================================================================
 #pragma once
 
 #include <memory>
@@ -24,9 +32,21 @@ namespace core::ecs {
     /**
      * @brief Система инициализации игрока из PlayerConfigComponent.
      *
-     * Она создаёт визуальные и логические компоненты (Sprite, Transform, Velocity, ResizeBehavior)
-     * на основе данных из JSON (player.json).
-     * Работает один раз — при первом обновлении, затем может быть отключена.
+     * Назначение:
+     *  - взять PlayerBlueprint (данные из JSON),
+     *  - создать на его основе runtime-компоненты:
+     *      * SpriteComponent
+     *      * TransformComponent
+     *      * VelocityComponent
+     *      * MovementStatsComponent
+     *      * ScalingBehaviorComponent
+     *      * LockBehaviorComponent (по необходимости)
+     *      * KeyboardControlComponent
+     *  - убрать PlayerConfigComponent после успешной инициализации.
+     *
+     * Система ожидается как "one-shot": после первого апдейта, когда все сущности
+     * созданы, её можно отключить или оставить работать вхолостую (она просто не
+     * найдёт больше PlayerConfigComponent в мире).
      */
     class PlayerInitSystem final : public ISystem {
       public:
@@ -41,13 +61,14 @@ namespace core::ecs {
             for (const auto& [entity, cfgComp] : configs) {
                 const auto& cfg = cfgComp.config;
 
-                // Текстура игрока по TextureID из PlayerConfig.
+                // Текстура игрока по TextureID из PlayerBlueprint.
                 // Путь для неё берётся из ResourcePaths::get(TextureID) внутри ResourceManager.
-                const sf::Texture& texture = mResources.getTexture(cfg.textureId, true).get();
+                const sf::Texture& texture =
+                    mResources.getTexture(cfg.sprite.textureId, true).get();
 
                 // Спрайт
                 sf::Sprite tempSprite(texture);
-                tempSprite.setScale(cfg.scale);
+                tempSprite.setScale(cfg.sprite.scale);
                 SpriteComponent spriteComp(std::move(tempSprite));
 
                 // Позиция и якорь
@@ -55,18 +76,18 @@ namespace core::ecs {
                     sf::FloatRect({0.f, 0.f}, {static_cast<float>(::config::WINDOW_WIDTH),
                                                static_cast<float>(::config::WINDOW_HEIGHT)}));
 
-                core::ui::AnchorType anchor = core::ui::anchors::fromString(cfg.anchor);
+                core::ui::AnchorType anchor = core::ui::anchors::fromString(cfg.anchor.anchorName);
                 if (anchor != core::ui::AnchorType::None) {
                     core::ui::AnchorPolicy(anchor).apply(spriteComp.sprite, defaultView);
                 } else {
-                    spriteComp.sprite.setPosition(cfg.startPosition);
+                    spriteComp.sprite.setPosition(cfg.anchor.startPosition);
                 }
 
                 const sf::Vector2f anchoredPos = spriteComp.sprite.getPosition();
 
                 // Компонент масштабирования
                 ScalingBehaviorComponent scalingComp{};
-                if (cfg.scaling == "Uniform") {
+                if (cfg.anchor.scaling == "Uniform") {
                     scalingComp.mode = ScalingBehaviorComponent::Mode::Uniform;
                 } else {
                     scalingComp.mode = ScalingBehaviorComponent::Mode::None;
@@ -74,8 +95,8 @@ namespace core::ecs {
 
                 // Компонент фиксации
                 std::unique_ptr<core::ui::ILockPolicy> lock_behavior;
-                if (!cfg.lockBehavior.empty() && cfg.lockBehavior != "None") {
-                    lock_behavior = core::ui::LockBehaviorFactory::create(cfg.lockBehavior);
+                if (!cfg.anchor.lockBehavior.empty() && cfg.anchor.lockBehavior != "None") {
+                    lock_behavior = core::ui::LockBehaviorFactory::create(cfg.anchor.lockBehavior);
                 }
 
                 // Добавляем компоненты
@@ -87,18 +108,20 @@ namespace core::ecs {
                     world.addComponent(entity, LockBehaviorComponent(std::move(lock_behavior)));
                 }
 
-                // Параметры движения из JSON (скорость и др.)
+                // Параметры движения из cfg.movement
                 world.addComponent(
                     entity, MovementStatsComponent{
-                                cfg.speed, // maxSpeed
-                                800.f, // acceleration (пока фикс — можно вынести в JSON позднее)
-                                6.f    // friction    (пока фикс — можно вынести в JSON позднее)
-                            });
+                        cfg.movement.speed,        // maxSpeed
+                        cfg.movement.acceleration, // acceleration
+                        cfg.movement.friction      // friction
+                    });
 
                 // Управление с клавиатуры — берём из JSON (или из дефолтов config.h)
                 world.addComponent(entity,
-                                   KeyboardControlComponent{cfg.controls.up, cfg.controls.down,
-                                                            cfg.controls.left, cfg.controls.right});
+                                   KeyboardControlComponent{cfg.controls.up,
+                                                            cfg.controls.down,
+                                                            cfg.controls.left,
+                                                            cfg.controls.right});
 
                 // Отложенное удаление PlayerConfigComponent (чтобы не ломать итератор)
                 toRemove.push_back(entity);

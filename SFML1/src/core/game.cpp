@@ -8,10 +8,12 @@
 #include "core/config/debug_overlay_config.h"
 #include "core/resources/paths/resource_paths.h"
 #include "core/utils/message.h"
+#include "game/skyguard/config/blueprints/player_blueprint.h"
 
 namespace cfg = ::config; // глобальные дефолты движка (окно, vsync, fixed step, hotkeys...)
 namespace gcfg =
     ::core::config;       // игровые JSON-конфиги/лоадеры (PlayerConfig, DebugOverlayConfig...)
+namespace gblueprints = ::core::config::blueprints;
 
 namespace core {
 
@@ -19,12 +21,13 @@ namespace core {
         : mWindow(sf::VideoMode({cfg::WINDOW_WIDTH, cfg::WINDOW_HEIGHT}), cfg::WINDOW_TITLE) {
 
         // Загружаем ресурсы/пути из JSON
-        core::resources::paths::ResourcePaths::loadFromJSON("assets/config/resources.json");
+        core::resources::paths::ResourcePaths::loadFromJSON(
+            "assets/game/skyguard/config/resources.json");
 
         // Применяем настройки рендеринга из config.h
         if constexpr (cfg::ENABLE_VSYNC) {
             mWindow.setVerticalSyncEnabled(true); // включаем вертикальную синхронизацию
-            DEBUG_MSG("[Config] VSync enabled (FRAME_LIMIT ignored)");
+            DEBUG_MSG("[Game]\nVSync enabled (FRAME_LIMIT ignored)");
         } else if constexpr (cfg::FRAME_LIMIT > 0) {
             mWindow.setFramerateLimit(cfg::FRAME_LIMIT); // ограничение FPS
         }
@@ -34,9 +37,9 @@ namespace core {
 
     void Game::initWorld() {
         try {
-            // Создаём конфигурацию игрока (data-driven)
-            gcfg::PlayerConfig playerCfg =
-                gcfg::ConfigLoader::loadPlayerConfig("assets/config/player.json");
+            // Создаём blueprint игрока (data-driven, собранный из properties)
+            gblueprints::PlayerBlueprint playerCfg =
+                gcfg::ConfigLoader::loadPlayerConfig("assets/game/skyguard/config/player.json");
 
             // Создаём сущность игрока
             mPlayerEntity = mWorld.createEntity();
@@ -62,7 +65,7 @@ namespace core {
 
                 // Грузим конфиг для DebugOverlay
                 const auto overlayCfg =
-                    gcfg::loadDebugOverlayConfig("assets/config/debug_overlay.json");
+                    gcfg::loadDebugOverlayConfig("assets/core/config/debug_overlay.json");
 
                 // Применяем стиль
                 ecs::DebugOverlaySystem::Style st;

@@ -31,7 +31,7 @@ namespace {
     using core::resources::ids::toString;
 
     // --------------------------------------------------------------------------------------------
-    // Валидация верхнего уровня JSON-структуры assets/config/resources.json
+    // Валидация верхнего уровня JSON-структуры assets/game/skyguard/config/resources.json
     // --------------------------------------------------------------------------------------------
 
     void validateResourceRegistry(const Json& data) {
