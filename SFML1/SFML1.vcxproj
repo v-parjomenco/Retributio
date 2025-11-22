@@ -208,6 +208,7 @@
     <ClCompile Include="src\core\resources\resource_manager.cpp" />
     <ClCompile Include="src\core\time\time_service.cpp" />
     <ClCompile Include="src\core\ui\anchor_policy.cpp" />
+    <ClCompile Include="src\core\ui\ids\ui_id_utils.cpp" />
     <ClCompile Include="src\core\ui\lock_behavior.cpp" />
     <ClCompile Include="src\core\ui\scaling_behavior.cpp" />
     <ClCompile Include="src\core\utils\file_loader.cpp" />
@@ -270,6 +271,7 @@
     <ClInclude Include="include\core\time\time_service.h" />
     <ClInclude Include="include\core\ui\anchor_policy.h" />
     <ClInclude Include="include\core\ui\anchor_utils.h" />
+    <ClInclude Include="include\core\ui\ids\ui_id_utils.h" />
     <ClInclude Include="include\core\ui\lock_behavior.h" />
     <ClInclude Include="include\core\ui\scaling_behavior.h" />
     <ClInclude Include="include\core\utils\file_loader.h" />

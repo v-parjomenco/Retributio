@@ -1,12 +1,10 @@
 // ================================================================================================
 // File: core/ui/scaling_behavior.h
 // Purpose: Scaling behavior types and helper functions for resize handling
-// Used by: AnchorProperties, ScalingBehaviorComponent, ScalingSystem, config loaders
-// Related headers: core/config.h
+// Used by: AnchorProperties, ScalingBehaviorComponent, ScalingSystem
+// Related headers: core/config.h, core/ui/ids/ui_id_utils.h
 // ================================================================================================
 #pragma once
-
-#include <string_view>
 
 #include <SFML/Graphics/Sprite.hpp>
 #include <SFML/Graphics/View.hpp>
@@ -18,26 +16,11 @@ namespace core::ui {
      *
      * None    - без дополнительного масштабирования;
      * Uniform - равномерное масштабирование относительно базового размера окна.
-     */
-    enum class ScalingBehaviorKind {
-        None,
-        Uniform
-    };
-
-    /**
-     * @brief Конвертация строкового имени resize_scaling (из JSON) в enum.
      *
-     * Поддерживаемые значения:
-     *  - "Uniform" -> ScalingBehaviorKind::Uniform
-     *  - "None"    -> ScalingBehaviorKind::None
-     *
-     * При неизвестном имени:
-     *  - возвращается defaultKind,
-     *  - при этом лог и/или popup об ошибке.
+     * Строковые имена ("None", "Uniform") и маппинг string <-> enum живут
+     * в core::ui::ids::scalingFromString / core::ui::ids::toString.
      */
-    ScalingBehaviorKind scalingBehaviorFromString(
-        std::string_view name,
-        ScalingBehaviorKind defaultKind = ScalingBehaviorKind::None);
+    enum class ScalingBehaviorKind { None, Uniform };
 
     /**
      * @brief Реализация Uniform-скейлинга.
@@ -50,8 +33,6 @@ namespace core::ui {
      *
      * Вся "память" хранится в lastUniform (per-entity state в компоненте).
      */
-    void applyUniformScaling(sf::Sprite& sprite,
-                             const sf::View& view,
-                             float& lastUniform);
+    void applyUniformScaling(sf::Sprite& sprite, const sf::View& view, float& lastUniform);
 
 } // namespace core::ui

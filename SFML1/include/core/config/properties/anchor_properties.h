@@ -2,11 +2,9 @@
 // File: core/config/properties/anchor_properties.h
 // Purpose: Data-only anchor/resize/lock configuration brick
 // Used by: PlayerBlueprint, future UI/world-anchored blueprints
-// Related headers: core/config.h
+// Related headers: core/config.h, core/ui/ids/ui_id_utils.h
 // ================================================================================================
 #pragma once
-
-#include <string>
 
 #include <SFML/System/Vector2.hpp>
 
@@ -21,41 +19,37 @@ namespace core::config::properties {
      * @brief Набор параметров, связанных с позиционированием и поведением при resize.
      *
      * Эта структура описывает:
-     *  - как объект привязан к экрану (anchorName),
+     *  - к какому якорю привязан объект (anchorType),
      *  - где он находится по умолчанию, если якорь не задан,
      *  - как он масштабируется при изменении размера окна,
      *  - какую политику фиксации (lock) использовать.
      *
      * Здесь хранятся только данные, без логики. Логику реализуют AnchorPolicy,
-     * ResizeBehavior и LockPolicy в других модулях.
+     * ScalingSystem и LockSystem в других модулях.
      */
     struct AnchorProperties {
-        /**
-        * @brief Строковое представление якоря из JSON (поле "anchor").
-        *        Значение "None" означает, что якорь не используется.
-        */
-        std::string anchorName = ::config::DEFAULT_ANCHOR;
 
         /**
-         * @brief Тип якоря, сконвертированный из строки anchorName в loader'е.
+         * @brief Тип якоря, полученный из строки "anchor" в ConfigLoader.
          *
          * AnchorType::None означает "нет якоря" (объект живёт в startPosition).
-         * Это поле используется в runtime-коде (PlayerInitSystem, UI и т.п.),
-         * чтобы не дёргать fromString(...) повторно.
+         *
+         * Строковое имя в рантайме не храним — при необходимости его можно
+         * всегда восстановить через core::ui::ids::toString(anchorType).
          */
         core::ui::AnchorType anchorType{core::ui::AnchorType::None};
 
         /**
         * @brief Стартовая позиция в мировых координатах, используемая,
-        *        если anchorName == "None" (JSON поле "anchor").
+        *        если anchorType == AnchorType::None (JSON поле "start_position").
         */
         sf::Vector2f startPosition{0.f, 0.f};
 
         /**
          * @brief Тип политики масштабирования при изменении размера экрана.
          *
-         * В JSON это строка "resize_scaling", которая конвертируется в enum
-         * (см. core::ui::scalingBehaviorFromString).
+         * В JSON это строка "resize_scaling", которая конвертируется в enum через
+         * core::ui::ids::scalingFromString(...).
          *
          * ScalingBehaviorKind::None    — без дополнительного масштабирования;
          * ScalingBehaviorKind::Uniform — равномерное масштабирование.
@@ -65,8 +59,8 @@ namespace core::config::properties {
         /**
          * @brief Тип политики фиксации при resize.
          *
-         * В JSON это строка "lock_behavior", которая конвертируется в enum
-         * (см. core::ui::lockBehaviorFromString).
+         * В JSON это строка "lock_behavior", которая конвертируется в enum через
+         * core::ui::ids::lockFromString(...).
          *
          * LockBehaviorKind::World  — жить в мировых координатах;
          * LockBehaviorKind::Screen — фиксировать относительное положение на экране.

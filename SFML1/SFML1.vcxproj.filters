@@ -214,6 +214,12 @@
     <Filter Include="src\game\skyguard\config\loader">
       <UniqueIdentifier>{d717f2a1-9ba3-41e3-bb21-f64cf2e0ffd0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\ui\ids">
+      <UniqueIdentifier>{430249f0-c878-4c92-bbc0-f3bbbc173eb0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\ui\ids">
+      <UniqueIdentifier>{b26f29cd-3e7b-413a-bf16-020f8b927df0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -266,6 +272,9 @@
     </ClCompile>
     <ClCompile Include="src\game\skyguard\config\loader\config_loader.cpp">
       <Filter>src\game\skyguard\config\loader</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ui\ids\ui_id_utils.cpp">
+      <Filter>src\core\ui\ids</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -442,6 +451,9 @@
     </ClInclude>
     <ClInclude Include="include\game\skyguard\config\loader\config_loader.h">
       <Filter>include\game\skyguard\config\loader</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ui\ids\ui_id_utils.h">
+      <Filter>include\core\ui\ids</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

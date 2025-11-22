@@ -4,7 +4,7 @@
 
 namespace core::ui {
 
-    void ui::AnchorPolicy::apply(sf::Sprite& sprite, const sf::View& view) const {
+    void AnchorPolicy::apply(sf::Sprite& sprite, const sf::View& view) const {
         // Получаем локальные границы (без учёта scale и transform)
         sf::FloatRect bounds = sprite.getLocalBounds();
 

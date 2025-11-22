@@ -4,9 +4,7 @@
 
 #include "core/config/config_keys.h"
 #include "core/resources/ids/resource_id_utils.h"
-#include "core/ui/anchor_utils.h"
-#include "core/ui/lock_behavior.h"
-#include "core/ui/scaling_behavior.h"
+#include "core/ui/ids/ui_id_utils.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_utils.h"
 #include "core/utils/message.h"
@@ -19,7 +17,7 @@ namespace {
     namespace keys = core::config::keys;
     namespace json_utils = core::utils::json;
     namespace rids = core::resources::ids;
-    namespace anchors = core::ui::anchors;
+    namespace ui_ids = core::ui::ids;
 
     using Json = json_utils::json;
 
@@ -54,9 +52,7 @@ namespace game::skyguard::config {
         *  - приложение завершится через std::exit(EXIT_FAILURE).
         */
         Json data = json_utils::parseAndValidateCritical(
-            fileContent,
-            path,
-            "ConfigLoader",
+            fileContent, path, "ConfigLoader",
             {
                 // Обязательный: строковый ID текстуры (например, "Player")
                 {keys::Player::TEXTURE, {Json::value_t::string}},
@@ -108,58 +104,50 @@ namespace game::skyguard::config {
         }
 
         // Коэффициент масштабирования спрайта игрока
-        cfg.sprite.scale = json_utils::parseValue<sf::Vector2f>(
-            data, keys::Player::SCALE, cfg.sprite.scale);
+        cfg.sprite.scale =
+            json_utils::parseValue<sf::Vector2f>(data, keys::Player::SCALE, cfg.sprite.scale);
 
         // Параметры движения игрока
-        cfg.movement.speed = json_utils::parseValue<float>(
-            data, keys::Player::SPEED, cfg.movement.speed);
-        cfg.movement.acceleration = json_utils::parseValue<float>(
-            data, keys::Player::ACCELERATION, cfg.movement.acceleration);
-        cfg.movement.friction =json_utils::parseValue<float>(
-            data, keys::Player::FRICTION, cfg.movement.friction);
+        cfg.movement.speed =
+            json_utils::parseValue<float>(data, keys::Player::SPEED, cfg.movement.speed);
+        cfg.movement.acceleration = json_utils::parseValue<float>(data, keys::Player::ACCELERATION,
+                                                                  cfg.movement.acceleration);
+        cfg.movement.friction =
+            json_utils::parseValue<float>(data, keys::Player::FRICTION, cfg.movement.friction);
 
         // ----------------------------------------------------------------------------------------
         // Параметры привязки и поведения камеры/экрана
         // ----------------------------------------------------------------------------------------
 
+        // anchor: строка -> AnchorType (enum в AnchorProperties)
         {
-            // anchor: строка → enum AnchorType
+            // Если в JSON нет поля "anchor" — используем строковый дефолт из config.h,
+            // затем конвертируем в enum через ui::ids::anchorFromString.
             const std::string anchorStr = json_utils::parseValue<std::string>(
-                data, keys::Player::ANCHOR, cfg.anchor.anchorName);
+                data, keys::Player::ANCHOR, ::config::DEFAULT_ANCHOR);
 
-            auto anchorType = anchors::fromString(anchorStr);
-
-            if (anchorType == core::ui::AnchorType::None && anchorStr != "None") {
-                // Неизвестное значение anchor — логируем и откатываемся на дефолт.
-                message::showError(std::string("[ConfigLoader]\nНеизвестное значение anchor: ") +
-                                   anchorStr + ". Применено значение по умолчанию (None).");
-
-                cfg.anchor.anchorName = "None";
-            } else {
-                cfg.anchor.anchorName = anchorStr;
-                cfg.anchor.anchorType = anchorType;
-            }
+            cfg.anchor.anchorType = ui_ids::anchorFromString(anchorStr, cfg.anchor.anchorType);
         }
 
         // Стартовая позиция в мировых координатах
         cfg.anchor.startPosition = json_utils::parseValue<sf::Vector2f>(
             data, keys::Player::START_POSITION, cfg.anchor.startPosition);
 
-        // resize_scaling: строка → enum в AnchorProperties
+        // resize_scaling: строка -> ScalingBehaviorKind
         {
             const std::string scalingStr = json_utils::parseValue<std::string>(
                 data, keys::Player::RESIZE_SCALING, ::config::DEFAULT_RESIZE_SCALING);
 
-            cfg.anchor.scalingBehavior = core::ui::scalingBehaviorFromString(scalingStr);
+            cfg.anchor.scalingBehavior =
+                ui_ids::scalingFromString(scalingStr, cfg.anchor.scalingBehavior);
         }
 
-        // lock_behavior: строка → enum в AnchorProperties
+        // lock_behavior: строка -> LockBehaviorKind
         {
             const std::string lockStr = json_utils::parseValue<std::string>(
                 data, keys::Player::LOCK_BEHAVIOR, ::config::DEFAULT_LOCK_BEHAVIOR);
 
-            cfg.anchor.lockBehavior = core::ui::lockBehaviorFromString(lockStr);
+            cfg.anchor.lockBehavior = ui_ids::lockFromString(lockStr, cfg.anchor.lockBehavior);
         }
 
         // Обработка блока управляющих клавиш (если он есть)
@@ -168,8 +156,7 @@ namespace game::skyguard::config {
             const auto& c = data.at(keys::Player::CONTROLS);
 
             // Каждая клавиша может быть переопределена в JSON
-            cfg.controls.up = 
-                json_utils::parseKey(c, keys::Player::CONTROL_UP, cfg.controls.up);
+            cfg.controls.up = json_utils::parseKey(c, keys::Player::CONTROL_UP, cfg.controls.up);
             cfg.controls.down =
                 json_utils::parseKey(c, keys::Player::CONTROL_DOWN, cfg.controls.down);
             cfg.controls.left =

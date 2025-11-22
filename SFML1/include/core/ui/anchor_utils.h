@@ -1,8 +1,14 @@
-﻿#pragma once
+﻿// ================================================================================================
+// File: core/ui/anchor_utils.h
+// Purpose: AnchorType enum and helpers for anchor-based positioning
+// Used by: AnchorProperties, AnchorPolicy, PlayerInitSystem, UI/layout systems
+// Related headers: core/ui/ids/ui_id_utils.h (string <-> enum helpers), core/config.h
+// ================================================================================================
+
+#pragma once
 
 #include <cassert>
 #include <cstdint>
-#include <string>
 
 #include <SFML/System/Vector2.hpp>
 
@@ -10,6 +16,20 @@
 
 namespace core::ui {
 
+    /**
+     * @brief Тип якоря на экране.
+     *
+     * Используется для привязки объекта к определённой части экрана:
+     *  - TopLeft / TopCenter / TopRight
+     *  - CenterLeft / Center / CenterRight
+     *  - BottomLeft / BottomCenter / BottomRight
+     *  - None — не использовать якорь, работать в мировых координатах.
+     *
+     * ВАЖНО:
+     *  - Строковые имена ("BottomCenter" и т.п.) живут в core::ui::ids::toString(...)
+     *    и сопоставляются через core::ui::ids::anchorFromString(...).
+     *  - Этот enum вообще не знает о JSON/строках.
+     */
     enum class AnchorType : std::uint8_t {
         None,
         TopLeft,
@@ -25,6 +45,19 @@ namespace core::ui {
 
     namespace anchors {
 
+        /**
+         * @brief Вычисляет смещение якоря относительно размера прямоугольника.
+         *
+         * size — размер объекта (например, спрайта) в пикселях.
+         * type — якорь, указывающий, к какой части объекта привязываться.
+         *
+         * Примеры:
+         *  - TopLeft      -> (0, 0)
+         *  - Center       -> (size.x * 0.5f, size.y * 0.5f)
+         *  - BottomRight  -> (size.x, size.y)
+         *
+         * None -> (0, 0).
+         */
         inline sf::Vector2f computeAnchorOffset(const sf::Vector2f& size, AnchorType type) {
             switch (type) {
             case AnchorType::TopLeft:
@@ -54,41 +87,10 @@ namespace core::ui {
             }
         }
 
-        inline AnchorType fromString(const std::string& str) noexcept {
-            if (str == "TopLeft") {
-                return AnchorType::TopLeft;
-            }
-            if (str == "TopCenter") {
-                return AnchorType::TopCenter;
-            }
-            if (str == "TopRight") {
-                return AnchorType::TopRight;
-            }
-            if (str == "CenterLeft") {
-                return AnchorType::CenterLeft;
-            }
-            if (str == "Center") {
-                return AnchorType::Center;
-            }
-            if (str == "CenterRight") {
-                return AnchorType::CenterRight;
-            }
-            if (str == "BottomLeft") {
-                return AnchorType::BottomLeft;
-            }
-            if (str == "BottomCenter") {
-                return AnchorType::BottomCenter;
-            }
-            if (str == "BottomRight") {
-                return AnchorType::BottomRight;
-            }
-            if (str == "None") {
-                return AnchorType::None;
-            }
-
-            // значение по умолчанию при ошибке
-            return AnchorType::None;
-        }
+        // ВНИМАНИЕ:
+        //  - Конвертация string <-> AnchorType живёт в core::ui::ids
+        //    (см. core/ui/ids/ui_id_utils.h / .cpp).
+        //  - Здесь остаётся только чистая математика, без JSON и строк.
 
     } // namespace anchors
 } // namespace core::ui

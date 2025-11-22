@@ -30,6 +30,7 @@
 #include "core/ui/anchor_policy.h"
 #include "core/ui/anchor_utils.h"
 #include "core/ui/scaling_behavior.h"
+
 #include "game/skyguard/ecs/components/player_config_component.h"
 
 namespace game::skyguard::ecs {
@@ -62,7 +63,7 @@ namespace game::skyguard::ecs {
             auto& configs = world.storage<PlayerConfigComponent>();
 
             // Копим сущности для безопасного удаления после цикла
-            std::vector<core::ecs::Entity> toRemove; 
+            std::vector<core::ecs::Entity> toRemove;
 
             for (const auto& [entity, cfgComp] : configs) {
                 const auto& cfg = cfgComp.config;
@@ -79,10 +80,10 @@ namespace game::skyguard::ecs {
 
                 // Позиция и якорь
                 sf::View defaultView(
-                    sf::FloatRect({0.f, 0.f},
-                                  {static_cast<float>(::config::WINDOW_WIDTH),
-                                   static_cast<float>(::config::WINDOW_HEIGHT)}));
+                    sf::FloatRect({0.f, 0.f}, {static_cast<float>(::config::WINDOW_WIDTH),
+                                               static_cast<float>(::config::WINDOW_HEIGHT)}));
 
+                // Используем enum AnchorType из AnchorProperties, без строк и JSON.
                 const core::ui::AnchorType anchorType = cfg.anchor.anchorType;
                 if (anchorType != core::ui::AnchorType::None) {
                     core::ui::AnchorPolicy(anchorType).apply(spriteComp.sprite, defaultView);
@@ -92,11 +93,11 @@ namespace game::skyguard::ecs {
 
                 const sf::Vector2f anchoredPos = spriteComp.sprite.getPosition();
 
-                // Компонент масштабирования
+                // Компонент масштабирования (enum уже пришёл из loader'а)
                 core::ecs::ScalingBehaviorComponent scalingComp{};
                 scalingComp.kind = cfg.anchor.scalingBehavior;
 
-                // Компонент фиксации
+                // Компонент фиксации (enum из loader'а)
                 core::ecs::LockBehaviorComponent lockComp{};
                 lockComp.kind = cfg.anchor.lockBehavior;
 
@@ -109,17 +110,15 @@ namespace game::skyguard::ecs {
 
                 // Параметры движения из cfg.movement
                 world.addComponent(entity, core::ecs::MovementStatsComponent{
-                    cfg.movement.speed,        // maxSpeed
-                    cfg.movement.acceleration, // acceleration
-                    cfg.movement.friction      // friction
-                });
+                                               cfg.movement.speed,        // maxSpeed
+                                               cfg.movement.acceleration, // acceleration
+                                               cfg.movement.friction      // friction
+                                           });
 
                 // Управление с клавиатуры — берём из JSON (или из дефолтов config.h)
                 world.addComponent(entity, core::ecs::KeyboardControlComponent{
-                    cfg.controls.up,
-                    cfg.controls.down,
-                    cfg.controls.left,
-                    cfg.controls.right});
+                                               cfg.controls.up, cfg.controls.down,
+                                               cfg.controls.left, cfg.controls.right});
 
                 // Отложенное удаление PlayerConfigComponent (чтобы не ломать итератор)
                 toRemove.push_back(entity);
