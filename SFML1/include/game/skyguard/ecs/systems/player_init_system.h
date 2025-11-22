@@ -1,33 +1,38 @@
 // ================================================================================================
-// File: core/ecs/systems/player_init_system.h
+// File: game/skyguard/ecs/systems/player_init_system.h
 // Purpose: One-shot system that turns PlayerBlueprint into runtime ECS components
 // Used by: World (systems wiring in Game)
-// Related headers: core/ecs/components/player_config_component.h,
+// Related headers: game/skyguard/ecs/components/player_config_component.h,
+//                  game/skyguard/config/blueprints/player_blueprint.h,
 //                  core/resources/resource_manager.h,
-//                  core/ui/anchor_policy.h, core/ui/lock_behavior_factory.h
+//                  core/ui/anchor_policy.h
 // ================================================================================================
 #pragma once
 
-#include <memory>
 #include <utility>
 #include <vector>
+
+#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/Graphics/Sprite.hpp>
+#include <SFML/Graphics/Texture.hpp>
 
 #include "core/config.h"
 #include "core/ecs/components/keyboard_control_component.h"
 #include "core/ecs/components/lock_behavior_component.h"
 #include "core/ecs/components/movement_stats_component.h"
-#include "core/ecs/components/player_config_component.h"
 #include "core/ecs/components/scaling_behavior_component.h"
 #include "core/ecs/components/sprite_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/components/velocity_component.h"
 #include "core/ecs/system.h"
+#include "core/ecs/world.h"
 #include "core/resources/resource_manager.h"
 #include "core/ui/anchor_policy.h"
 #include "core/ui/anchor_utils.h"
-#include "core/ui/lock_behavior_factory.h"
+#include "core/ui/scaling_behavior.h"
+#include "game/skyguard/ecs/components/player_config_component.h"
 
-namespace core::ecs {
+namespace game::skyguard::ecs {
 
     /**
      * @brief Система инициализации игрока из PlayerConfigComponent.
@@ -40,7 +45,7 @@ namespace core::ecs {
      *      * VelocityComponent
      *      * MovementStatsComponent
      *      * ScalingBehaviorComponent
-     *      * LockBehaviorComponent (по необходимости)
+     *      * LockBehaviorComponent
      *      * KeyboardControlComponent
      *  - убрать PlayerConfigComponent после успешной инициализации.
      *
@@ -48,15 +53,16 @@ namespace core::ecs {
      * созданы, её можно отключить или оставить работать вхолостую (она просто не
      * найдёт больше PlayerConfigComponent в мире).
      */
-    class PlayerInitSystem final : public ISystem {
+    class PlayerInitSystem final : public core::ecs::ISystem {
       public:
         explicit PlayerInitSystem(core::resources::ResourceManager& res) : mResources(res) {
         }
 
-        void update(World& world, float) override {
+        void update(core::ecs::World& world, float) override {
             auto& configs = world.storage<PlayerConfigComponent>();
 
-            std::vector<Entity> toRemove; // копим сущности для безопасного удаления после цикла
+            // Копим сущности для безопасного удаления после цикла
+            std::vector<core::ecs::Entity> toRemove; 
 
             for (const auto& [entity, cfgComp] : configs) {
                 const auto& cfg = cfgComp.config;
@@ -69,16 +75,17 @@ namespace core::ecs {
                 // Спрайт
                 sf::Sprite tempSprite(texture);
                 tempSprite.setScale(cfg.sprite.scale);
-                SpriteComponent spriteComp(std::move(tempSprite));
+                core::ecs::SpriteComponent spriteComp(std::move(tempSprite));
 
                 // Позиция и якорь
                 sf::View defaultView(
-                    sf::FloatRect({0.f, 0.f}, {static_cast<float>(::config::WINDOW_WIDTH),
-                                               static_cast<float>(::config::WINDOW_HEIGHT)}));
+                    sf::FloatRect({0.f, 0.f},
+                                  {static_cast<float>(::config::WINDOW_WIDTH),
+                                   static_cast<float>(::config::WINDOW_HEIGHT)}));
 
-                core::ui::AnchorType anchor = core::ui::anchors::fromString(cfg.anchor.anchorName);
-                if (anchor != core::ui::AnchorType::None) {
-                    core::ui::AnchorPolicy(anchor).apply(spriteComp.sprite, defaultView);
+                const core::ui::AnchorType anchorType = cfg.anchor.anchorType;
+                if (anchorType != core::ui::AnchorType::None) {
+                    core::ui::AnchorPolicy(anchorType).apply(spriteComp.sprite, defaultView);
                 } else {
                     spriteComp.sprite.setPosition(cfg.anchor.startPosition);
                 }
@@ -86,42 +93,33 @@ namespace core::ecs {
                 const sf::Vector2f anchoredPos = spriteComp.sprite.getPosition();
 
                 // Компонент масштабирования
-                ScalingBehaviorComponent scalingComp{};
-                if (cfg.anchor.scaling == "Uniform") {
-                    scalingComp.mode = ScalingBehaviorComponent::Mode::Uniform;
-                } else {
-                    scalingComp.mode = ScalingBehaviorComponent::Mode::None;
-                }
+                core::ecs::ScalingBehaviorComponent scalingComp{};
+                scalingComp.kind = cfg.anchor.scalingBehavior;
 
                 // Компонент фиксации
-                std::unique_ptr<core::ui::ILockPolicy> lock_behavior;
-                if (!cfg.anchor.lockBehavior.empty() && cfg.anchor.lockBehavior != "None") {
-                    lock_behavior = core::ui::LockBehaviorFactory::create(cfg.anchor.lockBehavior);
-                }
+                core::ecs::LockBehaviorComponent lockComp{};
+                lockComp.kind = cfg.anchor.lockBehavior;
 
                 // Добавляем компоненты
                 world.addComponent(entity, spriteComp);
-                world.addComponent(entity, TransformComponent{anchoredPos});
-                world.addComponent(entity, VelocityComponent{{0.f, 0.f}});
+                world.addComponent(entity, core::ecs::TransformComponent{anchoredPos});
+                world.addComponent(entity, core::ecs::VelocityComponent{{0.f, 0.f}});
                 world.addComponent(entity, std::move(scalingComp));
-                if (lock_behavior) {
-                    world.addComponent(entity, LockBehaviorComponent(std::move(lock_behavior)));
-                }
+                world.addComponent(entity, lockComp);
 
                 // Параметры движения из cfg.movement
-                world.addComponent(
-                    entity, MovementStatsComponent{
-                        cfg.movement.speed,        // maxSpeed
-                        cfg.movement.acceleration, // acceleration
-                        cfg.movement.friction      // friction
-                    });
+                world.addComponent(entity, core::ecs::MovementStatsComponent{
+                    cfg.movement.speed,        // maxSpeed
+                    cfg.movement.acceleration, // acceleration
+                    cfg.movement.friction      // friction
+                });
 
                 // Управление с клавиатуры — берём из JSON (или из дефолтов config.h)
-                world.addComponent(entity,
-                                   KeyboardControlComponent{cfg.controls.up,
-                                                            cfg.controls.down,
-                                                            cfg.controls.left,
-                                                            cfg.controls.right});
+                world.addComponent(entity, core::ecs::KeyboardControlComponent{
+                    cfg.controls.up,
+                    cfg.controls.down,
+                    cfg.controls.left,
+                    cfg.controls.right});
 
                 // Отложенное удаление PlayerConfigComponent (чтобы не ломать итератор)
                 toRemove.push_back(entity);
@@ -132,11 +130,11 @@ namespace core::ecs {
             }
         }
 
-        void render(World&, sf::RenderWindow&) override {
+        void render(core::ecs::World&, sf::RenderWindow&) override {
         }
 
       private:
         core::resources::ResourceManager& mResources;
     };
 
-} // namespace core::ecs
+} // namespace game::skyguard::ecs

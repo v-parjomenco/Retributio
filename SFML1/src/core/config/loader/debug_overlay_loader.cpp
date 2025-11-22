@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "core/config/debug_overlay_config.h"
+#include "core/config/loader/debug_overlay_loader.h"
 
 #include "core/config/config_keys.h"
 #include "core/utils/file_loader.h"
@@ -21,8 +21,8 @@ namespace {
 
 namespace core::config {
 
-    DebugOverlayConfig loadDebugOverlayConfig(const std::string& path) {
-        DebugOverlayConfig cfg; // стартуем с дефолтных значений
+    DebugOverlayBlueprint loadDebugOverlayBlueprint(const std::string& path) {
+        DebugOverlayBlueprint cfg; // стартуем с дефолтных значений
 
         /**
         * @brief Низкоуровневое чтение файла через FileLoader.
@@ -34,7 +34,7 @@ namespace core::config {
             // FileLoader уже залогировал низкоуровневую проблему с файлом,
             // здесь мы добавляем контекст более высокого уровня.
             message::logDebug(
-                "[DebugOverlayConfig]\nБудет использована конфигурация по умолчанию: " + path);
+                "[DebugOverlayBlueprint]\nБудет использована конфигурация по умолчанию: " + path);
             return cfg;
         }
 
@@ -49,7 +49,7 @@ namespace core::config {
         auto dataOpt = json_utils::parseAndValidateNonCritical(
             fileContent,
             path,
-            "DebugOverlayConfig",
+            "DebugOverlayBlueprint",
             {
                 {keys::DebugOverlay::ENABLED,
                  {Json::value_t::boolean},
@@ -79,25 +79,32 @@ namespace core::config {
         // ----------------------------------------------------------------------------------------
         // Заполнение полей на основе JSON-данных, считанных с помощью json_utils:
         //  - если ключ есть и валиден → используем значение из JSON,
-        //  - если ключа нет → оставляем значение по умолчанию из структуры DebugOverlayConfig.
+        //  - если ключа нет → оставляем значение по умолчанию из структуры DebugOverlayBlueprint.
         // ----------------------------------------------------------------------------------------
 
         // enabled (bool, если значение с JSON-файла не получено —> остаётся по умолчанию "true")
-        cfg.enabled =
-            json_utils::parseValue(data, keys::DebugOverlay::ENABLED, cfg.enabled);
+        cfg.enabled = json_utils::parseValue(
+                                                                 data,
+                                                                 keys::DebugOverlay::ENABLED,
+                                                                 cfg.enabled);
 
         // position (Vector2f с поддержкой number/array/object)
-        cfg.position =
-            json_utils::parseValue<sf::Vector2f>(data, keys::DebugOverlay::POSITION, cfg.position);
-
+        cfg.text.position = json_utils::parseValue<sf::Vector2f>(
+                                                                 data,
+                                                                 keys::DebugOverlay::POSITION,
+                                                                 cfg.text.position);
 
         // characterSize (unsigned int, если значения нет —> остаётся значение по умолчанию)
-        cfg.characterSize =
-            json_utils::parseValue(data, keys::DebugOverlay::CHARACTER_SIZE, cfg.characterSize);
+        cfg.text.characterSize = json_utils::parseValue(
+                                                                data,
+                                                                keys::DebugOverlay::CHARACTER_SIZE,
+                                                                cfg.text.characterSize);
 
         // color (строка "#RRGGBB"/"#RRGGBBAA" или объект {r,g,b,a})
-        cfg.color =
-            json_utils::parseColor(data, keys::DebugOverlay::COLOR, cfg.color);
+        cfg.text.color = json_utils::parseColor(
+                                                                data,
+                                                                keys::DebugOverlay::COLOR,
+                                                                cfg.text.color);
 
         return cfg;
     }

@@ -196,6 +196,24 @@
     <Filter Include="include\game\skyguard\ecs\systems">
       <UniqueIdentifier>{cdf6a807-9afb-46c4-a1d9-ffb3f58c3945}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\config\blueprints">
+      <UniqueIdentifier>{a64d81ae-cb5c-467e-aad1-b485d4e3d80c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\config\blueprints">
+      <UniqueIdentifier>{01fb9351-6a75-407b-b417-4933a810a8a7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\config\loader">
+      <UniqueIdentifier>{edcb2c32-ef84-4ccf-8292-35289d5b1386}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\game\skyguard\config\loader">
+      <UniqueIdentifier>{3546ea98-d299-4110-aed2-197617f799e2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\config\loader">
+      <UniqueIdentifier>{b36875ce-0f7a-48f0-b3f7-3bc94c166bed}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\config\loader">
+      <UniqueIdentifier>{d717f2a1-9ba3-41e3-bb21-f64cf2e0ffd0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -219,9 +237,6 @@
     <ClCompile Include="src\core\resources\paths\resource_paths.cpp">
       <Filter>src\core\resources\paths</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\config\config_loader.cpp">
-      <Filter>src\core\config</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\utils\json\json_utils.cpp">
       <Filter>src\core\utils\json</Filter>
     </ClCompile>
@@ -231,19 +246,7 @@
     <ClCompile Include="src\core\ecs\systems\debug_overlay_system.cpp">
       <Filter>src\core\ecs\systems</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\config\debug_overlay_config.cpp">
-      <Filter>src\core\config</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\ui\anchor_policy.cpp">
-      <Filter>src\core\ui</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\ui\lock_behavior_factory.cpp">
-      <Filter>src\core\ui</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\ui\lock_policy.cpp">
-      <Filter>src\core\ui</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\ui\scaling_policy.cpp">
       <Filter>src\core\ui</Filter>
     </ClCompile>
     <ClCompile Include="src\pch.cpp">
@@ -251,6 +254,18 @@
     </ClCompile>
     <ClCompile Include="src\core\utils\file_loader.cpp">
       <Filter>src\core\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ui\lock_behavior.cpp">
+      <Filter>src\core\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ui\scaling_behavior.cpp">
+      <Filter>src\core\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\config\loader\debug_overlay_loader.cpp">
+      <Filter>src\core\config\loader</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\skyguard\config\loader\config_loader.cpp">
+      <Filter>src\game\skyguard\config\loader</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -305,12 +320,6 @@
     <ClInclude Include="include\core\ecs\systems\render_system.h">
       <Filter>include\core\ecs\systems</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\ecs\components\player_config_component.h">
-      <Filter>include\core\ecs\components</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\ecs\systems\player_init_system.h">
-      <Filter>include\core\ecs\systems</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\ecs\components\lock_behavior_component.h">
       <Filter>include\core\ecs\components</Filter>
     </ClInclude>
@@ -359,15 +368,6 @@
     <ClInclude Include="include\core\ui\anchor_utils.h">
       <Filter>include\core\ui</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\ui\lock_policy.h">
-      <Filter>include\core\ui</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\ui\scaling_policy.h">
-      <Filter>include\core\ui</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\ui\lock_behavior_factory.h">
-      <Filter>include\core\ui</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\utils\message.h">
       <Filter>include\core\utils</Filter>
     </ClInclude>
@@ -375,9 +375,6 @@
       <Filter>include\core\ecs</Filter>
     </ClInclude>
     <ClInclude Include="include\core\config\config_keys.h">
-      <Filter>include\core\config</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\config\config_loader.h">
       <Filter>include\core\config</Filter>
     </ClInclude>
     <ClInclude Include="include\core\resources\i_resource.h">
@@ -397,9 +394,6 @@
     </ClInclude>
     <ClInclude Include="include\core\ecs\systems\debug_overlay_system.h">
       <Filter>include\core\ecs\systems</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\config\debug_overlay_config.h">
-      <Filter>include\core\config</Filter>
     </ClInclude>
     <ClInclude Include="include\core\compiler\warnings.h">
       <Filter>include\core\compiler</Filter>
@@ -424,6 +418,30 @@
     </ClInclude>
     <ClInclude Include="include\game\skyguard\config\blueprints\player_blueprint.h">
       <Filter>include\game\skyguard\config\blueprints</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\ecs\components\player_config_component.h">
+      <Filter>include\game\skyguard\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\ecs\systems\player_init_system.h">
+      <Filter>include\game\skyguard\ecs\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config\properties\text_properties.h">
+      <Filter>include\core\config\properties</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config\blueprints\debug_overlay_blueprint.h">
+      <Filter>include\core\config\blueprints</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ui\lock_behavior.h">
+      <Filter>include\core\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ui\scaling_behavior.h">
+      <Filter>include\core\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config\loader\debug_overlay_loader.h">
+      <Filter>include\core\config\loader</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\loader\config_loader.h">
+      <Filter>include\game\skyguard\config\loader</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

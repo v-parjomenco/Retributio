@@ -1,13 +1,36 @@
 #include "pch.h"
 
-#include "core/ui/scaling_policy.h"
+#include "core/ui/scaling_behavior.h"
+#include "core/config.h"
+#include "core/utils/message.h"
 
 namespace core::ui {
 
-    void UniformScalingPolicy::apply(sf::Sprite& sprite, const sf::View& view) {
+    ScalingBehaviorKind scalingBehaviorFromString(
+        std::string_view name,
+        ScalingBehaviorKind defaultKind) {
+            if (name == "Uniform") {
+                return ScalingBehaviorKind::Uniform;
+            }
+            if (name == "None") {
+                return ScalingBehaviorKind::None;
+            }
+
+            core::utils::message::showError(
+                std::string("[ScalingBehavior]\nНеизвестное значение resize_scaling: ") +
+                std::string{name} + ". Применено значение по умолчанию.");
+
+            return defaultKind;
+    }
+
+    void applyUniformScaling(sf::Sprite& sprite,
+                             const sf::View& view,
+                             float& lastUniform) {
+
         // Берём View изначального размера экрана
-        sf::Vector2f baseViewSize{static_cast<float>(config::WINDOW_WIDTH),
-                                  static_cast<float>(config::WINDOW_HEIGHT)};
+        sf::Vector2f baseViewSize{
+            static_cast<float>(config::WINDOW_WIDTH),
+            static_cast<float>(config::WINDOW_HEIGHT)};
 
         // Берём View текущего размера экрана, после изменения
         sf::Vector2f currentViewSize = view.getSize();
@@ -20,10 +43,9 @@ namespace core::ui {
         float newUniform = std::min(scaleX, scaleY);
 
         // Рассчитываем соотношение нового коэффициента к предыдущему
-        float ratio = 1.f;        // изначально деформации не было, поэтому стартовое значение = 1.f
-        if (mLastUniform > 0.f) { // проверка, чтобы избежать деления на 0
-            // Cоотношение, насколько изменилось окно по сравнению с прошлым разом
-            ratio = newUniform / mLastUniform;
+        float ratio = 1.f; // изначально деформации не было
+        if (lastUniform > 0.f) { // защита от деления на 0
+            ratio = newUniform / lastUniform;
         }
 
         // Получаем текущий коэффициент масштабирования спрайта
@@ -32,7 +54,7 @@ namespace core::ui {
         // Перемножаем старый коэффициент с новым и устанавливаем новый масштаб спрайта
         sprite.setScale({currentScale.x * ratio, currentScale.y * ratio});
 
-        mLastUniform = newUniform;
+        lastUniform = newUniform;
     }
 
 } // namespace core::ui

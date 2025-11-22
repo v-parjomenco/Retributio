@@ -3,12 +3,15 @@
 #include "core/ecs/components/scaling_behavior_component.h"
 #include "core/ecs/components/sprite_component.h"
 #include "core/ecs/system.h"
+#include "core/ui/scaling_behavior.h"
 
 namespace core::ecs {
 
     /**
-     * @brief Система масштабирования на событие ресайза
-     * Применяет UniformScalingPolicy только для сущностей с mode == Uniform.
+     * @brief Система масштабирования на событие ресайза.
+     *
+     * Применяет поведение Uniform только для сущностей,
+     * у которых kind == ScalingBehaviorKind::Uniform.
      */
     class ScalingSystem final : public ISystem {
       public:
@@ -17,9 +20,14 @@ namespace core::ecs {
             auto& scalings = world.storage<ScalingBehaviorComponent>();
 
             for (auto& [entity, sc] : scalings) {
-                if (sc.mode == ScalingBehaviorComponent::Mode::Uniform) {
-                    if (auto* sp = sprites.get(entity)) {
-                        sc.policy.apply(sp->sprite, newView);
+                if (auto* sp = sprites.get(entity)) {
+                    switch (sc.kind) {
+                    case core::ui::ScalingBehaviorKind::Uniform:
+                        core::ui::applyUniformScaling(sp->sprite, newView, sc.lastUniform);
+                        break;
+                    case core::ui::ScalingBehaviorKind::None:
+                        // Ничего не делаем.
+                        break;
                     }
                 }
             }

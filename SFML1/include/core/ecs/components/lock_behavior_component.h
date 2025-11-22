@@ -1,23 +1,26 @@
 ﻿#pragma once
 
-#include <memory>
-#include <utility>
+#include <SFML/System/Vector2.hpp>
 
-#include "core/ui/lock_policy.h"
+#include "core/ui/lock_behavior.h"
 
 namespace core::ecs {
 
     /**
-    * @brief Компонент, отвечающий за выбор политики фиксации элемента на экране.
-    * Хранит уникальный указатель на политику фиксации (core::ui::ILockPolicy),
-    * которая инкапсулирует логику привязки спрайта к экрану/миру.
+    * @brief Компонент, описывающий поведение фиксации сущности при resize.
+    *
+    * Данные:
+    *  - kind             — какая политика применяется (World / Screen);
+    *  - previousViewSize — размер view на предыдущем шаге (для ScreenLock);
+    *  - initialized      — был ли уже инициализирован previousViewSize.
+    *
+    * Логика политики реализована в core::ui::applyScreenLock и вызывается
+    * из LockSystem. Здесь только данные.
     */
     struct LockBehaviorComponent {
-        std::unique_ptr<core::ui::ILockPolicy> policy;
-
-        explicit LockBehaviorComponent(std::unique_ptr<core::ui::ILockPolicy> p)
-            : policy(std::move(p)) {
-        }
+        core::ui::LockBehaviorKind kind{core::ui::LockBehaviorKind::World};
+        sf::Vector2f previousViewSize{};
+        bool initialized{false};
     };
 
 } // namespace core::ecs

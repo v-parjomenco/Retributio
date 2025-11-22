@@ -1,22 +1,29 @@
+// ================================================================================================
+// File: core/ecs/components/scaling_behavior_component.h
+// Purpose: Per-entity scaling behavior settings for resize handling
+// Used by: ScalingSystem
+// Related headers: core/ui/scaling_behavior.h
+// ================================================================================================
 #pragma once
 
-#include <cstdint>
+// #include <cstdint>
 
-#include "core/ui/scaling_policy.h"
+#include "core/ui/scaling_behavior.h"
 
 namespace core::ecs {
 
     /**
-     * @brief Компонент масштабирования на ресайз
-     * Mode::Uniform — применяем равномерное масштабирование (через UniformScalingPolicy)
-     * Mode::None    — масштабирование отключено
+     * @brief Компонент, описывающий поведение масштабирования сущности при resize.
+     *
+     * kind        — тип масштабирования (Uniform / None);
+     * lastUniform — последний рассчитанный коэффициент uniform-скейла.
+     *
+     * Логика масштабирования реализована в core::ui::applyUniformScaling и
+     * вызывается из ScalingSystem. Здесь только данные.
      */
     struct ScalingBehaviorComponent {
-        enum class Mode : std::uint8_t { None, Uniform };
-        Mode mode{Mode::None};
-
-        // Политика хранит per-entity состояние (mLastUniform), что правильно для ECS.
-        core::ui::UniformScalingPolicy policy{};
+        core::ui::ScalingBehaviorKind kind{core::ui::ScalingBehaviorKind::None};
+        float lastUniform{1.f};
     };
 
 } // namespace core::ecs

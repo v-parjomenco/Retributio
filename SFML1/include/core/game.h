@@ -15,13 +15,13 @@
 #include "core/ecs/systems/input_system.h"
 #include "core/ecs/systems/lock_system.h"
 #include "core/ecs/systems/movement_system.h"
-#include "core/ecs/systems/player_init_system.h"
 #include "core/ecs/systems/render_system.h"
 #include "core/ecs/systems/scaling_system.h"
 #include "core/ecs/world.h"
 #include "core/resources/resource_manager.h"
 #include "core/time/time_service.h"
 #include "core/utils/message.h"
+#include "game/skyguard/ecs/systems/player_init_system.h"
 
 namespace core {
 

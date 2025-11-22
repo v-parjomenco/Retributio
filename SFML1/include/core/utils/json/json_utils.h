@@ -2,7 +2,7 @@
 // File: core/utils/json/json_utils.h
 // Purpose: Typed helpers for reading values from nlohmann::json +
 //          shared helpers for parsing and validating JSON configs
-// Used by: ConfigLoader, DebugOverlayConfig, other config parsers
+// Used by: ConfigLoader, DebugOverlayBlueprint, other config parsers
 // ================================================================================================
 
 #pragma once
@@ -131,7 +131,7 @@ namespace core::utils::json {
     *   * показывает пользователю окно ошибки (showError),
     *   * вызывает std::exit(EXIT_FAILURE).
     * - Если всё хорошо — возвращает разобранный json.
-    * moduleTag - строка вроде "ConfigLoader" / "DebugOverlayConfig" — для префикса в сообщениях.
+    * moduleTag - строка вроде "ConfigLoader" / "DebugOverlayBlueprint" — для префикса в сообщениях.
     */
     json parseAndValidateCritical(const std::string& fileContent,
                                   const std::string& path,
@@ -145,7 +145,7 @@ namespace core::utils::json {
     * - При ошибке:
     *   * пишет logDebug,
     *   * возвращает std::nullopt (вызывающий код сам решает, что делать дальше).
-    * moduleTag - строка вроде "ConfigLoader" / "DebugOverlayConfig" — для префикса в сообщениях.
+    * moduleTag - строка вроде "ConfigLoader" / "DebugOverlayBlueprint" — для префикса в сообщениях.
     */
     std::optional<json>
     parseAndValidateNonCritical(const std::string& fileContent,

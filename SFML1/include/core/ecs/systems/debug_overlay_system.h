@@ -26,12 +26,16 @@
 
 #include "core/ecs/system.h"
 
-// Предварительные объявления, чтобы избежать лишних инклюдов, ускорить пересборку.
-// Нужно для core::time::TimeService* mTime{ nullptr };
+// Предварительные объявления, чтобы избежать лишних инклюдов и ускорить пересборку.
 namespace core {
     namespace time {
         class TimeService;
-    }
+    } // namespace time
+    namespace config {
+        namespace properties {
+            struct TextProperties;
+        }
+    } // namespace config
 } // namespace core
 
 namespace core::ecs {
@@ -39,12 +43,6 @@ namespace core::ecs {
     class DebugOverlaySystem final : public ISystem {
       public:
         DebugOverlaySystem() = default;
-
-        struct Style {
-            sf::Vector2f position{10.f, 10.f};
-            unsigned int characterSize{35};
-            sf::Color color{255, 0, 0, 255};
-        };
 
         // Связать с сервисом времени и шрифтом (полученным через ResourceManager)
         void bind(core::time::TimeService& timeService, const sf::Font& font);
@@ -59,7 +57,14 @@ namespace core::ecs {
         void update(World&, float) override;
         void render(World&, sf::RenderWindow& window) override;
 
-        void applyStyle(const Style& s);
+        /**
+         * @brief Применить визуальные свойства текста (позиция, размер, цвет).
+         *
+         * Система ничего не знает о JSON/DebugOverlayBlueprint.
+         * Она получает уже готовый набор свойств текста и лишь
+         * отображает их на sf::Text.
+         */
+        void applyTextProperties(const core::config::properties::TextProperties& props);
 
       private:
         core::time::TimeService* mTime{nullptr}; // не владеем

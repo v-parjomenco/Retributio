@@ -9,7 +9,7 @@
   "acceleration": 800.0,
   "friction": 6.0,
 
-  "scaling": "Uniform",
+  "resize_scaling": "Uniform",
   "lock_behavior": "ScreenLock",
 
   "anchor": "BottomCenter",

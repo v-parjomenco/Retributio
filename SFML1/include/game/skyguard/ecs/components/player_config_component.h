@@ -1,21 +1,20 @@
 // ================================================================================================
-// File: core/ecs/components/player_config_component.h
+// File: game/skyguard/ecs/components/player_config_component.h
 // Purpose: Temporary ECS component storing PlayerBlueprint for initialization
 // Used by: Game (initWorld), PlayerInitSystem
-// Related headers: core/config/blueprints/player_blueprint.h
+// Related headers: game/skyguard/config/blueprints/player_blueprint.h
 // ================================================================================================
 #pragma once
 
 #include "game/skyguard/config/blueprints/player_blueprint.h"
-#include "core/config/config_loader.h"
 
-namespace core::ecs {
+namespace game::skyguard::ecs {
 
     /**
      * @brief Компонент конфигурации игрока (blueprint, загружается из JSON).
      *
-     * Хранит копию core::config::blueprints::PlayerBlueprint, загруженную
-     * из JSON через core::config::ConfigLoader.
+     * Хранит копию game::skyguard::config::blueprints::PlayerBlueprint, загруженную
+     * из JSON через game::skyguard::config::ConfigLoader.
      *
      * Жизненный цикл:
      *  - Game создаёт сущность и добавляет PlayerConfigComponent с blueprint'ом;
@@ -24,7 +23,7 @@ namespace core::ecs {
      *  - после инициализации PlayerInitSystem удаляет этот компонент.
      */
     struct PlayerConfigComponent {
-        core::config::blueprints::PlayerBlueprint config;
+        game::skyguard::config::blueprints::PlayerBlueprint config;
     };
 
-} // namespace core::ecs
+} // namespace game::skyguard::ecs

@@ -1,6 +1,6 @@
 // ================================================================================================
-// File: core/config/config_loader.h
-// Purpose: High-level player configuration loader (JSON -> PlayerBlueprint)
+// File: game/skyguard/config/loader/config_loader.h
+// Purpose: High-level player configuration loader (JSON -> Player)
 // Used by: Game, PlayerConfigComponent, PlayerInitSystem
 // Related headers: core/config/config_keys.h, core/utils/json/json_utils.h,
 //                  core/utils/json/json_validator.h, core/utils/file_loader.h,
@@ -12,9 +12,9 @@
 
 #include "game/skyguard/config/blueprints/player_blueprint.h"
 
-namespace core::config {
+namespace game::skyguard::config {
 
-    /**
+     /**
      * @brief Высокоуровневый загрузчик, преобразующий JSON-файл в PlayerBlueprint.
      *
      * Обязанности:
@@ -25,22 +25,22 @@ namespace core::config {
      *
      * НЕ:
      *  - занимается низкоуровневой загрузкой ресурсов (диском/Texture/Font),
-     *  - знает ничего о рендеринге, ECS и прочем.
+     *  - знает что-либо о рендеринге, ECS и прочем.
      */
     class ConfigLoader {
       public:
         /**
-         * @brief Загружает JSON из файла и парсит данные в PlayerBlueprint.
-         *
-         * Поведение:
-         *  - Если файл не может быть прочитан:
-         *      -> showError(...) + возврат значения PlayerBlueprint по умолчанию.
-         *  - Если информация в JSON невалидна или искажена:
-         *      -> showError(...) + std::exit(EXIT_FAILURE).
-         *  - Если структура JSON неверна:
-         *      -> showError(...) + std::exit(EXIT_FAILURE).
-         */
+     * @brief Загружает JSON из файла и парсит данные в PlayerBlueprint.
+     *
+     * Поведение:
+     *  - Если файл не может быть прочитан:
+     *      -> showError(...) + возврат значения PlayerBlueprint по умолчанию.
+     *  - Если информация в JSON невалидна или искажена:
+     *      -> showError(...) + std::exit(EXIT_FAILURE).
+     *  - Если структура JSON неверна:
+     *      -> showError(...) + std::exit(EXIT_FAILURE).
+     */
         static blueprints::PlayerBlueprint loadPlayerConfig(const std::string& path);
     };
 
-} // namespace core::config
+} // namespace game::skyguard::config

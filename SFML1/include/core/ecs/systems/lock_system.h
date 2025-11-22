@@ -4,6 +4,7 @@
 #include "core/ecs/components/sprite_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/system.h"
+#include "core/ui/lock_behavior.h"
 
 namespace core::ecs {
 
@@ -16,10 +17,18 @@ namespace core::ecs {
 
             for (auto& [entity, lockComp] : locks) {
                 if (auto* sprite = sprites.get(entity)) {
-                    // Применяем политику к спрайту
-                    if (lockComp.policy) {
-                        lockComp.policy->apply(sprite->sprite, view);
+                    switch (lockComp.kind) {
+                    case core::ui::LockBehaviorKind::Screen:
+                        core::ui::applyScreenLock(
+                                                  sprite->sprite,
+                                                  view, lockComp.previousViewSize,
+                                                  lockComp.initialized);
+                        break;
+                    case core::ui::LockBehaviorKind::World:
+                        // Живём в мировых координатах, позицию не трогаем.
+                        break;
                     }
+
                     // Обязательно синхронизируем Transform, иначе RenderSystem перетрёт позицию
                     if (auto* tr = transforms.get(entity)) {
                         tr->position = sprite->sprite.getPosition();

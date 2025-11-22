@@ -4,16 +4,17 @@
 #include <cassert>
 #include <iostream>
 
-#include "core/config/config_loader.h"
-#include "core/config/debug_overlay_config.h"
+#include "core/config/loader/debug_overlay_loader.h"
 #include "core/resources/paths/resource_paths.h"
 #include "core/utils/message.h"
-#include "game/skyguard/config/blueprints/player_blueprint.h"
+
+#include "game/skyguard/config/loader/config_loader.h"
+#include "game/skyguard/ecs/components/player_config_component.h"
 
 namespace cfg = ::config; // глобальные дефолты движка (окно, vsync, fixed step, hotkeys...)
-namespace gcfg =
-    ::core::config;       // игровые JSON-конфиги/лоадеры (PlayerConfig, DebugOverlayConfig...)
-namespace gblueprints = ::core::config::blueprints;
+namespace gcfg = ::core::config; // core::config — для debug overlay и других движковых конфигов
+// game-specific конфиги/blueprints для Skyguard
+namespace skycfg = ::game::skyguard::config;
 
 namespace core {
 
@@ -38,26 +39,30 @@ namespace core {
     void Game::initWorld() {
         try {
             // Создаём blueprint игрока (data-driven, собранный из properties)
-            gblueprints::PlayerBlueprint playerCfg =
-                gcfg::ConfigLoader::loadPlayerConfig("assets/game/skyguard/config/player.json");
+            auto playerCfg =
+                skycfg::ConfigLoader::loadPlayerConfig("assets/game/skyguard/config/player.json");
 
             // Создаём сущность игрока
             mPlayerEntity = mWorld.createEntity();
 
             // Добавляем компонент с конфигурацией игрока из JSON (playerCfg) в ECS-мир
-            // PlayerInitSystem при первом апдейте создаст остальные компоненты (Sprite, Transform и т.д.)
-            mWorld.addComponent(mPlayerEntity, ecs::PlayerConfigComponent{playerCfg});
+            // PlayerInitSystem при первом апдейте создаст остальные компоненты
+            // (Sprite, Transform и т.д.)
+            mWorld.addComponent(
+                mPlayerEntity,
+                game::skyguard::ecs::PlayerConfigComponent{playerCfg});
 
             // Подключаем ECS-системы
 
-            mWorld.addSystem<ecs::PlayerInitSystem>(mResources);
-            mWorld.addSystem<ecs::MovementSystem>();
-            mWorld.addSystem<ecs::RenderSystem>();
-            // Эти системы требуют прямого доступа (onResize, onKeyEvent), поэтому сохраняем указатели
-            mScalingSystem = &mWorld.addSystem<ecs::ScalingSystem>();
-            mLockSystem = &mWorld.addSystem<ecs::LockSystem>();
-            mInputSystem = &mWorld.addSystem<ecs::InputSystem>();
-            mDebugOverlay = &mWorld.addSystem<ecs::DebugOverlaySystem>();
+            mWorld.addSystem<game::skyguard::ecs::PlayerInitSystem>(mResources);
+            mWorld.addSystem<core::ecs::MovementSystem>();
+            mWorld.addSystem<core::ecs::RenderSystem>();
+            // Эти системы требуют прямого доступа (onResize, onKeyEvent),
+            // поэтому сохраняем указатели
+            mScalingSystem  = &mWorld.addSystem<core::ecs::ScalingSystem>();
+            mLockSystem     = &mWorld.addSystem<core::ecs::LockSystem>();
+            mInputSystem    = &mWorld.addSystem<core::ecs::InputSystem>();
+            mDebugOverlay   = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
             // Привязываем overlay к сервису времени и шрифту (через ResourceManager)
             if (mDebugOverlay) {
                 const sf::Font& font = mResources.getFont(resources::ids::FontID::Default).get();
@@ -65,14 +70,10 @@ namespace core {
 
                 // Грузим конфиг для DebugOverlay
                 const auto overlayCfg =
-                    gcfg::loadDebugOverlayConfig("assets/core/config/debug_overlay.json");
+                    gcfg::loadDebugOverlayBlueprint("assets/core/config/debug_overlay.json");
 
                 // Применяем стиль
-                ecs::DebugOverlaySystem::Style st;
-                st.position = overlayCfg.position;
-                st.characterSize = overlayCfg.characterSize;
-                st.color = overlayCfg.color;
-                mDebugOverlay->applyStyle(st);
+                mDebugOverlay->applyTextProperties(overlayCfg.text);
 
                 // enabled = config.json ∧ дефолт из config.h (Debug=true, Release=false)
                 mDebugOverlay->setEnabled(overlayCfg.enabled && cfg::SHOW_FPS_OVERLAY);
@@ -85,7 +86,7 @@ namespace core {
 #else
             std::cerr << "Ошибка при инициализации ECS: " << e.what() << std::endl;
 #endif
-            mWorld = std::move(ecs::World()); // fallback: создаём безопасный пустой мир
+            mWorld = std::move(core::ecs::World()); // fallback: создаём безопасный пустой мир
         }
     }
 

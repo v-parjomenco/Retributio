@@ -1,8 +1,8 @@
 // ================================================================================================
 // File: core/config/config_keys.h
 // Purpose: Centralized keys for JSON configurations. Used by all parsing systems.
-// Used by: ConfigLoader, DebugOverlayConfig, ResourcePaths, UI, ECS, etc.
-// Related headers: config_loader.h, debug_overlay_config.h, resource_paths.h
+// Used by: ConfigLoader, DebugOverlayLoader, UI, ECS, etc.
+// Related headers: config_loader.h, debug_overlay_loader.h, resource_paths.h
 // ================================================================================================
 #pragma once
 
@@ -21,7 +21,7 @@ namespace core::config::keys {
         inline constexpr const char* FRICTION = "friction";
         inline constexpr const char* ANCHOR = "anchor";
         inline constexpr const char* START_POSITION = "start_position";
-        inline constexpr const char* SCALING = "scaling";
+        inline constexpr const char* RESIZE_SCALING = "resize_scaling";
         inline constexpr const char* LOCK_BEHAVIOR = "lock_behavior";
     } // namespace Common
 
@@ -36,7 +36,7 @@ namespace core::config::keys {
         inline constexpr const char* FRICTION = Common::FRICTION;
         inline constexpr const char* ANCHOR = Common::ANCHOR;
         inline constexpr const char* START_POSITION = Common::START_POSITION;
-        inline constexpr const char* SCALING = Common::SCALING;
+        inline constexpr const char* RESIZE_SCALING = Common::RESIZE_SCALING;
         inline constexpr const char* LOCK_BEHAVIOR = Common::LOCK_BEHAVIOR;
 
         inline constexpr const char* CONTROLS = "controls";

@@ -11,7 +11,7 @@
 #include "core/config/properties/movement_properties.h"
 #include "core/config/properties/sprite_properties.h"
 
-namespace core::config::blueprints {
+namespace game::skyguard::config::blueprints {
 
 /**
  * @brief Высокоуровневый конфиг сущности игрока.
@@ -24,7 +24,7 @@ namespace core::config::blueprints {
  *  - как он привязан к экрану/миру и что происходит при resize;
  *  - какими клавишами управляется.
  *
- * Важно: этот blueprint всё ещё относится к конкретной игре (Skyguard),
+ * Важно: этот blueprint относится к конкретной игре (Skyguard),
  * но использует максимально переиспользуемые properties из ядра.
  */
 struct PlayerBlueprint {
@@ -34,4 +34,4 @@ struct PlayerBlueprint {
     core::config::properties::ControlsProperties controls;
 };
 
-} // namespace core::config::blueprints
+} // namespace game::skyguard::config::blueprints

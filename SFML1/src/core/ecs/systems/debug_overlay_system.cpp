@@ -1,7 +1,7 @@
 #include "pch.h"
 
 #include "core/ecs/systems/debug_overlay_system.h"
-
+#include "core/config/properties/text_properties.h"
 #include "core/time/time_service.h"
 
 namespace core::ecs {
@@ -12,13 +12,14 @@ namespace core::ecs {
         mFpsText.emplace(font); // инициализация объекта std::optional
     }
 
-    void DebugOverlaySystem::applyStyle(const Style& s) {
+    void DebugOverlaySystem::applyTextProperties(
+        const core::config::properties::TextProperties& props) {
         if (!mFpsText) {
             return;
         }
-        mFpsText->setPosition(s.position);
-        mFpsText->setCharacterSize(s.characterSize);
-        mFpsText->setFillColor(s.color);
+        mFpsText->setPosition(props.position);
+        mFpsText->setCharacterSize(props.characterSize);
+        mFpsText->setFillColor(props.color);
     }
 
     void DebugOverlaySystem::update(World&, float) {

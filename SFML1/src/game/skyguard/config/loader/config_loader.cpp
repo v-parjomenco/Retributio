@@ -1,10 +1,12 @@
 #include "pch.h"
 
-#include "core/config/config_loader.h"
+#include "game/skyguard/config/loader/config_loader.h"
 
 #include "core/config/config_keys.h"
 #include "core/resources/ids/resource_id_utils.h"
 #include "core/ui/anchor_utils.h"
+#include "core/ui/lock_behavior.h"
+#include "core/ui/scaling_behavior.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_utils.h"
 #include "core/utils/message.h"
@@ -17,12 +19,13 @@ namespace {
     namespace keys = core::config::keys;
     namespace json_utils = core::utils::json;
     namespace rids = core::resources::ids;
+    namespace anchors = core::ui::anchors;
 
     using Json = json_utils::json;
 
 } // namespace
 
-namespace core::config {
+namespace game::skyguard::config {
 
     blueprints::PlayerBlueprint ConfigLoader::loadPlayerConfig(const std::string& path) {
 
@@ -73,7 +76,7 @@ namespace core::config {
                 {keys::Player::START_POSITION,
                  {Json::value_t::object, Json::value_t::array},
                  false},
-                {keys::Player::SCALING, {Json::value_t::string}, false},
+                {keys::Player::RESIZE_SCALING, {Json::value_t::string}, false},
                 {keys::Player::LOCK_BEHAVIOR, {Json::value_t::string}, false},
                 {keys::Player::CONTROLS, {Json::value_t::object}, false},
             });
@@ -105,26 +108,59 @@ namespace core::config {
         }
 
         // Коэффициент масштабирования спрайта игрока
-        cfg.sprite.scale =
-            json_utils::parseValue<sf::Vector2f>(data, keys::Player::SCALE, cfg.sprite.scale);
+        cfg.sprite.scale = json_utils::parseValue<sf::Vector2f>(
+            data, keys::Player::SCALE, cfg.sprite.scale);
 
         // Параметры движения игрока
-        cfg.movement.speed =
-            json_utils::parseValue<float>(data, keys::Player::SPEED, cfg.movement.speed);
-        cfg.movement.acceleration = json_utils::parseValue<float>(data, keys::Player::ACCELERATION,
-                                                                  cfg.movement.acceleration);
-        cfg.movement.friction =
-            json_utils::parseValue<float>(data, keys::Player::FRICTION, cfg.movement.friction);
+        cfg.movement.speed = json_utils::parseValue<float>(
+            data, keys::Player::SPEED, cfg.movement.speed);
+        cfg.movement.acceleration = json_utils::parseValue<float>(
+            data, keys::Player::ACCELERATION, cfg.movement.acceleration);
+        cfg.movement.friction =json_utils::parseValue<float>(
+            data, keys::Player::FRICTION, cfg.movement.friction);
 
+        // ----------------------------------------------------------------------------------------
         // Параметры привязки и поведения камеры/экрана
-        cfg.anchor.anchorName =
-            json_utils::parseValue<std::string>(data, keys::Player::ANCHOR, cfg.anchor.anchorName);
+        // ----------------------------------------------------------------------------------------
+
+        {
+            // anchor: строка → enum AnchorType
+            const std::string anchorStr = json_utils::parseValue<std::string>(
+                data, keys::Player::ANCHOR, cfg.anchor.anchorName);
+
+            auto anchorType = anchors::fromString(anchorStr);
+
+            if (anchorType == core::ui::AnchorType::None && anchorStr != "None") {
+                // Неизвестное значение anchor — логируем и откатываемся на дефолт.
+                message::showError(std::string("[ConfigLoader]\nНеизвестное значение anchor: ") +
+                                   anchorStr + ". Применено значение по умолчанию (None).");
+
+                cfg.anchor.anchorName = "None";
+            } else {
+                cfg.anchor.anchorName = anchorStr;
+                cfg.anchor.anchorType = anchorType;
+            }
+        }
+
+        // Стартовая позиция в мировых координатах
         cfg.anchor.startPosition = json_utils::parseValue<sf::Vector2f>(
             data, keys::Player::START_POSITION, cfg.anchor.startPosition);
-        cfg.anchor.scaling =
-            json_utils::parseValue<std::string>(data, keys::Player::SCALING, cfg.anchor.scaling);
-        cfg.anchor.lockBehavior = json_utils::parseValue<std::string>(
-            data, keys::Player::LOCK_BEHAVIOR, cfg.anchor.lockBehavior);
+
+        // resize_scaling: строка → enum в AnchorProperties
+        {
+            const std::string scalingStr = json_utils::parseValue<std::string>(
+                data, keys::Player::RESIZE_SCALING, ::config::DEFAULT_RESIZE_SCALING);
+
+            cfg.anchor.scalingBehavior = core::ui::scalingBehaviorFromString(scalingStr);
+        }
+
+        // lock_behavior: строка → enum в AnchorProperties
+        {
+            const std::string lockStr = json_utils::parseValue<std::string>(
+                data, keys::Player::LOCK_BEHAVIOR, ::config::DEFAULT_LOCK_BEHAVIOR);
+
+            cfg.anchor.lockBehavior = core::ui::lockBehaviorFromString(lockStr);
+        }
 
         // Обработка блока управляющих клавиш (если он есть)
         // Здесь мы находим конкретные кнопки движения, которые могут быть переопределены в JSON.
@@ -146,33 +182,8 @@ namespace core::config {
                                "Применены значения по умолчанию.");
         }
 
-        // scaling может быть только "Uniform" или "None"
-        if (cfg.anchor.scaling != "Uniform" && cfg.anchor.scaling != "None") {
-            message::showError(
-                std::string("[ConfigLoader]\nНеизвестное значение scaling: ") + cfg.anchor.scaling
-                + ". Применено значение по умолчанию (None).");
-            cfg.anchor.scaling = "None";
-        }
-
-        // lockBehavior может быть только "ScreenLock" или "WorldLock"
-        if (cfg.anchor.lockBehavior != "ScreenLock" && cfg.anchor.lockBehavior != "WorldLock") {
-            message::showError(
-                std::string("[ConfigLoader]\nНеизвестное значение lock_behavior: ") +
-                cfg.anchor.lockBehavior + ". Применено значение по умолчанию (WorldLock).");
-            cfg.anchor.lockBehavior = "WorldLock";
-        }
-
-        // anchor должен конвертироваться в валидный AnchorType
-        if (core::ui::anchors::fromString(cfg.anchor.anchorName) == core::ui::AnchorType::None &&
-            cfg.anchor.anchorName != "None") {
-            message::showError(
-                std::string("[ConfigLoader]\nНеизвестное значение anchor: ") 
-                + cfg.anchor.anchorName + ". Применено значение по умолчанию (None).");
-            cfg.anchor.anchorName = "None";
-        }
-
         // Возвращаем полностью собранный PlayerConfig
         return cfg;
     }
 
-} // namespace core::config
+} // namespace game::skyguard::config
