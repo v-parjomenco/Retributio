@@ -25,7 +25,6 @@ namespace core::resources::paths {
     */
     class ResourcePaths {
       public:
-
         /**
         * @brief Загружает реестр ресурсов из JSON-файла.
         * @param filename Путь к JSON (обычно assets/game/skyguard/config/resources.json)
@@ -46,7 +45,6 @@ namespace core::resources::paths {
         static const std::string& get(ids::SoundID id);
 
       private:
-
         // Внутренние таблицы соответствий ID → path.
 
         static std::unordered_map<ids::TextureID, std::string> mTextures;

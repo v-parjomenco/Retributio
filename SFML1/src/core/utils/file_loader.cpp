@@ -1,8 +1,8 @@
 #include "pch.h"
 
 #include "core/utils/file_loader.h"
-#include <filesystem>           // для std::filesystem::exists
-#include <fstream>              // для std::ifstream
+#include <filesystem> // для std::filesystem::exists
+#include <fstream>    // для std::ifstream
 
 #include "core/utils/message.h" // для message::logDebug
 
@@ -43,8 +43,8 @@ namespace core::utils {
 
         // Если позиция отрицательная — что-то пошло не так (например, ошибка потока).
         if (endPosition < 0) {
-            message::logDebug(
-                std::string("[FileLoader]\nНе удалось определить размер файла: ") + path);
+            message::logDebug(std::string("[FileLoader]\nНе удалось определить размер файла: ") +
+                              path);
             return std::nullopt;
         }
 
@@ -113,8 +113,8 @@ namespace core::utils {
         // Проверяем, открылся ли файл вообще.
         // Если, например, путь неверный или прав нет — поток будет в "плохом" состоянии.
         if (!ifs) {
-            message::logDebug(
-                std::string("[FileLoader]\nНе удалось открыть бинарный файл: ") + path);
+            message::logDebug(std::string("[FileLoader]\nНе удалось открыть бинарный файл: ") +
+                              path);
             return std::nullopt;
         }
 
@@ -162,8 +162,8 @@ namespace core::utils {
             // Дополнительная страховка: если поток в плохом состоянии
             // и это не просто "дошли до конца файла".
             if (!ifs && !ifs.eof()) {
-                message::logDebug(
-                    std::string("[FileLoader]\nОшибка чтения бинарного файла: ") + path);
+                message::logDebug(std::string("[FileLoader]\nОшибка чтения бинарного файла: ") +
+                                  path);
                 return std::nullopt;
             }
         }

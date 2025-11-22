@@ -15,23 +15,23 @@
 
 namespace core::utils {
 
-/**
+    /**
  * @brief Низкоуровневый загрузчик
  * 
  * Управляет загрузкой файлов для движка.
  * Никакой иной логики, кроме чтения сырых файлов здесь быть не должно.
  */
-class FileLoader {
-public:
-    // Текстовые файлы (JSON, конфиги, скрипты)
-    static std::optional<std::string> loadTextFile(const std::string& path);
-    
-    // Бинарные файлы (изображения, звуки, произвольные данные)
-    static std::optional<std::vector<uint8_t>> loadBinaryFile(const std::string& path);
-    
-    // Утилиты
-    static bool fileExists(const std::string& path);
-    static bool isReadable(const std::string& path);
-};
+    class FileLoader {
+      public:
+        // Текстовые файлы (JSON, конфиги, скрипты)
+        static std::optional<std::string> loadTextFile(const std::string& path);
+
+        // Бинарные файлы (изображения, звуки, произвольные данные)
+        static std::optional<std::vector<uint8_t>> loadBinaryFile(const std::string& path);
+
+        // Утилиты
+        static bool fileExists(const std::string& path);
+        static bool isReadable(const std::string& path);
+    };
 
 } // namespace core::utils

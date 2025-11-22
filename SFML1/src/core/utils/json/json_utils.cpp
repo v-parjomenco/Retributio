@@ -1,9 +1,8 @@
 #include "pch.h"
 
 #include "core/utils/json/json_utils.h"
-
-#include <cstdlib>      // std::exit, EXIT_FAILURE
-#include <stdexcept>    // std::exception
+#include <cstdlib>   // std::exit, EXIT_FAILURE
+#include <stdexcept> // std::exception
 
 #include "core/utils/message.h"
 
@@ -35,16 +34,12 @@ namespace {
 
                 try {
                     if (s.size() == 6) {
-                        return {hexToByte(s.substr(0, 2)),
-                                hexToByte(s.substr(2, 2)),
-                                hexToByte(s.substr(4, 2)),
-                                255};
+                        return {hexToByte(s.substr(0, 2)), hexToByte(s.substr(2, 2)),
+                                hexToByte(s.substr(4, 2)), 255};
                     }
                     if (s.size() == 8) {
-                        return {hexToByte(s.substr(0, 2)),
-                                hexToByte(s.substr(2, 2)),
-                                hexToByte(s.substr(4, 2)),
-                                hexToByte(s.substr(6, 2))};
+                        return {hexToByte(s.substr(0, 2)), hexToByte(s.substr(2, 2)),
+                                hexToByte(s.substr(4, 2)), hexToByte(s.substr(6, 2))};
                     }
                 } catch (...) {
                     // Любая ошибка в разборе — возвращаем fallback.
@@ -145,9 +140,7 @@ namespace core::utils::json {
     // Специализации
 
     template <>
-    float parseValue<float>(const json& data,
-                            const std::string& key,
-                            const float& defaultValue) {
+    float parseValue<float>(const json& data, const std::string& key, const float& defaultValue) {
         if (data.contains(key)) {
             const auto& v = data.at(key);
             if (v.is_number()) {
@@ -169,8 +162,7 @@ namespace core::utils::json {
     }
 
     template <>
-    sf::Vector2f parseValue<sf::Vector2f>(const json& data,
-                                          const std::string& key,
+    sf::Vector2f parseValue<sf::Vector2f>(const json& data, const std::string& key,
                                           const sf::Vector2f& defaultValue) {
         if (!data.contains(key)) {
             return defaultValue;
@@ -231,11 +223,10 @@ namespace core::utils::json {
 
     // --------------------------------------------------------------------------------------------
     // Клавиатурный парсер
-    // -------------------------------------------------------------------------------------------- 
+    // --------------------------------------------------------------------------------------------
 
     // Преобразование строки из JSON-объекта в клавишу SFML.
-    sf::Keyboard::Key parseKey(const json& data,
-                               const std::string& key,
+    sf::Keyboard::Key parseKey(const json& data, const std::string& key,
                                sf::Keyboard::Key defaultValue) {
         // Если нет поля или это не строка → возвращаем defaultValue.
         if (!data.contains(key) || !data.at(key).is_string()) {
@@ -276,8 +267,7 @@ namespace core::utils::json {
             */
             data = json::parse(fileContent);
         } catch (const std::exception& e) {
-            message::showError("[" + std::string(moduleTag) +
-                                "]\nОшибка чтения JSON: " + e.what());
+            message::showError("[" + std::string(moduleTag) + "]\nОшибка чтения JSON: " + e.what());
             std::exit(EXIT_FAILURE);
         } catch (...) {
             message::showError("[" + std::string(moduleTag) +

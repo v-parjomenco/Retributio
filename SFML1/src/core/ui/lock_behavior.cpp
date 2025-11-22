@@ -6,9 +6,7 @@
 
 namespace core::ui {
 
-    void applyScreenLock(sf::Sprite& sprite,
-                         const sf::View& view,
-                         sf::Vector2f& previousViewSize,
+    void applyScreenLock(sf::Sprite& sprite, const sf::View& view, sf::Vector2f& previousViewSize,
                          bool& initialized) {
 
         // При первом вызове используем базовый размер из config.h

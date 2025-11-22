@@ -13,7 +13,7 @@
 
 namespace game::skyguard::config::blueprints {
 
-/**
+    /**
  * @brief Высокоуровневый конфиг сущности игрока.
  *
  * Это не «сырые данные из JSON», а уже собранный blueprint из маленьких
@@ -27,11 +27,11 @@ namespace game::skyguard::config::blueprints {
  * Важно: этот blueprint относится к конкретной игре (Skyguard),
  * но использует максимально переиспользуемые properties из ядра.
  */
-struct PlayerBlueprint {
-    core::config::properties::SpriteProperties   sprite;
-    core::config::properties::MovementProperties movement;
-    core::config::properties::AnchorProperties   anchor;
-    core::config::properties::ControlsProperties controls;
-};
+    struct PlayerBlueprint {
+        core::config::properties::SpriteProperties sprite;
+        core::config::properties::MovementProperties movement;
+        core::config::properties::AnchorProperties anchor;
+        core::config::properties::ControlsProperties controls;
+    };
 
 } // namespace game::skyguard::config::blueprints

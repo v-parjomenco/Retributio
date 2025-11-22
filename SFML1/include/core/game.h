@@ -21,6 +21,7 @@
 #include "core/resources/resource_manager.h"
 #include "core/time/time_service.h"
 #include "core/utils/message.h"
+
 #include "game/skyguard/ecs/systems/player_init_system.h"
 
 namespace core {

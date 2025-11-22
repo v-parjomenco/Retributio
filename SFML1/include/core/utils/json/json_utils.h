@@ -16,6 +16,7 @@
 #include <SFML/Window/Keyboard.hpp>
 
 #include "third_party/json_silent.hpp"
+
 #include "core/utils/json/json_validator.h"
 
 namespace core::utils::json {
@@ -37,15 +38,14 @@ namespace core::utils::json {
     T parseValue(const json& data, const std::string& key, const T& defaultValue);
 
     // Специализации — объявляются здесь, реализуются в .cpp.
-    
+
     // float: аккуратная проверка на number
     template <>
     float parseValue<float>(const json& data, const std::string& key, const float& defaultValue);
 
     // std::string: только строка, иначе default
     template <>
-    std::string parseValue<std::string>(const json& data,
-                                        const std::string& key,
+    std::string parseValue<std::string>(const json& data, const std::string& key,
                                         const std::string& defaultValue);
 
     // sf::Vector2f: поддержка форматов:
@@ -53,8 +53,7 @@ namespace core::utils::json {
     //  - массив [x, y]  → (x, y)
     //  - объект {x, y}  → (x, y)
     template <>
-    sf::Vector2f parseValue<sf::Vector2f>(const json& data,
-                                          const std::string& key,
+    sf::Vector2f parseValue<sf::Vector2f>(const json& data, const std::string& key,
                                           const sf::Vector2f& defaultValue);
 
     // bool: безопасное чтение логического значения
@@ -63,8 +62,7 @@ namespace core::utils::json {
 
     // unsigned: целое без знака (используется, например, для characterSize)
     template <>
-    unsigned parseValue<unsigned>(const json& data,
-                                  const std::string& key,
+    unsigned parseValue<unsigned>(const json& data, const std::string& key,
                                   const unsigned& defaultValue);
 
     /**
@@ -116,8 +114,7 @@ namespace core::utils::json {
     // Парсинг цвета:
     //  - "#RRGGBB" / "#RRGGBBAA"
     //  - объект { "r": 255, "g": 0, "b": 0, "a": 255 }
-    sf::Color parseColor(const json& data, const std::string& key,
-                         const sf::Color& defaultValue);
+    sf::Color parseColor(const json& data, const std::string& key, const sf::Color& defaultValue);
 
     // --------------------------------------------------------------------------------------------
     // Общие хелперы для парсинга и валидации JSON-конфигов
@@ -133,8 +130,7 @@ namespace core::utils::json {
     * - Если всё хорошо — возвращает разобранный json.
     * moduleTag - строка вроде "ConfigLoader" / "DebugOverlayBlueprint" — для префикса в сообщениях.
     */
-    json parseAndValidateCritical(const std::string& fileContent,
-                                  const std::string& path,
+    json parseAndValidateCritical(const std::string& fileContent, const std::string& path,
                                   const char* moduleTag,
                                   const std::vector<JsonValidator::KeyRule>& rules);
 
@@ -148,8 +144,7 @@ namespace core::utils::json {
     * moduleTag - строка вроде "ConfigLoader" / "DebugOverlayBlueprint" — для префикса в сообщениях.
     */
     std::optional<json>
-    parseAndValidateNonCritical(const std::string& fileContent,
-                                const std::string& path,
+    parseAndValidateNonCritical(const std::string& fileContent, const std::string& path,
                                 const char* moduleTag,
                                 const std::vector<JsonValidator::KeyRule>& rules);
 

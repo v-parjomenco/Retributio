@@ -11,7 +11,7 @@
 
 namespace core::config::properties {
 
-/**
+    /**
  * @brief Набор свойств для отрисовки текста.
  *
  * Здесь описываются только данные:
@@ -21,10 +21,10 @@ namespace core::config::properties {
  *
  * Логика отрисовки и выбор шрифта живут в других модулях (системах/виджетах).
  */
-struct TextProperties {
-    sf::Vector2f position{10.f, 10.f}; // позиция текста в мировых координатах / пикселях
-    unsigned int characterSize = 35;   // размер шрифта
-    sf::Color color{255, 0, 0, 255};   // цвет текста по умолчанию (красный)
-};
+    struct TextProperties {
+        sf::Vector2f position{10.f, 10.f}; // позиция текста в мировых координатах / пикселях
+        unsigned int characterSize = 35;   // размер шрифта
+        sf::Color color{255, 0, 0, 255};   // цвет текста по умолчанию (красный)
+    };
 
 } // namespace core::config::properties

@@ -19,9 +19,7 @@ namespace core::ecs {
                 if (auto* sprite = sprites.get(entity)) {
                     switch (lockComp.kind) {
                     case core::ui::LockBehaviorKind::Screen:
-                        core::ui::applyScreenLock(
-                                                  sprite->sprite,
-                                                  view, lockComp.previousViewSize,
+                        core::ui::applyScreenLock(sprite->sprite, view, lockComp.previousViewSize,
                                                   lockComp.initialized);
                         break;
                     case core::ui::LockBehaviorKind::World:

@@ -34,9 +34,7 @@ namespace core::ui {
      * Состояние (previousViewSize/initialized) передаётся снаружи, чтобы
      * храниться в ECS-компоненте, а не во внутреннем объекте.
      */
-    void applyScreenLock(sf::Sprite& sprite,
-                         const sf::View& view,
-                         sf::Vector2f& previousViewSize,
+    void applyScreenLock(sf::Sprite& sprite, const sf::View& view, sf::Vector2f& previousViewSize,
                          bool& initialized);
 
 } // namespace core::ui

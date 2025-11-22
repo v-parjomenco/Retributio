@@ -14,7 +14,7 @@
 
 namespace game::skyguard::config {
 
-     /**
+    /**
      * @brief Высокоуровневый загрузчик, преобразующий JSON-файл в PlayerBlueprint.
      *
      * Обязанности:

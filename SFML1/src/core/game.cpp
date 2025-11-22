@@ -11,7 +11,7 @@
 #include "game/skyguard/config/loader/config_loader.h"
 #include "game/skyguard/ecs/components/player_config_component.h"
 
-namespace cfg = ::config; // глобальные дефолты движка (окно, vsync, fixed step, hotkeys...)
+namespace cfg = ::config;        // глобальные дефолты движка (окно, vsync, fixed step, hotkeys...)
 namespace gcfg = ::core::config; // core::config — для debug overlay и других движковых конфигов
 // game-specific конфиги/blueprints для Skyguard
 namespace skycfg = ::game::skyguard::config;
@@ -48,9 +48,8 @@ namespace core {
             // Добавляем компонент с конфигурацией игрока из JSON (playerCfg) в ECS-мир
             // PlayerInitSystem при первом апдейте создаст остальные компоненты
             // (Sprite, Transform и т.д.)
-            mWorld.addComponent(
-                mPlayerEntity,
-                game::skyguard::ecs::PlayerConfigComponent{playerCfg});
+            mWorld.addComponent(mPlayerEntity,
+                                game::skyguard::ecs::PlayerConfigComponent{playerCfg});
 
             // Подключаем ECS-системы
 
@@ -59,10 +58,10 @@ namespace core {
             mWorld.addSystem<core::ecs::RenderSystem>();
             // Эти системы требуют прямого доступа (onResize, onKeyEvent),
             // поэтому сохраняем указатели
-            mScalingSystem  = &mWorld.addSystem<core::ecs::ScalingSystem>();
-            mLockSystem     = &mWorld.addSystem<core::ecs::LockSystem>();
-            mInputSystem    = &mWorld.addSystem<core::ecs::InputSystem>();
-            mDebugOverlay   = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
+            mScalingSystem = &mWorld.addSystem<core::ecs::ScalingSystem>();
+            mLockSystem = &mWorld.addSystem<core::ecs::LockSystem>();
+            mInputSystem = &mWorld.addSystem<core::ecs::InputSystem>();
+            mDebugOverlay = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
             // Привязываем overlay к сервису времени и шрифту (через ResourceManager)
             if (mDebugOverlay) {
                 const sf::Font& font = mResources.getFont(resources::ids::FontID::Default).get();

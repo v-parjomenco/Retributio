@@ -28,17 +28,16 @@ namespace core::ui::ids {
     // string_view -> enum (парсинг JSON / пользовательского ввода)
     // --------------------------------------------------------------------------------------------
 
-    AnchorType anchorFromString(
-                            std::string_view name,
-                            AnchorType defaultType = AnchorType::None) noexcept;
+    AnchorType anchorFromString(std::string_view name,
+                                AnchorType defaultType = AnchorType::None) noexcept;
 
-    ScalingBehaviorKind scalingFromString(
-                            std::string_view name,
-                            ScalingBehaviorKind defaultKind = ScalingBehaviorKind::None) noexcept;
+    ScalingBehaviorKind
+    scalingFromString(std::string_view name,
+                      ScalingBehaviorKind defaultKind = ScalingBehaviorKind::None) noexcept;
 
-    LockBehaviorKind lockFromString(
-                            std::string_view name,
-                            LockBehaviorKind defaultKind = LockBehaviorKind::World) noexcept;
+    LockBehaviorKind
+    lockFromString(std::string_view name,
+                   LockBehaviorKind defaultKind = LockBehaviorKind::World) noexcept;
 
     // --------------------------------------------------------------------------------------------
     // Унифицированный idToString для UI-идентификаторов (в духе resource_id_utils)
@@ -50,16 +49,14 @@ namespace core::ui::ids {
      * По умолчанию возвращает "UnknownUiId", а для известных enum'ов использует
      * специализированные версии, завязанные на toString(...).
      */
-    template <typename Identifier>
-    inline std::string_view idToString(Identifier) noexcept {
+    template <typename Identifier> inline std::string_view idToString(Identifier) noexcept {
         // Для неизвестных типов — просто метка.
         return u8"UnknownUiId";
     }
 
     // Специализации для AnchorType / ScalingBehaviorKind / LockBehaviorKind
 
-    template <>
-    inline std::string_view idToString<AnchorType>(AnchorType id) noexcept {
+    template <> inline std::string_view idToString<AnchorType>(AnchorType id) noexcept {
         return toString(id);
     }
 
@@ -68,8 +65,7 @@ namespace core::ui::ids {
         return toString(id);
     }
 
-    template <>
-    inline std::string_view idToString<LockBehaviorKind>(LockBehaviorKind id) noexcept {
+    template <> inline std::string_view idToString<LockBehaviorKind>(LockBehaviorKind id) noexcept {
         return toString(id);
     }
 
