@@ -9,6 +9,7 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <SFML/Graphics/Color.hpp>
@@ -130,7 +131,7 @@ namespace core::utils::json {
     * - Если всё хорошо — возвращает разобранный json.
     * moduleTag - строка вроде "ConfigLoader" / "DebugOverlayBlueprint" — для префикса в сообщениях.
     */
-    json parseAndValidateCritical(const std::string& fileContent, const std::string& path,
+    json parseAndValidateCritical(const std::string& fileContent, std::string_view path,
                                   const char* moduleTag,
                                   const std::vector<JsonValidator::KeyRule>& rules);
 
@@ -144,7 +145,7 @@ namespace core::utils::json {
     * moduleTag - строка вроде "ConfigLoader" / "DebugOverlayBlueprint" — для префикса в сообщениях.
     */
     std::optional<json>
-    parseAndValidateNonCritical(const std::string& fileContent, const std::string& path,
+    parseAndValidateNonCritical(const std::string& fileContent, std::string_view path,
                                 const char* moduleTag,
                                 const std::vector<JsonValidator::KeyRule>& rules);
 

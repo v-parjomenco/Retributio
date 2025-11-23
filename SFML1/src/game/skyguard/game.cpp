@@ -1,8 +1,20 @@
 #include "pch.h"
 
-#include "core/game.h"
-#include <cassert>
+#include "game/skyguard/game.h"
+
+#include <cassert>  
 #include <iostream>
+
+// Системы ECS из ядра, используемые SkyGuard wiring
+#include "core/ecs/systems/debug_overlay_system.h"
+#include "core/ecs/systems/input_system.h"
+#include "core/ecs/systems/lock_system.h"
+#include "core/ecs/systems/movement_system.h"
+#include "core/ecs/systems/render_system.h"
+#include "core/ecs/systems/scaling_system.h"
+
+// Специфические игровые системы ECS для SkyGuard
+#include "game/skyguard/ecs/systems/player_init_system.h"
 
 #include "core/config/loader/debug_overlay_loader.h"
 #include "core/resources/paths/resource_paths.h"
@@ -13,10 +25,10 @@
 
 namespace cfg = ::config;        // глобальные дефолты движка (окно, vsync, fixed step, hotkeys...)
 namespace gcfg = ::core::config; // core::config — для debug overlay и других движковых конфигов
-// game-specific конфиги/blueprints для Skyguard
+// Специфические игровые конфиги/blueprints для SkyGuard
 namespace skycfg = ::game::skyguard::config;
 
-namespace core {
+namespace game::skyguard {
 
     Game::Game()
         : mWindow(sf::VideoMode({cfg::WINDOW_WIDTH, cfg::WINDOW_HEIGHT}), cfg::WINDOW_TITLE) {
@@ -48,23 +60,29 @@ namespace core {
             // Добавляем компонент с конфигурацией игрока из JSON (playerCfg) в ECS-мир
             // PlayerInitSystem при первом апдейте создаст остальные компоненты
             // (Sprite, Transform и т.д.)
-            mWorld.addComponent(mPlayerEntity,
-                                game::skyguard::ecs::PlayerConfigComponent{playerCfg});
+            mWorld.addComponent(
+                mPlayerEntity,
+                game::skyguard::ecs::PlayerConfigComponent{playerCfg}
+            );
 
+            // ------------------------------------------------------------------------------------
             // Подключаем ECS-системы
-
+            // ------------------------------------------------------------------------------------
             mWorld.addSystem<game::skyguard::ecs::PlayerInitSystem>(mResources);
             mWorld.addSystem<core::ecs::MovementSystem>();
             mWorld.addSystem<core::ecs::RenderSystem>();
             // Эти системы требуют прямого доступа (onResize, onKeyEvent),
             // поэтому сохраняем указатели
             mScalingSystem = &mWorld.addSystem<core::ecs::ScalingSystem>();
-            mLockSystem = &mWorld.addSystem<core::ecs::LockSystem>();
-            mInputSystem = &mWorld.addSystem<core::ecs::InputSystem>();
-            mDebugOverlay = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
+            mLockSystem    = &mWorld.addSystem<core::ecs::LockSystem>();
+            mInputSystem   = &mWorld.addSystem<core::ecs::InputSystem>();
+            mDebugOverlay  = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
+
             // Привязываем overlay к сервису времени и шрифту (через ResourceManager)
             if (mDebugOverlay) {
-                const sf::Font& font = mResources.getFont(resources::ids::FontID::Default).get();
+                const sf::Font& font =
+                    mResources.getFont(core::resources::ids::FontID::Default).get();
+
                 mDebugOverlay->bind(mTime, font);
 
                 // Грузим конфиг для DebugOverlay
@@ -80,8 +98,10 @@ namespace core {
         } catch (const std::exception& e) {
             // Кросс-платформенная обработка ошибок
 #ifdef _WIN32
-            utils::message::showError(std::string("Ошибка при инициализации ECS: ") + e.what());
-            utils::message::holdOnExit();
+            core::utils::message::showError(
+                std::string("Ошибка при инициализации ECS: ") + e.what()
+            );
+            core::utils::message::holdOnExit();
 #else
             std::cerr << "Ошибка при инициализации ECS: " << e.what() << std::endl;
 #endif
@@ -97,8 +117,8 @@ namespace core {
 
             // Если накопилось достаточно времени — выполняем апдейт
             while (mTime.shouldUpdate(cfg::FIXED_TIME_STEP)) {
-                processEvents(); // обрабатываем события повторно, если фрэймрейт упал)
-                // это необязательно, но может помочь с отзывчивостью программы при подвисании
+                processEvents(); // обрабатываем события повторно, если фрэймрейт упал
+                // это необязательно, но может помочь с отзывчивостью программы при подвисании:
                 // окно всё равно будет реагировать на клавиши и не зависнет “в воздухе”.
 
                 update(cfg::FIXED_TIME_STEP);
@@ -157,4 +177,5 @@ namespace core {
         mWorld.render(mWindow); // отрисовываем ECS-мир
         mWindow.display();
     }
-} // namespace core
+
+} // namespace game::skyguard

@@ -2,8 +2,6 @@
 
 #include "core/ui/lock_behavior.h"
 
-#include "core/config.h"
-
 namespace core::ui {
 
     void applyScreenLock(sf::Sprite& sprite, const sf::View& view, sf::Vector2f& previousViewSize,

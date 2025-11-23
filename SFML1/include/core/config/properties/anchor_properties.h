@@ -8,7 +8,6 @@
 
 #include <SFML/System/Vector2.hpp>
 
-#include "core/config.h"
 #include "core/ui/anchor_utils.h"
 #include "core/ui/lock_behavior.h"
 #include "core/ui/scaling_behavior.h"

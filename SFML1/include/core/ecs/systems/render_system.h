@@ -1,3 +1,9 @@
+// ================================================================================================
+// File: core/ecs/systems/render_system.h
+// Purpose: Render sprites for entities that have TransformComponent + SpriteComponent
+// Used by: World/SystemManager, high-level Game render loop
+// Related headers: render_system.cpp, transform_component.h, sprite_component.h
+// ================================================================================================
 #pragma once
 
 #include <SFML/Graphics.hpp>

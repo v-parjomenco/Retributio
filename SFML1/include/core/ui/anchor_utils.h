@@ -12,8 +12,6 @@
 
 #include <SFML/System/Vector2.hpp>
 
-#include "core/config.h"
-
 namespace core::ui {
 
     /**

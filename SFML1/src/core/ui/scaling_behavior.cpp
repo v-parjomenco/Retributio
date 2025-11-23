@@ -2,8 +2,6 @@
 
 #include "core/ui/scaling_behavior.h"
 
-#include "core/config.h"
-
 namespace core::ui {
 
     void applyUniformScaling(sf::Sprite& sprite, const sf::View& view, float& lastUniform) {

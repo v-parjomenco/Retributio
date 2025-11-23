@@ -253,7 +253,7 @@ namespace core::utils::json {
     // Общие хелперы для парсинга и валидации JSON-конфигов
     // --------------------------------------------------------------------------------------------
 
-    json parseAndValidateCritical(const std::string& fileContent, const std::string& path,
+    json parseAndValidateCritical(const std::string& fileContent, std::string_view path,
                                   const char* moduleTag,
                                   const std::vector<JsonValidator::KeyRule>& rules) {
         json data;
@@ -271,7 +271,8 @@ namespace core::utils::json {
             std::exit(EXIT_FAILURE);
         } catch (...) {
             message::showError("[" + std::string(moduleTag) +
-                               "]\nНеизвестная ошибка при чтении JSON файла: " + path);
+                               "]\nНеизвестная ошибка при чтении JSON файла: " +
+                               std::string(path));
             std::exit(EXIT_FAILURE);
         }
 
@@ -295,7 +296,7 @@ namespace core::utils::json {
     }
 
     std::optional<json>
-    parseAndValidateNonCritical(const std::string& fileContent, const std::string& path,
+    parseAndValidateNonCritical(const std::string& fileContent, std::string_view path,
                                 const char* moduleTag,
                                 const std::vector<JsonValidator::KeyRule>& rules) {
 
@@ -310,12 +311,12 @@ namespace core::utils::json {
             */
             data = json::parse(fileContent);
         } catch (const std::exception& e) {
-            message::logDebug("[" + std::string(moduleTag) + "]\nНеверный JSON в файле " + path +
-                              ": " + e.what());
+            message::logDebug("[" + std::string(moduleTag) +
+                              "]\nНеверный JSON в файле " + std::string(path) + ": " + e.what());
             return std::nullopt;
         } catch (...) {
             message::logDebug("[" + std::string(moduleTag) +
-                              "]\nНеизвестная ошибка при разборе JSON: " + path);
+                              "]\nНеизвестная ошибка при разборе JSON: " + std::string(path));
             return std::nullopt;
         }
 

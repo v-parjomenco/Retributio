@@ -3,13 +3,13 @@
 #include <cstdlib>
 #include <exception>
 
-#include "core/game.h"
+#include "game/skyguard/game.h"
 #include "core/utils/message.h"
 
 int main() {
 
     try {
-        core::Game game;
+        game::skyguard::Game game;
         game.run();
     } catch (const std::exception& e) {
         core::utils::message::showError(e.what());

@@ -9,11 +9,12 @@ param(
     [string]$ProjectFolderName = "SFML1"
 )
 
-# Не делаем Stop на любую мелочь, пусть скрипт идет дальше
+# Не делаем Stop на любую мелочь, пусть скрипт идёт дальше
 $ErrorActionPreference = "Continue"
 
-# Корень репозитория = папка, где лежит сам скрипт
-$repoRoot   = Split-Path -Parent $MyInvocation.MyCommand.Path
+# PSScriptRoot = папка, где лежит сам скрипт (tools/)
+# Нам нужен корень репозитория = родитель папки tools/
+$repoRoot   = Split-Path -Parent $PSScriptRoot
 $projectDir = Join-Path $repoRoot $ProjectFolderName
 $srcDir     = Join-Path $projectDir "src"
 $includeDir = Join-Path $projectDir "include"
@@ -29,10 +30,8 @@ $tidyOptions = @(
     # Показывать диагностику только для файлов в:
     #  SFML1/src/**,
     #  SFML1/include/core/**,
-    #  SFML1/include/entities/**,
-    #  SFML1/include/graphics/**,
-    #  SFML1/include/utils/**
-    "-header-filter=$ProjectFolderName[\\/]src[\\/].*|$ProjectFolderName[\\/]include[\\/](core|entities|graphics|utils)[\\/].*"
+    #  SFML1/include/game/**
+    "-header-filter=^$ProjectFolderName[\\/]src[\\/].*|^$ProjectFolderName[\\/]include[\\/](core|game)[\\/].*"
 
     # Добавляем флаги компилятора ко всем запускам
     "-extra-arg=-std=c++17"
@@ -63,10 +62,10 @@ Write-Host "SFML include:    $SfmlInclude"
 Write-Host "Third-party dir: $thirdPartyDir"
 Write-Host ""
 
-# Обходим все .cpp в SFML1/src
+# Обходим все .cpp в SFML1/src (и core, и game)
 Get-ChildItem $srcDir -Recurse -Filter *.cpp | ForEach-Object {
     $file     = $_.FullName
-    # относительный путь от корня репозитория
+    # относительный путь от корня репозитория – для красивого вывода
     $relative = $file.Substring($repoRoot.Length + 1)
 
     Write-Host "=== clang-tidy: $relative ===" -ForegroundColor Cyan

@@ -1,9 +1,6 @@
 #pragma once
 
 #include <type_traits>
-#include <utility>
-#include <stdexcept>
-#include <string>
 
 #include "core/resources/ids/resource_ids.h"
 #include "core/resources/ids/resource_id_utils.h"

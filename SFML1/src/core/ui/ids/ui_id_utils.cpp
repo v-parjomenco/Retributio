@@ -62,26 +62,36 @@ namespace core::ui::ids {
 
     AnchorType anchorFromString(std::string_view name, AnchorType defaultType) noexcept {
 
-        if (name == "TopLeft")
+        if (name == "TopLeft") {
             return AnchorType::TopLeft;
-        if (name == "TopCenter")
+        }
+        if (name == "TopCenter") {
             return AnchorType::TopCenter;
-        if (name == "TopRight")
+        }
+        if (name == "TopRight") {
             return AnchorType::TopRight;
-        if (name == "CenterLeft")
+        }
+        if (name == "CenterLeft") {
             return AnchorType::CenterLeft;
-        if (name == "Center")
+        }
+        if (name == "Center") {
             return AnchorType::Center;
-        if (name == "CenterRight")
+        }
+        if (name == "CenterRight") {
             return AnchorType::CenterRight;
-        if (name == "BottomLeft")
+        }
+        if (name == "BottomLeft") {
             return AnchorType::BottomLeft;
-        if (name == "BottomCenter")
+        }
+        if (name == "BottomCenter") {
             return AnchorType::BottomCenter;
-        if (name == "BottomRight")
+        }
+        if (name == "BottomRight") {
             return AnchorType::BottomRight;
-        if (name == "None")
+        }
+        if (name == "None") {
             return AnchorType::None;
+        }
 
         // Неизвестное значение — лог + откат на defaultType.
         core::utils::message::showError(std::string("[Anchor]\nНеизвестное значение anchor: ") +
@@ -94,10 +104,12 @@ namespace core::ui::ids {
     ScalingBehaviorKind scalingFromString(std::string_view name,
                                           ScalingBehaviorKind defaultKind) noexcept {
 
-        if (name == "Uniform")
+        if (name == "Uniform") {
             return ScalingBehaviorKind::Uniform;
-        if (name == "None")
+        }
+        if (name == "None") {
             return ScalingBehaviorKind::None;
+        }
 
         core::utils::message::showError(
             std::string("[ScalingBehavior]\nНеизвестное значение resize_scaling: ") +
@@ -109,10 +121,12 @@ namespace core::ui::ids {
 
     LockBehaviorKind lockFromString(std::string_view name, LockBehaviorKind defaultKind) noexcept {
 
-        if (name == "ScreenLock")
+        if (name == "ScreenLock") {
             return LockBehaviorKind::Screen;
-        if (name == "WorldLock")
+        }
+        if (name == "WorldLock") {
             return LockBehaviorKind::World;
+        }
 
         core::utils::message::showError(
             std::string("[LockBehavior]\nНеизвестное значение lock_behavior: ") +

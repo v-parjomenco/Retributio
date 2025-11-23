@@ -225,9 +225,6 @@
     <ClCompile Include="main.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\game.cpp">
-      <Filter>src\core</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\resources\resource_manager.cpp">
       <Filter>src\core\resources</Filter>
     </ClCompile>
@@ -276,12 +273,12 @@
     <ClCompile Include="src\core\ui\ids\ui_id_utils.cpp">
       <Filter>src\core\ui\ids</Filter>
     </ClCompile>
+    <ClCompile Include="src\game\skyguard\game.cpp">
+      <Filter>src\game\skyguard</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\config.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\game.h">
       <Filter>include\core</Filter>
     </ClInclude>
     <ClInclude Include="include\third_party\json.hpp">
@@ -454,6 +451,9 @@
     </ClInclude>
     <ClInclude Include="include\core\ui\ids\ui_id_utils.h">
       <Filter>include\core\ui\ids</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\game.h">
+      <Filter>include\game\skyguard</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
