@@ -220,9 +220,15 @@
     <Filter Include="src\core\ui\ids">
       <UniqueIdentifier>{b26f29cd-3e7b-413a-bf16-020f8b927df0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\compiler\platform">
+      <UniqueIdentifier>{2affc0d3-4352-49f4-aef8-a0d4edd017f2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\compiler\platform">
+      <UniqueIdentifier>{0c92b304-5ee8-4b2b-b975-18057cab9aa0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="main_skyguard.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="src\core\resources\resource_manager.cpp">
@@ -275,6 +281,12 @@
     </ClCompile>
     <ClCompile Include="src\game\skyguard\game.cpp">
       <Filter>src\game\skyguard</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\config\loader\engine_settings_loader.cpp">
+      <Filter>src\core\config\loader</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\skyguard\config\loader\window_config_loader.cpp">
+      <Filter>src\game\skyguard\config\loader</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -452,6 +464,24 @@
     <ClInclude Include="include\core\ui\ids\ui_id_utils.h">
       <Filter>include\core\ui\ids</Filter>
     </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\config_keys.h">
+      <Filter>include\game\skyguard\config</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\compiler\platform\windows.h">
+      <Filter>include\core\compiler\platform</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config\engine_settings.h">
+      <Filter>include\core\config</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config\loader\engine_settings_loader.h">
+      <Filter>include\core\config\loader</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\window_config.h">
+      <Filter>include\game\skyguard\config</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\loader\window_config_loader.h">
+      <Filter>include\game\skyguard\config\loader</Filter>
+    </ClInclude>
     <ClInclude Include="include\game\skyguard\game.h">
       <Filter>include\game\skyguard</Filter>
     </ClInclude>
@@ -467,6 +497,12 @@
       <Filter>assets\game\skyguard\config</Filter>
     </None>
     <None Include="assets\game\skyguard\config\resources.json">
+      <Filter>assets\game\skyguard\config</Filter>
+    </None>
+    <None Include="assets\core\config\engine_settings.json">
+      <Filter>assets\core\config</Filter>
+    </None>
+    <None Include="assets\game\skyguard\config\skyguard_game.json">
       <Filter>assets\game\skyguard\config</Filter>
     </None>
   </ItemGroup>

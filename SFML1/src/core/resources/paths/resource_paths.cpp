@@ -4,19 +4,20 @@
 #include <cstdlib>   // для std::exit, EXIT_FAILURE
 #include <stdexcept> // для std::runtime_error
 
-#include "core/config/config_keys.h"
 #include "core/resources/ids/resource_id_utils.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_utils.h"
 #include "core/utils/json/json_validator.h"
 #include "core/utils/message.h"
 
+#include "game/skyguard/config/config_keys.h"
+
 namespace {
 
     using core::utils::FileLoader;
 
     namespace message = core::utils::message;
-    namespace keys = core::config::keys;
+    namespace keys = game::skyguard::config::keys;
     namespace json_utils = core::utils::json;
 
     using Json = json_utils::json;

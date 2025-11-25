@@ -1,4 +1,10 @@
-﻿#pragma once
+﻿// ================================================================================================
+// File: core/ecs/components/lock_behavior_component.h
+// Purpose: Per-entity state for lock behavior on window resize
+// Used by: LockSystem, PlayerInitSystem
+// Related headers: core/ui/lock_behavior.h, game\skyguard\ecs\systems\player_init_system.h
+// ================================================================================================
+#pragma once
 
 #include <SFML/System/Vector2.hpp>
 
@@ -19,7 +25,11 @@ namespace core::ecs {
     */
     struct LockBehaviorComponent {
         core::ui::LockBehaviorKind kind{core::ui::LockBehaviorKind::World};
-        sf::Vector2f previousViewSize{};
+
+        // Размер view, который использовался в прошлый раз для позиционирования.
+        sf::Vector2f previousViewSize{0.f, 0.f};
+
+        // Флаг для отладки (использовался ли компонент).
         bool initialized{false};
     };
 

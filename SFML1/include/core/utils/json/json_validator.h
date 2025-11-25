@@ -1,3 +1,8 @@
+// ================================================================================================
+// File: core/utils/json/json_validator.h
+// Purpose: Lightweight schema-like validation helper for JSON configs
+// Used by: json_utils::parseAndValidateCritical/NonCritical, ConfigLoader, debug blueprints
+// ================================================================================================
 #pragma once
 
 #include <stdexcept>
@@ -11,7 +16,7 @@
 namespace core::utils::json {
 
     /**
-     * @brief Утилита для проверки корректности JSON-конфигурации игрока.
+     * @brief Утилита для проверки корректности JSON-конфигурации.
      *
      * Проверяет, что ключи присутствуют и имеют допустимые типы данных.
      * Поддерживает несколько возможных типов для одного ключа.

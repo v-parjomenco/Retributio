@@ -2,7 +2,7 @@
 // File: core/config/properties/anchor_properties.h
 // Purpose: Data-only anchor/resize/lock configuration brick
 // Used by: PlayerBlueprint, future UI/world-anchored blueprints
-// Related headers: core/config.h, core/ui/ids/ui_id_utils.h
+// Related headers: core/ui/ids/ui_id_utils.h
 // ================================================================================================
 #pragma once
 

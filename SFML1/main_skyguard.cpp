@@ -1,3 +1,4 @@
+// Entry point for the SkyGuard game (single-game build for now)
 #include "pch.h"
 
 #include <cstdlib>

@@ -1,7 +1,12 @@
 #pragma once
 
-// Всегда первым — правила по ворнингам
+// clang-format off
+
+// Критически важные системные заголовки - строгий порядок
 #include "core/compiler/warnings.h"
+#include "core/compiler/platform/windows.h"
+
+// clang-format on
 
 // STD
 
@@ -17,7 +22,11 @@
 #include <vector>        // один из основных STL-контейнеров
 
 // SFML
+#ifdef _MSC_VER
+    #pragma warning(push)
+    #pragma warning(disable : 4868)
+#endif
 #include <SFML/Graphics.hpp> // подтягивает System и Window
-
-// Глобальная конфигурация окна и базовых параметров игры
-#include "core/config.h"
+#ifdef _MSC_VER
+    #pragma warning(pop)
+#endif

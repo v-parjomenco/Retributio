@@ -1,8 +1,8 @@
 #include "pch.h"
 
 #include "core/utils/json/json_utils.h"
-#include <cstdlib>   // std::exit, EXIT_FAILURE
-#include <stdexcept> // std::exception
+#include <cstdlib>   // для std::exit, EXIT_FAILURE
+#include <stdexcept> // для std::exception
 
 #include "core/utils/message.h"
 
@@ -10,26 +10,30 @@ namespace {
     using core::utils::json::json;
     namespace message = core::utils::message;
 
+    // --------------------------------------------------------------------------------------------
+    // Внутренние утилиты для парсинга цвета и клавиш
+    // --------------------------------------------------------------------------------------------
+
     /**
-    * @brief Внутренняя утилита: парсинг JSON-значения в sf::Color.
-    *
-    * Поддерживает:
-    *  - строку "#RRGGBB"  (альфа-канал = 255)
-    *  - строку "#RRGGBBAA"
-    *  - объект { "r": ..., "g": ..., "b": ..., "a": ... }
-    *
-    * При любой ошибке возвращает fallback.
-    * Внешний API для пользователей — core::utils::json::parseColor(...).
-    */
+     * @brief Внутренняя утилита: парсинг JSON-значения в sf::Color.
+     *
+     * Поддерживает:
+     *  - строку "#RRGGBB"  (альфа-канал = 255)
+     *  - строку "#RRGGBBAA"
+     *  - объект { "r": ..., "g": ..., "b": ..., "a": ... }
+     *
+     * При любой ошибке возвращает fallback.
+     * Внешний API для пользователей — core::utils::json::parseColor(...).
+     */
     sf::Color parseColorValue(const json& value, const sf::Color& fallback) {
-        // Для строки формата "#RRGGBB" или "#RRGGBBAA"
+        // Строка формата "#RRGGBB" или "#RRGGBBAA"
         if (value.is_string()) {
             std::string s = value.get<std::string>();
             if (!s.empty() && s[0] == '#') {
                 s.erase(0, 1);
 
-                auto hexToByte = [](const std::string& hex) -> uint8_t {
-                    return static_cast<uint8_t>(std::stoul(hex, nullptr, 16));
+                auto hexToByte = [](const std::string& hex) -> std::uint8_t {
+                    return static_cast<std::uint8_t>(std::stoul(hex, nullptr, 16));
                 };
 
                 try {
@@ -47,25 +51,25 @@ namespace {
                 }
             }
         }
-
-        // Для строки формата RGBa: {"r": 255, "g": 0, "b": 0, "a": 255}
+        // Объект { "r": 255, "g": 0, "b": 0, "a": 255 }
         else if (value.is_object()) {
-            auto r = static_cast<uint8_t>(value.value("r", 255));
-            auto g = static_cast<uint8_t>(value.value("g", 255));
-            auto b = static_cast<uint8_t>(value.value("b", 255));
-            auto a = static_cast<uint8_t>(value.value("a", 255));
+            auto r = static_cast<std::uint8_t>(value.value("r", 255));
+            auto g = static_cast<std::uint8_t>(value.value("g", 255));
+            auto b = static_cast<std::uint8_t>(value.value("b", 255));
+            auto a = static_cast<std::uint8_t>(value.value("a", 255));
             return {r, g, b, a};
         }
+
         // Любой другой формат — оставляем цвет по умолчанию.
         return fallback;
     }
 
     /**
-    * @brief Внутренний парсер.
-    * Преобразует строковое имя клавиши (напр. "W", "Left") в sf::Keyboard::Key.
-    * Используется в parseKey и ConfigLoader при обработке controls.
-    * Внешний API для пользователей — core::utils::json::parseKey(...).
-    */
+     * @brief Внутренний парсер: строка ("W", "Left", ...) -> sf::Keyboard::Key.
+     *
+     * Используется в parseKey и ConfigLoader при обработке controls.
+     * Внешний API для пользователей — core::utils::json::parseKey(...).
+     */
     sf::Keyboard::Key parseKeyString(const std::string& name) {
         using K = sf::Keyboard::Key;
 
@@ -126,26 +130,18 @@ namespace core::utils::json {
     using json = nlohmann::json;
 
     // --------------------------------------------------------------------------------------------
-    // Шаблонный парсер и его специализации
+    // Специализации parseValue<T>
     // --------------------------------------------------------------------------------------------
-
-    template <typename T>
-    T parseValue(const json& data, const std::string& key, const T& defaultValue) {
-        if (data.contains(key)) {
-            return data.at(key).get<T>();
-        }
-        return defaultValue;
-    }
-
-    // Специализации
 
     template <>
     float parseValue<float>(const json& data, const std::string& key, const float& defaultValue) {
-        if (data.contains(key)) {
-            const auto& v = data.at(key);
-            if (v.is_number()) {
-                return v.get<float>();
-            }
+        if (!data.contains(key)) {
+            return defaultValue;
+        }
+
+        const auto& v = data.at(key);
+        if (v.is_number()) {
+            return v.get<float>();
         }
         return defaultValue;
     }
@@ -225,7 +221,6 @@ namespace core::utils::json {
     // Клавиатурный парсер
     // --------------------------------------------------------------------------------------------
 
-    // Преобразование строки из JSON-объекта в клавишу SFML.
     sf::Keyboard::Key parseKey(const json& data, const std::string& key,
                                sf::Keyboard::Key defaultValue) {
         // Если нет поля или это не строка → возвращаем defaultValue.
@@ -240,9 +235,8 @@ namespace core::utils::json {
     // Парсер цвета
     // --------------------------------------------------------------------------------------------
 
-    // Парсинг цвета из JSON
     sf::Color parseColor(const json& data, const std::string& key, const sf::Color& defaultValue) {
-        // Если в JSON нет "color" → возвращаем defaultValue.
+        // Если в JSON нет ключа → возвращаем defaultValue.
         if (!data.contains(key)) {
             return defaultValue;
         }
@@ -258,33 +252,21 @@ namespace core::utils::json {
                                   const std::vector<JsonValidator::KeyRule>& rules) {
         json data;
         try {
-            /**
-            * @brief Парсинг JSON из строки.
-            * 
-            * Здесь мы переходим с уровня "просто текст" на уровень "структурированные данные".
-            * Разбираем JSON-текст в дерево nlohmann::json.
-            * json::parse может бросить json::parse_error или другие std::exception-подобные.
-            */
+            // Парсинг JSON из строки: текст -> дерево nlohmann::json.
             data = json::parse(fileContent);
         } catch (const std::exception& e) {
             message::showError("[" + std::string(moduleTag) + "]\nОшибка чтения JSON: " + e.what());
             std::exit(EXIT_FAILURE);
         } catch (...) {
             message::showError("[" + std::string(moduleTag) +
-                               "]\nНеизвестная ошибка при чтении JSON файла: " +
-                               std::string(path));
+                               "]\nНеизвестная ошибка при чтении JSON файла: " + std::string(path));
             std::exit(EXIT_FAILURE);
         }
 
         try {
-            /**
-            * @brief Валидация структуры JSON
-            *
-            * JsonValidator смотрит только на:
-            *  - какие ключи есть/нет,
-            *  - какие у них типы (string / number / object / array / ...).
-            * Он НЕ знает о семантике (что именно означает "speed" или "anchor").
-            */
+            // Валидация структуры JSON:
+            //  - какие ключи есть/нет,
+            //  - какие у них типы.
             JsonValidator::validate(data, rules);
         } catch (const std::exception& e) {
             message::showError("[" + std::string(moduleTag) +
@@ -302,17 +284,11 @@ namespace core::utils::json {
 
         json data;
         try {
-            /**
-            * @brief Парсинг JSON из строки.
-            *
-            * Здесь мы переходим с уровня "просто текст" на уровень "структурированные данные". 
-            * Разбираем JSON-текст в дерево nlohmann::json.
-            * json::parse может бросить json::parse_error или другие std::exception-подобные.
-            */
+            // Парсинг JSON из строки для некритичных конфигов.
             data = json::parse(fileContent);
         } catch (const std::exception& e) {
-            message::logDebug("[" + std::string(moduleTag) +
-                              "]\nНеверный JSON в файле " + std::string(path) + ": " + e.what());
+            message::logDebug("[" + std::string(moduleTag) + "]\nНеверный JSON в файле " +
+                              std::string(path) + ": " + e.what());
             return std::nullopt;
         } catch (...) {
             message::logDebug("[" + std::string(moduleTag) +
@@ -321,12 +297,9 @@ namespace core::utils::json {
         }
 
         try {
-            /**
-            * @brief Валидация структуры:
-            *
-            * Все поля необязательны (required = false),
-            * но если они присутствуют, тип должен соответствовать ожиданиям.
-            */
+            // Валидация структуры:
+            // Все поля необязательны (required = false),
+            // но если они присутствуют, тип должен соответствовать ожиданиям.
             JsonValidator::validate(data, rules);
         } catch (const std::exception& e) {
             message::logDebug("[" + std::string(moduleTag) + "]\nВалидация: " + e.what());
@@ -335,17 +308,5 @@ namespace core::utils::json {
 
         return data;
     }
-
-    // --------------------------------------------------------------------------------------------
-    // Явные инстанциации, чтобы линковщик видел шаблоны
-    // --------------------------------------------------------------------------------------------
-
-    template float parseValue<float>(const json&, const std::string&, const float&);
-    template std::string parseValue<std::string>(const json&, const std::string&,
-                                                 const std::string&);
-    template sf::Vector2f parseValue<sf::Vector2f>(const json&, const std::string&,
-                                                   const sf::Vector2f&);
-    template bool parseValue<bool>(const json&, const std::string&, const bool&);
-    template unsigned parseValue<unsigned>(const json&, const std::string&, const unsigned&);
 
 } // namespace core::utils::json

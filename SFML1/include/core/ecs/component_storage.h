@@ -5,7 +5,6 @@
 // Related headers: entity.h, world.h
 // Notes: Will be swapped to SparseSet later without API changes.
 // ================================================================================================
-
 #pragma once
 
 #include <type_traits>

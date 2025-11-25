@@ -1,8 +1,8 @@
 // ================================================================================================
 // File: core/config/config_keys.h
 // Purpose: Centralized keys for JSON configurations. Used by all parsing systems.
-// Used by: ConfigLoader, DebugOverlayLoader, UI, ECS, etc.
-// Related headers: config_loader.h, debug_overlay_loader.h, resource_paths.h
+// Used by: DebugOverlayLoader, UI, ECS, future core config loaders
+// Related headers: debug_overlay_loader.h
 // ================================================================================================
 #pragma once
 
@@ -11,7 +11,7 @@
 namespace core::config::keys {
 
     // --------------------------------------------------------------------------------------------
-    // Общие ключи, встречающиеся во многих JSON
+    // Общие ключи, встречающиеся во многих JSON (движковый уровень)
     // --------------------------------------------------------------------------------------------
     namespace Common {
         inline constexpr const char* TEXTURE = "texture";
@@ -23,36 +23,45 @@ namespace core::config::keys {
         inline constexpr const char* START_POSITION = "start_position";
         inline constexpr const char* RESIZE_SCALING = "resize_scaling";
         inline constexpr const char* LOCK_BEHAVIOR = "lock_behavior";
+        
+        // Общие текстовые настройки
+        inline constexpr const char* COLOR = "color";
+        inline constexpr const char* CHARACTER_SIZE = "characterSize";
+        inline constexpr const char* FONT = "font";
+        
     } // namespace Common
 
     // --------------------------------------------------------------------------------------------
-    // Ключи для конфигурации игрока (assets/game/skyguard/config/player.json)
+    // Ключи для движкового конфига EngineSettings (assets/core/config/engine_settings.json)
     // --------------------------------------------------------------------------------------------
-    namespace Player {
-        inline constexpr const char* TEXTURE = Common::TEXTURE;
-        inline constexpr const char* SCALE = Common::SCALE;
-        inline constexpr const char* SPEED = Common::SPEED;
-        inline constexpr const char* ACCELERATION = Common::ACCELERATION;
-        inline constexpr const char* FRICTION = Common::FRICTION;
-        inline constexpr const char* ANCHOR = Common::ANCHOR;
-        inline constexpr const char* START_POSITION = Common::START_POSITION;
-        inline constexpr const char* RESIZE_SCALING = Common::RESIZE_SCALING;
-        inline constexpr const char* LOCK_BEHAVIOR = Common::LOCK_BEHAVIOR;
+    namespace EngineSettings {
+        inline constexpr const char* VSYNC = "vsync";
+        inline constexpr const char* FRAME_LIMIT = "frameLimit";
+    } // namespace EngineSettings
 
-        inline constexpr const char* CONTROLS = "controls";
-        inline constexpr const char* CONTROL_UP = "up";
-        inline constexpr const char* CONTROL_DOWN = "down";
-        inline constexpr const char* CONTROL_LEFT = "left";
-        inline constexpr const char* CONTROL_RIGHT = "right";
-    } // namespace Player
+    // --------------------------------------------------------------------------------------------
+    // Ключи настроек текста для debug overlay (assets/core/config/debug_overlay.json)
+    // --------------------------------------------------------------------------------------------
+    namespace DebugOverlay {
+        inline constexpr const char* ENABLED = "enabled";
+        inline constexpr const char* POSITION = "position";
+        
+        // Используем общие текстовые ключи, чтобы не дублировать литералы
+        inline constexpr const char* CHARACTER_SIZE = Common::CHARACTER_SIZE;
+        inline constexpr const char* COLOR = Common::COLOR;
+        
+    } // namespace DebugOverlay
 
     // --------------------------------------------------------------------------------------------
     // Ключи для интерфейса (UI-конфиги, на будущее)
     // --------------------------------------------------------------------------------------------
     namespace UI {
-        inline constexpr const char* FONT = "font";
-        inline constexpr const char* FONT_SIZE = "font_size";
-        inline constexpr const char* COLOR = "color";
+        
+        // Для UI тоже опираемся на те же общие ключи
+        inline constexpr const char* FONT = Common::FONT;
+        inline constexpr const char* CHARACTER_SIZE = Common::CHARACTER_SIZE;
+        inline constexpr const char* COLOR = Common::COLOR;
+        
     } // namespace UI
 
     // --------------------------------------------------------------------------------------------
@@ -72,24 +81,5 @@ namespace core::config::keys {
         inline constexpr const char* TYPE = "type";
         inline constexpr const char* COMPONENTS = "components";
     } // namespace Entity
-
-    // --------------------------------------------------------------------------------------------
-    // Ключи настроек текста для debug overlay (assets/core/config/debug_overlay.json)
-    // --------------------------------------------------------------------------------------------
-    namespace DebugOverlay {
-        inline constexpr const char* ENABLED = "enabled";
-        inline constexpr const char* POSITION = "position";
-        inline constexpr const char* CHARACTER_SIZE = "characterSize";
-        inline constexpr const char* COLOR = "color";
-    } // namespace DebugOverlay
-
-    // --------------------------------------------------------------------------------------------
-    // Ключи для реестра ресурсов (assets/game/skyguard/config/resources.json)
-    // --------------------------------------------------------------------------------------------
-    namespace ResourceRegistry {
-        inline constexpr const char* TEXTURES = "textures";
-        inline constexpr const char* FONTS = "fonts";
-        inline constexpr const char* SOUNDS = "sounds";
-    } // namespace ResourceRegistry
 
 } // namespace core::config::keys

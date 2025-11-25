@@ -23,7 +23,8 @@ namespace core::ecs {
                 if (auto* sp = sprites.get(entity)) {
                     switch (sc.kind) {
                     case core::ui::ScalingBehaviorKind::Uniform:
-                        core::ui::applyUniformScaling(sp->sprite, newView, sc.lastUniform);
+                        core::ui::applyUniformScaling(sp->sprite, newView, sc.baseViewSize,
+                                                      sc.lastUniform);
                         break;
                     case core::ui::ScalingBehaviorKind::None:
                         // Ничего не делаем.

@@ -7,7 +7,6 @@
 //  - ECS systems receive dt as a parameter; they don't own timing
 //  - This matches common AAA engine practice (deterministic systems)
 // ================================================================================================
-
 #pragma once
 #include <SFML/System/Clock.hpp>
 #include <SFML/System/Time.hpp>

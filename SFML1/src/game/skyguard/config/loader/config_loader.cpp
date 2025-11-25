@@ -2,19 +2,20 @@
 
 #include "game/skyguard/config/loader/config_loader.h"
 
-#include "core/config/config_keys.h"
 #include "core/resources/ids/resource_id_utils.h"
 #include "core/ui/ids/ui_id_utils.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_utils.h"
 #include "core/utils/message.h"
 
+#include "game/skyguard/config/config_keys.h"
+
 namespace {
 
     using core::utils::FileLoader;
 
     namespace message = core::utils::message;
-    namespace keys = core::config::keys;
+    namespace keys = game::skyguard::config::keys;
     namespace json_utils = core::utils::json;
     namespace rids = core::resources::ids;
     namespace ui_ids = core::ui::ids;
@@ -27,30 +28,22 @@ namespace game::skyguard::config {
 
     blueprints::PlayerBlueprint ConfigLoader::loadPlayerConfig(const std::string& path) {
 
-        /**
-        * @brief Низкоуровневое чтение файла через FileLoader.
-        * На этом шаге нас интересуют только два факта:
-        *  - получилось ли прочитать файл целиком;
-        *  - если нет —> логируем это в debug и показываем пользователю окно об ошибке.
-        */
+        // ----------------------------------------------------------------------------------------
+        // Низкоуровневое чтение файла
+        // ----------------------------------------------------------------------------------------
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
             // FileLoader уже залогировал низкоуровневую проблему с файлом,
             // здесь даём пользователю понятный popup и возвращаем дефолтные значения.
             message::showError("[ConfigLoader]\nНе удалось открыть конфигурацию игрока: " + path +
                                ".\nБудут использованы значения по умолчанию.");
-
-            return blueprints::PlayerBlueprint{}; // дефолт из PlayerBlueprint+properties
+            return blueprints::PlayerBlueprint{}; // дефолт из PlayerBlueprint + properties
         }
-
         const std::string& fileContent = *fileContentOpt;
 
-        /**
-        * @brief Общий хелпер: парсинг + валидация для "критичного" конфига.
-        * В случае любой ошибки:
-        *  - пользователь увидит showError,
-        *  - приложение завершится через std::exit(EXIT_FAILURE).
-        */
+        // ----------------------------------------------------------------------------------------
+        // Парсинг + валидация как "критичного" конфига
+        // ----------------------------------------------------------------------------------------
         Json data = json_utils::parseAndValidateCritical(
             fileContent, path, "ConfigLoader",
             {
@@ -64,10 +57,12 @@ namespace game::skyguard::config {
                 {keys::Player::SCALE,
                  {Json::value_t::number_float, Json::value_t::object, Json::value_t::array}},
 
+                // Параметры движения игрока также считаем обязательными.
+                {keys::Player::SPEED, {Json::value_t::number_float}},
+                {keys::Player::ACCELERATION, {Json::value_t::number_float}},
+                {keys::Player::FRICTION, {Json::value_t::number_float}},
+
                 // Остальные параметры — необязательны, возможны значения по умолчанию.
-                {keys::Player::SPEED, {Json::value_t::number_float}, false},
-                {keys::Player::ACCELERATION, {Json::value_t::number_float}, false},
-                {keys::Player::FRICTION, {Json::value_t::number_float}, false},
                 {keys::Player::ANCHOR, {Json::value_t::string}, false},
                 {keys::Player::START_POSITION,
                  {Json::value_t::object, Json::value_t::array},
@@ -79,15 +74,12 @@ namespace game::skyguard::config {
 
         // Используем PlayerBlueprint, в котором лежат properties::Sprite/Movement/Anchor/Controls
         blueprints::PlayerBlueprint
-            cfg; // создаём со значениями по умолчанию из properties + config.h
+            cfg; // создаём со значениями по умолчанию из properties (enum-дефолты)
 
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
         // Текстура: строковый ID ("Player" из player.json) → enum TextureID
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
         {
-            // Читаем строковый идентификатор текстуры, например "Player".
-            // В JSON это НЕ путь, а логическое имя, которое должно совпадать
-            // с именем в resources.json и с toString(TextureID).
             const std::string defaultTextureIdStr = rids::toString(cfg.sprite.textureId);
 
             const std::string textureIdStr = json_utils::parseValue<std::string>(
@@ -103,11 +95,12 @@ namespace game::skyguard::config {
             }
         }
 
-        // Коэффициент масштабирования спрайта игрока
+        // ----------------------------------------------------------------------------------------
+        // Масштаб и движение
+        // ----------------------------------------------------------------------------------------
         cfg.sprite.scale =
             json_utils::parseValue<sf::Vector2f>(data, keys::Player::SCALE, cfg.sprite.scale);
 
-        // Параметры движения игрока
         cfg.movement.speed =
             json_utils::parseValue<float>(data, keys::Player::SPEED, cfg.movement.speed);
         cfg.movement.acceleration = json_utils::parseValue<float>(data, keys::Player::ACCELERATION,
@@ -121,13 +114,12 @@ namespace game::skyguard::config {
 
         // anchor: строка -> AnchorType (enum в AnchorProperties)
         {
-            // Если в JSON нет поля "anchor" — используем строковый дефолт из config.h,
-            // затем конвертируем в enum через ui::ids::anchorFromString.
-            const std::string anchorStr = json_utils::parseValue<std::string>(
-                data, keys::Player::ANCHOR, ::config::DEFAULT_ANCHOR);
-
-            cfg.anchor.anchorType = ui_ids::anchorFromString(anchorStr, cfg.anchor.anchorType);
+            // Если в JSON нет поля "anchor" — остаётся enum-дефолт из AnchorProperties.
+            if (auto anchorStr = json_utils::getOptional<std::string>(data, keys::Player::ANCHOR)) {
+                cfg.anchor.anchorType = ui_ids::anchorFromString(*anchorStr, cfg.anchor.anchorType);
+            }
         }
+        // Если в JSON нет поля "anchor" — остаётся enum-дефолт из AnchorProperties.
 
         // Стартовая позиция в мировых координатах
         cfg.anchor.startPosition = json_utils::parseValue<sf::Vector2f>(
@@ -135,27 +127,30 @@ namespace game::skyguard::config {
 
         // resize_scaling: строка -> ScalingBehaviorKind
         {
-            const std::string scalingStr = json_utils::parseValue<std::string>(
-                data, keys::Player::RESIZE_SCALING, ::config::DEFAULT_RESIZE_SCALING);
-
-            cfg.anchor.scalingBehavior =
-                ui_ids::scalingFromString(scalingStr, cfg.anchor.scalingBehavior);
+            // Если в JSON нет поля "resize_scaling" — остаётся enum-дефолт.
+            if (auto scalingStr =
+                    json_utils::getOptional<std::string>(data, keys::Player::RESIZE_SCALING)) {
+                cfg.anchor.scalingBehavior =
+                    ui_ids::scalingFromString(*scalingStr, cfg.anchor.scalingBehavior);
+            }
         }
 
         // lock_behavior: строка -> LockBehaviorKind
         {
-            const std::string lockStr = json_utils::parseValue<std::string>(
-                data, keys::Player::LOCK_BEHAVIOR, ::config::DEFAULT_LOCK_BEHAVIOR);
-
-            cfg.anchor.lockBehavior = ui_ids::lockFromString(lockStr, cfg.anchor.lockBehavior);
+            // Если в JSON нет поля "lock_behavior" — остаётся enum-дефолт.
+            if (auto lockStr =
+                    json_utils::getOptional<std::string>(data, keys::Player::LOCK_BEHAVIOR)) {
+                cfg.anchor.lockBehavior = ui_ids::lockFromString(*lockStr, cfg.anchor.lockBehavior);
+            }
         }
 
-        // Обработка блока управляющих клавиш (если он есть)
-        // Здесь мы находим конкретные кнопки движения, которые могут быть переопределены в JSON.
+        // ----------------------------------------------------------------------------------------
+        // Управляющие клавиши
+        // ----------------------------------------------------------------------------------------
         if (data.contains(keys::Player::CONTROLS) && data.at(keys::Player::CONTROLS).is_object()) {
+
             const auto& c = data.at(keys::Player::CONTROLS);
 
-            // Каждая клавиша может быть переопределена в JSON
             cfg.controls.up = json_utils::parseKey(c, keys::Player::CONTROL_UP, cfg.controls.up);
             cfg.controls.down =
                 json_utils::parseKey(c, keys::Player::CONTROL_DOWN, cfg.controls.down);
@@ -169,7 +164,7 @@ namespace game::skyguard::config {
                                "Применены значения по умолчанию.");
         }
 
-        // Возвращаем полностью собранный PlayerConfig
+        // Возвращаем полностью собранную конфигурацию игрока
         return cfg;
     }
 

@@ -2,9 +2,8 @@
 // File: core/ui/anchor_utils.h
 // Purpose: AnchorType enum and helpers for anchor-based positioning
 // Used by: AnchorProperties, AnchorPolicy, PlayerInitSystem, UI/layout systems
-// Related headers: core/ui/ids/ui_id_utils.h (string <-> enum helpers), core/config.h
+// Related headers: core/ui/ids/ui_id_utils.h (string <-> enum helpers)
 // ================================================================================================
-
 #pragma once
 
 #include <cassert>

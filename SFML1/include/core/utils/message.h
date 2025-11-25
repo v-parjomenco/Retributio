@@ -116,7 +116,7 @@ namespace core::utils {
 #endif
 
         inline void holdOnExit() {
-            if constexpr (::config::DEBUG_HOLD_ON_EXIT) {
+            if constexpr (::core::config::DEBUG_HOLD_ON_EXIT) {
 #ifdef _WIN32
                 showMessageBox("Нажмите OK, чтобы выйти.", "Завершение", MB_OK);
 #else

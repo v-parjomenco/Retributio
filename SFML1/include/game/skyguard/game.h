@@ -1,11 +1,11 @@
-// ============================================================================
+// ================================================================================================
 // File: game/skyguard/game.h
 // Role: High-level application for SkyGuard (window, loop, ECS wiring)
 // Notes:
 //  - Lives in the game layer (game/skyguard), depends on core engine only
 //  - Owns TimeService and ECS World, wires SkyGuard-specific systems
 //  - Does NOT belong to core/, and core/ does not depend on this header
-// ============================================================================
+// ================================================================================================
 #pragma once
 
 #include <SFML/Graphics.hpp>
@@ -43,10 +43,10 @@ namespace game::skyguard {
         core::ecs::Entity mPlayerEntity; // сущность игрока
 
         // Системы, к которым нужен прямой доступ
-        core::ecs::ScalingSystem* mScalingSystem{nullptr};      // кэшируем систему масштабирования
-        core::ecs::LockSystem* mLockSystem{nullptr};            // кэшируем систему фиксации
-        core::ecs::InputSystem* mInputSystem{nullptr};          // клавиатурный ввод
-        core::ecs::DebugOverlaySystem* mDebugOverlay{nullptr};  // debug overlay (FPS и т.п.)
+        core::ecs::ScalingSystem* mScalingSystem{nullptr};     // кэшируем систему масштабирования
+        core::ecs::LockSystem* mLockSystem{nullptr};           // кэшируем систему фиксации
+        core::ecs::InputSystem* mInputSystem{nullptr};         // клавиатурный ввод
+        core::ecs::DebugOverlaySystem* mDebugOverlay{nullptr}; // debug overlay (FPS и т.п.)
     };
 
 } // namespace game::skyguard

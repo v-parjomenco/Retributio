@@ -7,14 +7,13 @@ namespace core::ui {
     void applyScreenLock(sf::Sprite& sprite, const sf::View& view, sf::Vector2f& previousViewSize,
                          bool& initialized) {
 
-        // При первом вызове используем базовый размер из config.h
-        if (!initialized) {
-            previousViewSize = {static_cast<float>(config::WINDOW_WIDTH),
-                                static_cast<float>(config::WINDOW_HEIGHT)};
-            initialized = true;
-        }
+#ifndef NDEBUG
+        // В Debug ожидаем корректную инициализацию в PlayerInitSystem:
+        assert(previousViewSize.x > 0.f && previousViewSize.y > 0.f &&
+               "LockBehavior: previousViewSize must be initialized before use");
+#endif
 
-        // Защита от деления на 0 (на случай старта с нулевым размером окна)
+        // Защита от деления на 0 (на случай некорректного состояния)
         const float previousWidth = std::max(1.f, previousViewSize.x);
         const float previousHeight = std::max(1.f, previousViewSize.y);
 
@@ -28,7 +27,7 @@ namespace core::ui {
         // Получаем размер экрана после масштабирования
         const sf::Vector2f currentViewSize = view.getSize();
 
-        // Пересчитываем новую позицию, сохраняя пропорции на экране
+        // Новая позиция с сохранением пропорций
         const sf::Vector2f newPosition = {currentViewSize.x * relativePosition.x,
                                           currentViewSize.y * relativePosition.y};
 
@@ -36,6 +35,7 @@ namespace core::ui {
 
         // Обновляем сохранённый размер экрана для следующего вызова
         previousViewSize = currentViewSize;
+        initialized = true;
     }
 
 } // namespace core::ui

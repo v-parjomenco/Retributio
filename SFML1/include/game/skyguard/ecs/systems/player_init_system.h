@@ -16,7 +16,6 @@
 #include <SFML/Graphics/Sprite.hpp>
 #include <SFML/Graphics/Texture.hpp>
 
-#include "core/config.h"
 #include "core/ecs/components/keyboard_control_component.h"
 #include "core/ecs/components/lock_behavior_component.h"
 #include "core/ecs/components/movement_stats_component.h"
@@ -56,7 +55,8 @@ namespace game::skyguard::ecs {
      */
     class PlayerInitSystem final : public core::ecs::ISystem {
       public:
-        explicit PlayerInitSystem(core::resources::ResourceManager& res) : mResources(res) {
+        explicit PlayerInitSystem(core::resources::ResourceManager& res, sf::Vector2f baseViewSize)
+            : mResources(res), mBaseViewSize(baseViewSize) {
         }
 
         void update(core::ecs::World& world, float) override {
@@ -64,6 +64,7 @@ namespace game::skyguard::ecs {
 
             // Копим сущности для безопасного удаления после цикла
             std::vector<core::ecs::Entity> toRemove;
+            toRemove.reserve(configs.size());
 
             for (const auto& [entity, cfgComp] : configs) {
                 const auto& cfg = cfgComp.config;
@@ -79,9 +80,10 @@ namespace game::skyguard::ecs {
                 core::ecs::SpriteComponent spriteComp(std::move(tempSprite));
 
                 // Позиция и якорь
-                sf::View defaultView(
-                    sf::FloatRect({0.f, 0.f}, {static_cast<float>(::config::WINDOW_WIDTH),
-                                               static_cast<float>(::config::WINDOW_HEIGHT)}));
+                // Базовая view для якоря и масштабирования — берём размер,
+                // переданный из Game (во время первичной инициализации окна).
+                sf::View defaultView(sf::FloatRect({0.f, 0.f}, {mBaseViewSize.x, mBaseViewSize.y}));
+                const sf::Vector2f baseViewSize = defaultView.getSize();
 
                 // Используем enum AnchorType из AnchorProperties, без строк и JSON.
                 const core::ui::AnchorType anchorType = cfg.anchor.anchorType;
@@ -96,10 +98,14 @@ namespace game::skyguard::ecs {
                 // Компонент масштабирования (enum уже пришёл из loader'а)
                 core::ecs::ScalingBehaviorComponent scalingComp{};
                 scalingComp.kind = cfg.anchor.scalingBehavior;
+                scalingComp.baseViewSize = baseViewSize;
+                scalingComp.lastUniform = 1.f; // "без дополнительного масштабирования"
 
                 // Компонент фиксации (enum из loader'а)
                 core::ecs::LockBehaviorComponent lockComp{};
                 lockComp.kind = cfg.anchor.lockBehavior;
+                lockComp.previousViewSize = baseViewSize;
+                lockComp.initialized = false; // первый resize ещё не был обработан
 
                 // Добавляем компоненты
                 world.addComponent(entity, spriteComp);
@@ -115,7 +121,7 @@ namespace game::skyguard::ecs {
                                                cfg.movement.friction      // friction
                                            });
 
-                // Управление с клавиатуры — берём из JSON (или из дефолтов config.h)
+                // Управление с клавиатуры — берём из JSON (или из дефолтов properties)
                 world.addComponent(entity, core::ecs::KeyboardControlComponent{
                                                cfg.controls.up, cfg.controls.down,
                                                cfg.controls.left, cfg.controls.right});
@@ -134,6 +140,7 @@ namespace game::skyguard::ecs {
 
       private:
         core::resources::ResourceManager& mResources;
+        sf::Vector2f mBaseViewSize;
     };
 
 } // namespace game::skyguard::ecs

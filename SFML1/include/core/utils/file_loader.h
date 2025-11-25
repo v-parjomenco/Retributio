@@ -6,7 +6,6 @@
 // - Add error handling in one place
 // - Support virtual file systems later (for modding)
 // ================================================================================================
-
 #pragma once
 
 #include <optional>

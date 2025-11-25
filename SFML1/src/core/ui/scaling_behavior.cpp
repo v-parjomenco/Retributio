@@ -4,35 +4,34 @@
 
 namespace core::ui {
 
-    void applyUniformScaling(sf::Sprite& sprite, const sf::View& view, float& lastUniform) {
+    void applyUniformScaling(sf::Sprite& sprite, const sf::View& view,
+                             const sf::Vector2f& baseViewSize, float& lastUniform) {
 
-        // Берём View изначального размера экрана
-        sf::Vector2f baseViewSize{static_cast<float>(config::WINDOW_WIDTH),
-                                  static_cast<float>(config::WINDOW_HEIGHT)};
+        // Защита от некорректной инициализации baseViewSize
+        const sf::Vector2f safeBaseSize{std::max(baseViewSize.x, 1.f),
+                                        std::max(baseViewSize.y, 1.f)};
 
-        // Берём View текущего размера экрана, после изменения
-        sf::Vector2f currentViewSize = view.getSize();
+        // Текущий размер view после изменения
+        const sf::Vector2f currentViewSize = view.getSize();
 
-        // Вычисляем коэффициент, на который произошло изменение по каждой оси
-        const float scaleX = currentViewSize.x / baseViewSize.x;
-        const float scaleY = currentViewSize.y / baseViewSize.y;
+        // Коэффициенты изменения по осям
+        const float scaleX = currentViewSize.x / safeBaseSize.x;
+        const float scaleY = currentViewSize.y / safeBaseSize.y;
 
-        // Выбираем коэффициент, отражающий наименьшую деформацию сторон
+        // Равномерный масштаб
         const float newUniform = std::min(scaleX, scaleY);
 
-        // Рассчитываем соотношение нового коэффициента к предыдущему
-        float ratio = 1.f;       // изначально деформации не было
-        if (lastUniform > 0.f) { // защита от деления на 0
+        // Относительное изменение по сравнению с предыдущим uniform
+        float ratio = 1.f;
+        if (lastUniform > 0.f) {
             ratio = newUniform / lastUniform;
         }
 
-        // Получаем текущий коэффициент масштабирования спрайта
+        // Применяем изменение к текущему масштабу спрайта
         const sf::Vector2f currentScale = sprite.getScale();
-
-        // Перемножаем старый коэффициент с новым и устанавливаем новый масштаб спрайта
         sprite.setScale({currentScale.x * ratio, currentScale.y * ratio});
 
-        // Обновляем сохранённое значение для следующего resize
+        // Сохраняем новый uniform для следующего resize
         lastUniform = newUniform;
     }
 

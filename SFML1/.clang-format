@@ -25,7 +25,7 @@ AlignConsecutiveDeclarations: None
 AlignConsecutiveAssignments: None
 AlignConsecutiveMacros: None
 
-# Пробелы
+# Пробелы	
 SpaceBeforeParens: ControlStatements
 SpaceBeforeRangeBasedForLoopColon: true
 SpaceAfterCStyleCast: true
@@ -36,20 +36,24 @@ PointerAlignment: Left
 ReferenceAlignment: Left
 
 # include-ы
-SortIncludes: true
+SortIncludes: CaseSensitive
 IncludeBlocks: Regroup
 IncludeCategories:
-  # 0) PCH — всегда первым
+  # -1) PCH — всегда первым
   - Regex: '^"pch.h"'
-    Priority: -1
+    Priority: -10
 
-  # 1) SFML-хедеры
+  # 0) Compiler infrastructure (warnings, platform и т.п.)
+  - Regex: '^"core/compiler/.*"'
+    Priority: -9
+
+  # 1) Стандартная библиотека
+  - Regex: '^<[^/]*>$'
+    Priority: 0
+
+  # 2) SFML-хедеры
   - Regex: '^<SFML/.*>'
     Priority: 1
-
-  # 2) Стандартная библиотека
-  - Regex: '^<.*>'
-    Priority: 0
 
   # 3) third_party
   - Regex: '^"third_party/.*"'

@@ -1,16 +1,21 @@
+// ================================================================================================
+// File: core/ui/anchor_policy.h
+// Purpose: Anchor policy for sprite origin/position
+// Used by: PlayerInitSystem, future UI/layout systems
+// ================================================================================================
 #pragma once
 
 #include <SFML/Graphics.hpp>
 
-#include "core/config.h"
 #include "core/ui/anchor_utils.h"
 
 namespace core::ui {
 
     /**
-     * @brief Политика установки якоря для спрайта
-     * 
-     * Отвечает за вычисление origin и начальной позиции на экране
+     * @brief Политика установки якоря для спрайта.
+     *
+     * Отвечает за вычисление origin и начальной позиции на экране.
+     * Не знает ничего о JSON, конфиге или игре.
      */
     class AnchorPolicy final {
       public:
@@ -22,6 +27,7 @@ namespace core::ui {
         AnchorType getAnchor() const {
             return mAnchor;
         }
+
         void setAnchor(AnchorType anchor) {
             mAnchor = anchor;
         }

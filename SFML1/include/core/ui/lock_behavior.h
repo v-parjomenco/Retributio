@@ -2,7 +2,7 @@
 // File: core/ui/lock_behavior.h
 // Purpose: Lock behavior types and helpers for resize handling
 // Used by: AnchorProperties, LockBehaviorComponent, LockSystem
-// Related headers: core/config.h, core/ui/ids/ui_id_utils.h
+// Related headers: core/ui/ids/ui_id_utils.h
 // ================================================================================================
 #pragma once
 
@@ -27,12 +27,15 @@ namespace core::ui {
     /**
      * @brief Логика ScreenLock-политики.
      *
-     * Поведение:
-     *  - первая инициализация — mPreviousViewSize = (WINDOW_WIDTH, WINDOW_HEIGHT);
-     *  - далее позиция считается в долях от предыдущего размера и переносится в новый view.
+     * Состояние:
+     *  - previousViewSize — размер view при предыдущем вызове;
+     *  - initialized      — флаг, использовался ли компонент (для дебага/отладки).
      *
-     * Состояние (previousViewSize/initialized) передаётся снаружи, чтобы
-     * храниться в ECS-компоненте, а не во внутреннем объекте.
+     * Контракт:
+     *  - при создании сущности previousViewSize должен быть инициализирован
+     *    базовым размером окна (reference size) — это делает PlayerInitSystem;
+     *  - на каждом onResize LockSystem вызывает applyScreenLock с текущим view;
+     *  - функция пересчитывает позицию спрайта в пропорциях к новому размеру.
      */
     void applyScreenLock(sf::Sprite& sprite, const sf::View& view, sf::Vector2f& previousViewSize,
                          bool& initialized);
