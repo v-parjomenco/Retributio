@@ -9,6 +9,7 @@
 #include <typeindex>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "core/ecs/entity.h"
 #include "core/ecs/entity_manager.h"
@@ -62,10 +63,10 @@ namespace core::ecs {
         }
 
         // Доступ к менеджеру (если вдруг нужен более низкий уровень)
-        EntityManager& entities() noexcept {
+        [[nodiscard]] EntityManager& entities() noexcept {
             return mEntities;
         }
-        const EntityManager& entities() const noexcept {
+        [[nodiscard]] const EntityManager& entities() const noexcept {
             return mEntities;
         }
 

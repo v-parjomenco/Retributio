@@ -4,6 +4,7 @@
 // Notes:
 //  - Lives in the game layer (game/skyguard), depends on core engine only
 //  - Owns TimeService and ECS World, wires SkyGuard-specific systems
+//  - Implements a fixed-timestep game loop using core::time::TimeService
 //  - Does NOT belong to core/, and core/ does not depend on this header
 // ================================================================================================
 #pragma once

@@ -131,21 +131,37 @@ namespace game::skyguard {
         }
     }
 
+    /**
+     * @brief Главный игровой цикл SkyGuard.
+     *
+     * Структура кадра:
+     *  1) mTime.tick() — измеряем время кадра, обновляем FPS и накопление для fixed-step;
+     *  2) processEvents() — обрабатываем все события окна/ввода;
+     *  3) while (shouldUpdate(FIXED_TIME_STEP)) — выполняем 0..N фиксированных шагов логики;
+     *  4) render() — один кадр отрисовки текущего состояния мира.
+     *
+     * Логика времени:
+     *  - TimeService управляет тем, сколько раз за кадр будет вызван update();
+     *  - dt для мира — FIXED_TIME_STEP (compile-time константа движка);
+     *  - пауза и timeScale (когда будут использоваться) настраиваются через TimeService,
+     *    но сам цикл остаётся таким же.
+     */
     void Game::run() {
         assert(mWindow.isOpen()); // проверка, что окно открылось
+
+        const sf::Time fixedTimeStep = cfg::FIXED_TIME_STEP;
+
         while (mWindow.isOpen()) {
-            processEvents(); // для базовой логики и стабильных кадров
-            mTime.tick();    // обновляем время ровно 1 раз на кадр
-
-            // Если накопилось достаточно времени — выполняем апдейт
-            while (mTime.shouldUpdate(cfg::FIXED_TIME_STEP)) {
-                processEvents(); // обрабатываем события повторно, если фрэймрейт упал
-                // это необязательно, но может помочь с отзывчивостью программы при подвисании:
-                // окно всё равно будет реагировать на клавиши и не зависнет “в воздухе”.
-
-                update(cfg::FIXED_TIME_STEP);
+            // 1. Обновляем время кадра (raw dt, scaled dt, FPS/метрики).
+            mTime.tick();
+            // 2. Обрабатываем события окна и ввода.
+            processEvents();
+            // 3. Выполняем один или несколько фиксированных шагов логики.
+            while (mTime.shouldUpdate(fixedTimeStep)) {
+                update(fixedTimeStep);
             }
-            render(); // рендерим столько раз, сколько позволяет GPU
+            // 4. Отрисовываем текущее состояние мира.
+            render();
         }
     }
 
@@ -189,6 +205,9 @@ namespace game::skyguard {
         }
     }
 
+    // Здесь dt — фиксированный шаг (FIXED_TIME_STEP), который пришёл из игрового цикла
+    // и был "разрулен" TimeService (через shouldUpdate). ECS-системы не знают о том,
+    // сколько реального времени прошло между кадрами, они видят стабильный шаг логики.
     void Game::update(const sf::Time& dt) {
         assert(dt.asSeconds() > 0);    // время обновления должно быть положительным
         mWorld.update(dt.asSeconds()); // обновляем все ECS-системы

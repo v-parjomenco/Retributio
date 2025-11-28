@@ -41,7 +41,7 @@ namespace core::ecs {
         // NOLINTNEXTLINE(performance-noexcept-move-constructor, bugprone-exception-escape)
         World& operator=(World&&) = default;
 
-        // --------------------------- Сущности -----------------------------
+        // --------------------------- Сущности ---------------------------------------------------
         [[nodiscard]] Entity createEntity() {
             return mRegistry.createEntity();
         }
@@ -75,7 +75,7 @@ namespace core::ecs {
             return mRegistry.isAlive(e);
         }
 
-        // --------------------------- Компоненты ---------------------------
+        // --------------------------- Компоненты -------------------------------------------------
 
         /**
          * @brief Получить (создать при необходимости) хранилище компонента T.
@@ -91,10 +91,13 @@ namespace core::ecs {
             if (it != mStorages.end()) {
                 /**
                  * static_cast преобразует IComponentStorage*, который возвращает it->second.get()
-                 * в ComponentStorage<T>*, чтобы компилятор разрешил вызывать методы set, get, remove и т.д.,
-                 * (которые определены только в ComponentStorage<T>, поэтому нам нужно преобразовать тип обратно к нему.
-                 * (*) звездочка здесь - разыменование указателя, который возвращает static_cast, поскольку нам нужно
-                 * вернуть ComponentStorage<T>& storage(); не указатель, а сам объект
+                 * в ComponentStorage<T>*, чтобы компилятор разрешил вызывать методы set, get,
+                 * remove и т.д., которые определены только в ComponentStorage<T>, поэтому нам
+                 * нужно преобразовать тип обратно к нему.
+                 * 
+                 * (*) звездочка здесь - разыменование указателя, который возвращает static_cast,
+                 * поскольку нам нужно вернуть ComponentStorage<T>& storage(); не указатель,
+                 * а сам объект
                  */
                 return *static_cast<ComponentStorage<T>*>(it->second.get());
             }
@@ -105,8 +108,9 @@ namespace core::ecs {
             /**
              * Добавляет в mStorages новый элемент, где ключ — это тип компонента,
              * представленный через std::type_index (обёртку вокруг typeid(T)),
-             * чтобы его можно было безопасно и корректно использовать в unordered_map в качестве ключа,
-             * а значение — передача владения только что созданным хранилищем storage.
+             * чтобы его можно было безопасно и корректно использовать в unordered_map
+             * в качестве ключа, а значение — передача владения только что созданным
+             * хранилищем storage.
              */
             mStorages.emplace(key, std::move(storage));
             return *ptr;
@@ -147,7 +151,7 @@ namespace core::ecs {
             s.remove(e);
         }
 
-        // --------------------------- Системы ------------------------------
+        // --------------------------- Системы ----------------------------------------------------
 
         template <typename T, typename... Args> T& addSystem(Args&&... args) {
             return mSystems.addSystem<T>(std::forward<Args>(args)...);
@@ -161,11 +165,11 @@ namespace core::ecs {
             mSystems.renderAll(*this, window);
         }
 
-        // Доступ к registry — если нужно низкоуровневое
-        Registry& registry() noexcept {
+        // Доступ к registry — если нужно низкоуровневое управление списком сущностей
+        [[nodiscard]] Registry& registry() noexcept {
             return mRegistry;
         }
-        const Registry& registry() const noexcept {
+        [[nodiscard]] const Registry& registry() const noexcept {
             return mRegistry;
         }
 

@@ -1,3 +1,9 @@
+// ================================================================================================
+// File: core/ecs/systems/scaling_system.h
+// Purpose: Apply per-entity scaling behavior on window/view resize
+// Used by: Game resize handling, World/SystemManager
+// Related headers: scaling_behavior_component.h, sprite_component.h
+// ================================================================================================
 #pragma once
 
 #include "core/ecs/components/scaling_behavior_component.h"
@@ -8,16 +14,27 @@
 namespace core::ecs {
 
     /**
-     * @brief Система масштабирования на событие ресайза.
+     * @brief Система масштабирования сущностей при ресайзе окна/view.
      *
-     * Применяет поведение Uniform только для сущностей,
-     * у которых kind == ScalingBehaviorKind::Uniform.
+     * Поток данных:
+     *  - Game при событии resize вызывает onResize(...);
+     *  - система проходит по ScalingBehaviorComponent;
+     *  - для сущностей с kind == ScalingBehaviorKind::Uniform вызывает
+     *    core::ui::applyUniformScaling(...) и обновляет sprite;
+     *  - для kind == None ничего не делает (оставляет размер как есть).
+     *
+     * Важно:
+     *  - onResize вызывается РЕДКО, а не каждый кадр;
+     *  - логика масштабирования инкапсулирована в core::ui, система лишь
+     *    связывает компоненты ECS с UI-слоем;
+     *  - поведение полностью data-driven: значения kind/baseViewSize/lastUniform
+     *    задаются в конфиге игры.
      */
     class ScalingSystem final : public ISystem {
       public:
         void onResize(World& world, const sf::View& newView) {
-            auto& sprites = world.storage<SpriteComponent>();
-            auto& scalings = world.storage<ScalingBehaviorComponent>();
+            auto& sprites   = world.storage<SpriteComponent>();
+            auto& scalings  = world.storage<ScalingBehaviorComponent>();
 
             for (auto& [entity, sc] : scalings) {
                 if (auto* sp = sprites.get(entity)) {

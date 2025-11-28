@@ -2,7 +2,7 @@
 // File: core/ecs/components/lock_behavior_component.h
 // Purpose: Per-entity state for lock behavior on window resize
 // Used by: LockSystem, PlayerInitSystem
-// Related headers: core/ui/lock_behavior.h, game\skyguard\ecs\systems\player_init_system.h
+// Related headers: core/ui/lock_behavior.h, game/skyguard/ecs/systems/player_init_system.h
 // ================================================================================================
 #pragma once
 
@@ -21,7 +21,7 @@ namespace core::ecs {
     *  - initialized      — был ли уже инициализирован previousViewSize.
     *
     * Логика политики реализована в core::ui::applyScreenLock и вызывается
-    * из LockSystem. Здесь только данные.
+    * из LockSystem. Здесь только данные, без какой-либо логики.
     */
     struct LockBehaviorComponent {
         core::ui::LockBehaviorKind kind{core::ui::LockBehaviorKind::World};

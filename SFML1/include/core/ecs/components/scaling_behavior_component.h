@@ -15,8 +15,10 @@ namespace core::ecs {
     /**
      * @brief Компонент, описывающий поведение масштабирования сущности при resize.
      *
-     * kind        — тип масштабирования (Uniform / None);
-     * lastUniform — последний рассчитанный коэффициент uniform-скейла.
+     * Поля:
+     *  - kind        — тип масштабирования (Uniform / None);
+     *  - baseViewSize — reference view size, под который верстался объект;
+     *  - lastUniform — последний рассчитанный коэффициент uniform-скейла.
      *
      * Логика масштабирования реализована в core::ui::applyUniformScaling и
      * вызывается из ScalingSystem. Здесь только данные.

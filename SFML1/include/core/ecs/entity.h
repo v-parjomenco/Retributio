@@ -12,27 +12,28 @@
 namespace core::ecs {
 
     /**
-    * @brief Базовый "идентификатор сущности".
-    * Сейчас это просто обёртка над uint32_t.
-    * Позже сюда легко добавить "generation", если нужно будет защищаться
-    * от висячих Entity после удаления (entity id + generation).
-    */
+     * @brief Базовый "идентификатор сущности".
+     *
+     * Сейчас это тонкая обёртка над uint32_t без каких-либо скрытых аллокаций.
+     * Можно безболезненно расширить до схемы "id + generation",
+     * если потребуется дополнительная защита от висячих Entity после удаления.
+     */
     struct Entity {
         std::uint32_t id{0};
 
         // Удобно сравнивать как обычные числа
-        bool operator==(const Entity& other) const noexcept {
+        constexpr bool operator==(const Entity& other) const noexcept {
             return id == other.id;
         }
-        bool operator!=(const Entity& other) const noexcept {
+        constexpr bool operator!=(const Entity& other) const noexcept {
             return id != other.id;
         }
-        bool operator<(const Entity& other) const noexcept {
+        constexpr bool operator<(const Entity& other) const noexcept {
             return id < other.id;
         }
 
         // Быстрая проверка "валидная ли сущность вообще"
-        explicit operator bool() const noexcept {
+        [[nodiscard]] explicit constexpr operator bool() const noexcept {
             return id != 0;
         }
     };

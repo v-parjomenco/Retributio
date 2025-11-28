@@ -15,10 +15,19 @@
 
 namespace core::ecs {
     /**
-    * @brief Система отрисовки
-    * - ищет все сущности, у которых есть и TransformComponent, и SpriteComponent
-    * - переносит позицию в спрайт
-    * - рисует спрайт
+    * @brief Система отрисовки.
+    *
+    * Ответственность:
+    *  - ищет все сущности, у которых есть SpriteComponent;
+    *  - при наличии TransformComponent копирует world-space позицию в sf::Sprite;
+    *  - рисует спрайт в переданном sf::RenderWindow.
+    *
+    * Важно:
+    *  - система не владеет ни окнами, ни ресурсами;
+    *  - порядок отрисовки и z-order сейчас полностью определяются порядком обхода storage
+    *    и самим sf::RenderWindow (без слоёв и сортировки);
+    *  - позже можно добавить слои/батчинг/куллинг, не меняя базовый контракт:
+    *      сфокусироваться на связке Transform + SpriteComponent.
     */
     class RenderSystem final : public ISystem {
       public:

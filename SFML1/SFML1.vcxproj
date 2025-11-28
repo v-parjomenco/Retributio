@@ -241,7 +241,6 @@
     <ClInclude Include="include\core\config\properties\movement_properties.h" />
     <ClInclude Include="include\core\config\properties\sprite_properties.h" />
     <ClInclude Include="include\core\config\properties\text_properties.h" />
-    <ClInclude Include="include\core\ecs\component.h" />
     <ClInclude Include="include\core\ecs\components\keyboard_control_component.h" />
     <ClInclude Include="include\core\ecs\components\lock_behavior_component.h" />
     <ClInclude Include="include\core\ecs\components\movement_stats_component.h" />

@@ -1,8 +1,15 @@
+// ================================================================================================
+// File: core/ecs/systems/input_system.h
+// Purpose: Map global keyboard state to per-entity target velocity
+// Used by: Game loop (event forwarding), World/SystemManager
+// Related headers: keyboard_control_component.h, movement_stats_component.h, velocity_component.h
+// ================================================================================================
 #pragma once
 
 #include <array>
-#include <cassert>
 #include <cmath>
+
+#include <SFML/Window/Keyboard.hpp>
 
 #include "core/ecs/components/keyboard_control_component.h"
 #include "core/ecs/components/movement_stats_component.h"
@@ -13,31 +20,52 @@
 namespace core::ecs {
 
     /**
-     * @brief Система ввода: преобразует нажатые клавиши в целевую скорость сущностей.
-     * - Game пересылает KeyPressed/KeyReleased в onKeyEvent(...)
-     * - update() вычисляет вектор направления по нажатым клавишам и множит на maxSpeed
+     * @brief Система ввода: преобразует глобальное состояние клавиатуры
+     * в целевую скорость для сущностей.
+     *
+     * Поток данных:
+     *  - Game пересылает события KeyPressed/KeyReleased в onKeyEvent(...);
+     *  - InputSystem хранит текущее состояние всех клавиш (bool-массив);
+     *  - update():
+     *      * по KeyboardControlComponent определяет, какие клавиши считаются up/down/left/right
+     *      * вычисляет нормализованный вектор направления
+     *      * множит на MovementStatsComponent::maxSpeed и пишет в VelocityComponent::linear.
+     *
+     * Таким образом:
+     *  - раскладка управления и параметры движения задаются через компоненты (data-driven);
+     *  - система остаётся универсальной для любых игр (SkyGuard, платформер, 4X и т.д.).
      */
     class InputSystem final : public ISystem {
       public:
         InputSystem() {
-            keyDown.fill(false);
+            mKeyDown.fill(false);
         }
 
+        /// @brief Обновить состояние одной клавиши.
+        /// @param code код клавиши SFML
+        /// @param pressed true, если нажата; false, если отпущена
         void onKeyEvent(sf::Keyboard::Key code, bool pressed) {
             if (code == sf::Keyboard::Key::Unknown) {
                 return;
             }
-            const int idx = static_cast<int>(code);
-            if (idx < 0 || idx >= static_cast<int>(keyDown.size())) {
+
+            const auto idx = static_cast<int>(code);
+            if (idx < 0) {
                 return;
             }
-            keyDown[static_cast<size_t>(idx)] = pressed;
+
+            const auto index = static_cast<std::size_t>(idx);
+            if (index >= mKeyDown.size()) {
+                return;
+            }
+
+            mKeyDown[index] = pressed;
         }
 
         void update(World& world, float) override {
-            auto& controls = world.storage<KeyboardControlComponent>();
-            auto& stats = world.storage<MovementStatsComponent>();
-            auto& velos = world.storage<VelocityComponent>();
+            auto& controls  = world.storage<KeyboardControlComponent>();
+            auto& stats     = world.storage<MovementStatsComponent>();
+            auto& velos     = world.storage<VelocityComponent>();
 
             for (auto& [entity, cc] : controls) {
                 auto* st = stats.get(entity);
@@ -47,7 +75,9 @@ namespace core::ecs {
                 }
 
                 // Вычисляем направление по раскладке сущности и глобальному состоянию клавиш
-                float dirX = 0.f, dirY = 0.f;
+                float dirX = 0.f;
+                float dirY = 0.f;
+
                 if (isDown(cc.left)) {
                     dirX -= 1.f;
                 }
@@ -60,11 +90,14 @@ namespace core::ecs {
                 if (isDown(cc.down)) {
                     dirY += 1.f;
                 }
-                // Нормализация по диагонали (чтобы вправо+вверх не было быстрее)
+
+                // Нормализация по диагонали, чтобы вправо+вверх не было быстрее, чем просто вправо
                 if (dirX != 0.f || dirY != 0.f) {
-                    const float invLen = 1.f / std::sqrt(dirX * dirX + dirY * dirY);
+                    const float lenSq = dirX * dirX + dirY * dirY;
+                    const float invLen = 1.f / std::sqrt(lenSq);
                     dirX *= invLen;
                     dirY *= invLen;
+
                     v->linear = {dirX * st->maxSpeed, dirY * st->maxSpeed};
                 } else {
                     v->linear = {0.f, 0.f};
@@ -73,20 +106,25 @@ namespace core::ecs {
         }
 
         void render(World&, sf::RenderWindow&) override {
+            // Система ввода ничего не рисует.
         }
 
       private:
-        std::array<bool, 512> keyDown; // запас по размеру
+        // Используем KeyCount из SFML 3.0.2, чтобы не держать магическое число.
+        std::array<bool, sf::Keyboard::KeyCount> mKeyDown;
 
-        bool isDown(sf::Keyboard::Key k) const {
-            const int idx = static_cast<int>(k);
+        bool isDown(sf::Keyboard::Key key) const {
+            const auto idx = static_cast<int>(key);
             if (idx < 0) {
                 return false;
             }
-            if (idx >= static_cast<int>(keyDown.size())) {
+
+            const auto index = static_cast<std::size_t>(idx);
+            if (index >= mKeyDown.size()) {
                 return false;
             }
-            return keyDown[static_cast<size_t>(idx)];
+
+            return mKeyDown[index];
         }
     };
 

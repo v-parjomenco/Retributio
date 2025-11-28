@@ -47,16 +47,16 @@ namespace core::ecs {
             mData.insert_or_assign(e, std::move(value));
         }
 
-        // Вернуть указатель на компонент, если он есть, иначе nullptr
-        [[nodiscard]] T* get(Entity e) {
+          // Вернуть указатель на компонент, если он есть, иначе nullptr
+        [[nodiscard]] T* get(Entity e) noexcept {
             auto it = mData.find(e);
-            return (it == mData.end()) ? nullptr : &it->second;
+            return (it == mData.end()) ? nullptr : std::addressof(it->second);
         }
 
         // Вернуть константный указатель на компонент, если он есть, иначе nullptr
-        [[nodiscard]] const T* get(Entity e) const {
+        [[nodiscard]] const T* get(Entity e) const noexcept {
             auto it = mData.find(e);
-            return (it == mData.end()) ? nullptr : &it->second;
+            return (it == mData.end()) ? nullptr : std::addressof(it->second);
         }
 
         // Удалить компонент у сущности (реализация интерфейса IComponentStorage)
@@ -65,16 +65,16 @@ namespace core::ecs {
         }
 
         // Можно итерироваться по всем компонентам этого типа
-        auto begin() {
+        auto begin() noexcept {
             return mData.begin();
         }
-        auto end() {
+        auto end() noexcept {
             return mData.end();
         }
-        auto begin() const {
+        auto begin() const noexcept {
             return mData.begin();
         }
-        auto end() const {
+        auto end() const noexcept {
             return mData.end();
         }
 

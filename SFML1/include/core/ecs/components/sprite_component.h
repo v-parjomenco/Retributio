@@ -1,18 +1,37 @@
+// ================================================================================================
+// File: core/ecs/components/sprite_component.h
+// Purpose: Per-entity drawable sprite for RenderSystem
+// Used by: RenderSystem, game-specific init systems
+// Related headers: transform_component.h, render_system.h
+// ================================================================================================
 #pragma once
 
 #include <SFML/Graphics.hpp>
+#include <utility> // для std::move
 
 namespace core::ecs {
 
     /**
-     * @brief Компонент для отрисовки.
-     * Держит sf::Sprite прямо здесь, чтобы RenderSystem мог его нарисовать.
-     * В SFML 3.0 sf::Sprite не имеет конструктора по умолчанию —
-     * поэтому этот компонент можно создавать только явно.
+     * @brief Компонент для отрисовки сущности.
      *
-     * Позже можно заменить на:
-     *  - SpriteComponent { TextureID, IntRect, zOrder }
-     *  - и RenderSystem сам возьмёт текстуру из ResourceManager
+     * Хранит sf::Sprite напрямую, чтобы RenderSystem мог:
+     *  - обновить его позицию из TransformComponent;
+     *  - нарисовать в sf::RenderWindow.
+     *
+     * Особенности SFML 3:
+     *  - sf::Sprite не имеет конструктора по умолчанию,
+     *    поэтому компонент можно создать только явно (см. explicit конструктор).
+     *
+     * План на будущее (resource-driven):
+     *  - заменить хранение "живого" sf::Sprite на лёгкую модель:
+     *      SpriteComponent { TextureID, IntRect, zOrder }
+     *  - RenderSystem будет брать текстуру из ResourceManager по TextureID;
+     *  - это уменьшит размер компонента и упростит стриминг ресурсов
+     *    на больших картах и при множестве сущностей.
+     *
+     * Сейчас такой "прямой" sf::Sprite — нормальный компромисс для прототипов
+     * и небольших игр (SkyGuard, платформеры), но архитектура уже предполагает
+     * переход к ID-based ресурсоёмкой модели.
      */
     struct SpriteComponent {
         sf::Sprite sprite;

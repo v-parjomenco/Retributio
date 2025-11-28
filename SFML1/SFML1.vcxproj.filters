@@ -302,9 +302,6 @@
     <ClInclude Include="include\core\resources\resource_manager.h">
       <Filter>include\core\resources</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\ecs\component.h">
-      <Filter>include\core\ecs</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\ecs\component_storage.h">
       <Filter>include\core\ecs</Filter>
     </ClInclude>

@@ -8,7 +8,7 @@
 #include "core/utils/message.h"
 
 int main() {
-
+    
     try {
         game::skyguard::Game game;
         game.run();
