@@ -41,13 +41,4 @@ namespace game::skyguard::config::keys {
         inline constexpr const char* CONTROL_RIGHT = "right";
     } // namespace Player
 
-    // --------------------------------------------------------------------------------------------
-    // Ключи для реестра ресурсов (assets/game/skyguard/config/resources.json)
-    // --------------------------------------------------------------------------------------------
-    namespace ResourceRegistry {
-        inline constexpr const char* TEXTURES = "textures";
-        inline constexpr const char* FONTS = "fonts";
-        inline constexpr const char* SOUNDS = "sounds";
-    } // namespace ResourceRegistry
-
 } // namespace game::skyguard::config::keys

@@ -288,6 +288,9 @@
     <ClCompile Include="src\game\skyguard\config\loader\window_config_loader.cpp">
       <Filter>src\game\skyguard\config\loader</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\resources\ids\resource_ids.cpp">
+      <Filter>src\core\resources\ids</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\config.h">
@@ -391,9 +394,6 @@
     </ClInclude>
     <ClInclude Include="include\core\config\config_keys.h">
       <Filter>include\core\config</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resources\i_resource.h">
-      <Filter>include\core\resources</Filter>
     </ClInclude>
     <ClInclude Include="include\core\utils\json\json_utils.h">
       <Filter>include\core\utils\json</Filter>

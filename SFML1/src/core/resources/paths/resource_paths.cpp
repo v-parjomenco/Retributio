@@ -1,8 +1,8 @@
 #include "pch.h"
 
 #include "core/resources/paths/resource_paths.h"
-#include <cstdlib>   // для std::exit, EXIT_FAILURE
-#include <stdexcept> // для std::runtime_error
+#include <cstdlib>
+#include <stdexcept>
 
 #include "core/resources/ids/resource_id_utils.h"
 #include "core/utils/file_loader.h"
@@ -10,177 +10,138 @@
 #include "core/utils/json/json_validator.h"
 #include "core/utils/message.h"
 
-#include "game/skyguard/config/config_keys.h"
-
 namespace {
 
     using core::utils::FileLoader;
-
     namespace message = core::utils::message;
-    namespace keys = game::skyguard::config::keys;
     namespace json_utils = core::utils::json;
 
     using Json = json_utils::json;
     using JsonValidator = json_utils::JsonValidator;
 
-    using core::resources::ids::fontFromString;
-    using core::resources::ids::FontID;
-    using core::resources::ids::soundFromString;
-    using core::resources::ids::SoundID;
-    using core::resources::ids::textureFromString;
-    using core::resources::ids::TextureID;
-    using core::resources::ids::toString;
+    namespace registry_keys {
+        constexpr const char* Textures = "textures";
+        constexpr const char* Fonts = "fonts";
+        constexpr const char* Sounds = "sounds";
+    } // namespace registry_keys
 
     // --------------------------------------------------------------------------------------------
-    // Валидация верхнего уровня JSON-структуры assets/game/skyguard/config/resources.json
+    // Универсальный загрузчик карты ID -> путь (DRY principle).
+    // Поддерживает:
+    //  - разные enum'ы (TextureID / FontID / SoundID),
+    //  - разные ключи верхнего уровня в JSON ("textures", "fonts", "sounds"),
+    //  - разные функции парсинга строкового ID -> enum (textureFromString, ...).
     // --------------------------------------------------------------------------------------------
+    template <typename EnumID, typename Mapper>
+    void loadResourceMap(const Json& data, const char* keyName, Mapper mapper,
+                         std::unordered_map<EnumID, std::string>& outMap) {
 
+        outMap.clear();
+
+        // Ключ может отсутствовать (например, звуки ещё не используются).
+        if (!data.contains(keyName)) {
+            return;
+        }
+
+        const Json& node = data.at(keyName);
+        if (!node.is_object()) {
+            message::logDebug("[ResourcePaths]\n" + std::string(keyName) +
+                              " не является объектом, пропускаем.");
+            return;
+        }
+
+        outMap.reserve(node.size());
+
+        for (auto it = node.begin(); it != node.end(); ++it) {
+            const std::string& idStr = it.key();
+            const Json& value = it.value();
+
+            if (!value.is_string()) {
+                message::logDebug("[ResourcePaths]\nПропущен " + std::string(keyName) + " '" +
+                                  idStr + "': значение должно быть строкой пути.");
+                continue;
+            }
+
+            auto idOpt = mapper(idStr);
+            if (!idOpt) {
+                message::logDebug("[ResourcePaths]\nНеизвестный ID в resources.json: " + idStr);
+                continue;
+            }
+
+            outMap[*idOpt] = value.get<std::string>();
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Универсальный геттер с проверкой (DRY principle).
+    // Бросает std::runtime_error, если путь не найден.
+    // --------------------------------------------------------------------------------------------
+    template <typename EnumID>
+        const std::string& getResourcePath(const std::unordered_map<EnumID, std::string>& map,
+                                           EnumID id, const char* typeName) {
+
+        const auto it = map.find(id);
+        if (it == map.end()) {
+            throw std::runtime_error(std::string("[ResourcePaths::get(") + typeName +
+                                     ")]\nНе найден путь для " + typeName + ": " +
+                                     std::string(core::resources::ids::toString(id)));
+        }
+        return it->second;
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Валидация JSON-структуры базового реестра ресурсов.
+    // --------------------------------------------------------------------------------------------
     void validateResourceRegistry(const Json& data) {
-        using VR = JsonValidator::KeyRule;
-
-        // textures и fonts — обязательные объекты, но могут быть пустыми.
-        // sounds — необязателен (может пока не использоваться).
-        JsonValidator::validate(
-            data, {
-                      {keys::ResourceRegistry::TEXTURES, {Json::value_t::object}, true},
-                      {keys::ResourceRegistry::FONTS, {Json::value_t::object}, true},
-                      {keys::ResourceRegistry::SOUNDS, {Json::value_t::object}, false},
-                  });
-    }
-
-    // --------------------------------------------------------------------------------------------
-    // Заполнение внутренних map'ов из JSON-объектов
-    // --------------------------------------------------------------------------------------------
-
-    void loadTextureMap(const Json& data, std::unordered_map<TextureID, std::string>& outTextures) {
-        outTextures.clear();
-
-        if (!data.contains(keys::ResourceRegistry::TEXTURES)) {
-            return;
-        }
-
-        const Json& node = data.at(keys::ResourceRegistry::TEXTURES);
-        if (!node.is_object()) {
-            // validateResourceRegistry уже должен был это отсеять, но на всякий случай проверим.
-            message::logDebug("[ResourcePaths]\ntextures не является объектом, пропускаем.");
-            return;
-        }
-
-        for (auto it = node.begin(); it != node.end(); ++it) {
-            const std::string& idStr = it.key();
-            const Json& value = it.value();
-
-            if (!value.is_string()) {
-                message::logDebug("[ResourcePaths]\nПропущен texture '" + idStr +
-                                  "': значение должно быть строкой пути.");
-                continue;
-            }
-
-            auto idOpt = textureFromString(idStr);
-            if (!idOpt) {
-                message::logDebug("[ResourcePaths]\nНеизвестный TextureID в resources.json: " +
-                                  idStr);
-                continue;
-            }
-
-            outTextures[*idOpt] = value.get<std::string>();
-        }
-    }
-
-    void loadFontMap(const Json& data, std::unordered_map<FontID, std::string>& outFonts) {
-        outFonts.clear();
-
-        if (!data.contains(keys::ResourceRegistry::FONTS)) {
-            return;
-        }
-
-        const Json& node = data.at(keys::ResourceRegistry::FONTS);
-        if (!node.is_object()) {
-            message::logDebug("[ResourcePaths]\nfonts не является объектом, пропускаем.");
-            return;
-        }
-
-        for (auto it = node.begin(); it != node.end(); ++it) {
-            const std::string& idStr = it.key();
-            const Json& value = it.value();
-
-            if (!value.is_string()) {
-                message::logDebug("[ResourcePaths]\nПропущен font '" + idStr +
-                                  "': значение должно быть строкой пути.");
-                continue;
-            }
-
-            auto idOpt = fontFromString(idStr);
-            if (!idOpt) {
-                message::logDebug("[ResourcePaths]\nНеизвестный FontID в resources.json: " + idStr);
-                continue;
-            }
-
-            outFonts[*idOpt] = value.get<std::string>();
-        }
-    }
-
-    void loadSoundMap(const Json& data, std::unordered_map<SoundID, std::string>& outSounds) {
-        outSounds.clear();
-
-        if (!data.contains(keys::ResourceRegistry::SOUNDS)) {
-            return;
-        }
-
-        const Json& node = data.at(keys::ResourceRegistry::SOUNDS);
-        if (!node.is_object()) {
-            message::logDebug("[ResourcePaths]\nsounds не является объектом, пропускаем.");
-            return;
-        }
-
-        for (auto it = node.begin(); it != node.end(); ++it) {
-            const std::string& idStr = it.key();
-            const Json& value = it.value();
-
-            if (!value.is_string()) {
-                message::logDebug("[ResourcePaths]\nПропущен sound '" + idStr +
-                                  "': значение должно быть строкой пути.");
-                continue;
-            }
-
-            auto idOpt = soundFromString(idStr);
-            if (!idOpt) {
-                message::logDebug("[ResourcePaths]\nНеизвестный SoundID в resources.json: " +
-                                  idStr);
-                continue;
-            }
-
-            outSounds[*idOpt] = value.get<std::string>();
-        }
+        JsonValidator::validate(data, {
+                                          {registry_keys::Textures, {Json::value_t::object}, true},
+                                          {registry_keys::Fonts, {Json::value_t::object}, true},
+                                          {registry_keys::Sounds, {Json::value_t::object}, false},
+                                      });
     }
 
 } // namespace
 
 namespace core::resources::paths {
 
-    std::unordered_map<ids::TextureID, std::string> ResourcePaths::mTextures;
-    std::unordered_map<ids::FontID, std::string> ResourcePaths::mFonts;
-    std::unordered_map<ids::SoundID, std::string> ResourcePaths::mSounds;
+    // ============================================================================================
+    // Meyer's Singleton pattern для внутренних map'ов (thread-safe initialization).
+    // ============================================================================================
+
+    std::unordered_map<ids::TextureID, std::string>& ResourcePaths::getTextureMap() {
+        static std::unordered_map<ids::TextureID, std::string> instance;
+        return instance;
+    }
+
+    std::unordered_map<ids::FontID, std::string>& ResourcePaths::getFontMap() {
+        static std::unordered_map<ids::FontID, std::string> instance;
+        return instance;
+    }
+
+    std::unordered_map<ids::SoundID, std::string>& ResourcePaths::getSoundMap() {
+        static std::unordered_map<ids::SoundID, std::string> instance;
+        return instance;
+    }
+
+    // ============================================================================================
+    // Загрузка реестра из JSON
+    // ============================================================================================
 
     void ResourcePaths::loadFromJSON(const std::string& filename) {
-
-        // Шаг 1. Низкоуровневое чтение файла (I/O-уровень) через FileLoader
+        // Чтение файла
         const auto fileContentOpt = FileLoader::loadTextFile(filename);
         if (!fileContentOpt) {
-            // Это критический для движка файл: без него ресурсные ID не разрешатся.
             message::showError("[ResourcePaths]\nНе удалось открыть реестр ресурсов: " + filename);
             std::exit(EXIT_FAILURE);
         }
 
-        const std::string& fileContent = *fileContentOpt;
-
-        // Шаг 2. Разбор JSON
+        // Парсинг JSON
         Json data;
         try {
-            data = Json::parse(fileContent);
+            data = Json::parse(*fileContentOpt);
         } catch (const std::exception& e) {
-            message::showError(std::string("[ResourcePaths]\nОшибка парсинга JSON в ") + filename +
-                               ": " + e.what());
+            message::showError("[ResourcePaths]\nОшибка парсинга JSON в " + filename + ": " +
+                               e.what());
             std::exit(EXIT_FAILURE);
         } catch (...) {
             message::showError("[ResourcePaths]\nНеизвестная ошибка при парсинге JSON: " +
@@ -188,47 +149,69 @@ namespace core::resources::paths {
             std::exit(EXIT_FAILURE);
         }
 
-        // Шаг 3. Валидация верхнего уровня структуры
+        // Валидация структуры
         try {
             validateResourceRegistry(data);
         } catch (const std::exception& e) {
-            message::showError(std::string("[ResourcePaths]\nНеверная структура JSON: ") +
-                               e.what());
+            message::showError("[ResourcePaths]\nНеверная структура JSON: " +
+                               std::string(e.what()));
             std::exit(EXIT_FAILURE);
         }
 
-        // Шаг 4. Заполнение внутренних мапов
-        loadTextureMap(data, mTextures);
-        loadFontMap(data, mFonts);
-        loadSoundMap(data, mSounds);
+        // Заполнение карт через универсальный шаблон
+        loadResourceMap(data, registry_keys::Textures, ids::textureFromString, getTextureMap());
+        loadResourceMap(data, registry_keys::Fonts, ids::fontFromString, getFontMap());
+        loadResourceMap(data, registry_keys::Sounds, ids::soundFromString, getSoundMap());
     }
 
+    // ============================================================================================
+    // Геттеры
+    // ============================================================================================
+
     const std::string& ResourcePaths::get(ids::TextureID id) {
-        auto it = mTextures.find(id);
-        if (it == mTextures.end()) {
-            throw std::runtime_error(
-                "[ResourcePaths::get(TextureID)]\nНе найден путь для TextureID: " +
-                std::string(toString(id)));
-        }
-        return it->second;
+        return getResourcePath(getTextureMap(), id, "TextureID");
     }
 
     const std::string& ResourcePaths::get(ids::FontID id) {
-        auto it = mFonts.find(id);
-        if (it == mFonts.end()) {
-            throw std::runtime_error("[ResourcePaths::get(FontID)]\nНе найден путь для FontID: " +
-                                     std::string(toString(id)));
-        }
-        return it->second;
+        return getResourcePath(getFontMap(), id, "FontID");
     }
 
     const std::string& ResourcePaths::get(ids::SoundID id) {
-        auto it = mSounds.find(id);
-        if (it == mSounds.end()) {
-            throw std::runtime_error("[ResourcePaths::get(SoundID)]\nНе найден путь для SoundID: " +
-                                     std::string(toString(id)));
-        }
-        return it->second;
+        return getResourcePath(getSoundMap(), id, "SoundID");
+    }
+
+    // ============================================================================================
+    // Contains-методы
+    // ============================================================================================
+
+    bool ResourcePaths::contains(ids::TextureID id) noexcept {
+        return getTextureMap().find(id) != getTextureMap().end();
+    }
+
+    bool ResourcePaths::contains(ids::FontID id) noexcept {
+        return getFontMap().find(id) != getFontMap().end();
+    }
+
+    bool ResourcePaths::contains(ids::SoundID id) noexcept {
+        return getSoundMap().find(id) != getSoundMap().end();
+    }
+
+    // ============================================================================================
+    // Геттеры доступа ко всей коллекции сразу (для пакетной загрузки / предзагрузки)
+    // ============================================================================================
+
+    const std::unordered_map<ids::TextureID, std::string>&
+    ResourcePaths::getAllTexturePaths() noexcept {
+        return getTextureMap();
+    }
+
+    const std::unordered_map<ids::FontID, std::string>& ResourcePaths::getAllFontPaths() noexcept {
+        return getFontMap();
+    }
+
+    const std::unordered_map<ids::SoundID, std::string>&
+    ResourcePaths::getAllSoundPaths() noexcept {
+        return getSoundMap();
     }
 
 } // namespace core::resources::paths

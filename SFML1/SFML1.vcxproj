@@ -77,7 +77,7 @@
     <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2\include;$(ProjectDir)include\third_party;</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
+    <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
     <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2\include;$(ProjectDir)include\third_party;</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -87,7 +87,7 @@
     <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2-64\include;$(ProjectDir)include\third_party;</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
+    <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
     <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2-64\include;$(ProjectDir)include\third_party;</ExternalIncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -203,6 +203,7 @@
     <ClCompile Include="src\core\ecs\systems\debug_overlay_system.cpp" />
     <ClCompile Include="src\core\ecs\systems\movement_system.cpp" />
     <ClCompile Include="src\core\ecs\systems\render_system.cpp" />
+    <ClCompile Include="src\core\resources\ids\resource_ids.cpp" />
     <ClCompile Include="src\core\resources\loader\resource_loader.cpp" />
     <ClCompile Include="src\core\resources\paths\resource_paths.cpp" />
     <ClCompile Include="src\core\resources\resource_manager.cpp" />
@@ -264,7 +265,6 @@
     <ClInclude Include="include\core\resources\holders\resource_holder.h" />
     <ClInclude Include="include\core\resources\ids\resource_id_utils.h" />
     <ClInclude Include="include\core\resources\ids\resource_ids.h" />
-    <ClInclude Include="include\core\resources\i_resource.h" />
     <ClInclude Include="include\core\resources\loader\resource_loader.h" />
     <ClInclude Include="include\core\resources\paths\resource_paths.h" />
     <ClInclude Include="include\core\resources\resource_manager.h" />

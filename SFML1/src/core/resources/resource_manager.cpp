@@ -1,84 +1,105 @@
 #include "pch.h"
 
 #include "core/resources/resource_manager.h"
+#include <cassert>
 #include <stdexcept>
 
 #include "core/resources/loader/resource_loader.h"
+#include "core/utils/message.h"
 
 namespace core::resources {
+
+    namespace {
+        namespace message = core::utils::message;
+    }
 
     // --------------------------------------------------------------------------------------------
     // Текстуры
     // --------------------------------------------------------------------------------------------
 
-    /**
-    * @brief Статический ID из enum class в resourceIDs.
-    *
-    * Это основной, «движковый» путь доступа к ресурсам:
-    *  - код оперирует TextureID (например, TextureID::Player),
-    *  - фактический путь берётся из ResourcePaths::get(id),
-    *  - сами пути описаны assets/game/skyguard/config/resources.json.
-    *
-    * При опечатке в идентификаторе (TextureID::Playre) ошибка будет на этапе компиляции,
-    * а не в рантайме.
-    */
     const types::TextureResource& ResourceManager::getTexture(ids::TextureID id, bool smooth) {
-        if (!mTextures.contains(id)) {
-            const std::string path = paths::ResourcePaths::get(id); // путь берём из JSON-реестра
-            mTextures.load(id, path);
-            // Флаг сглаживания применяется только при первой загрузке ресурса.
-            mTextures.get(id).setSmooth(smooth);
+        try {
+            if (!mTextures.contains(id)) {
+                const std::string& path = paths::ResourcePaths::get(id);
+
+                [[maybe_unused]] const bool wasLoaded = mTextures.load(id, path);
+                assert(wasLoaded && "[ResourceManager::getTexture(TextureID)] "
+                                    "load() вернул false при !contains(id).");
+
+                // Флаг сглаживания применяется только при первой загрузке ресурса.
+                mTextures.get(id).setSmooth(smooth);
+            }
+
+            return mTextures.get(id);
+        } catch (const std::exception& exception) {
+            // Если задан fallback и это не сам fallback-ID — пробуем вернуть его.
+            if (mHasMissingTextureFallback && id != mMissingTextureID) {
+                message::logDebug(std::string("[ResourceManager::getTexture(TextureID)]\n"
+                                              "Не удалось получить текстуру для ID: ") +
+                                  std::string(ids::toString(id)) +
+                                  ". Используем fallback-текстуру: " +
+                                  std::string(ids::toString(mMissingTextureID)) +
+                                  ". Ошибка: " + exception.what());
+
+                // Если fallback также сломан — исключение пробросится наружу.
+                return getTexture(mMissingTextureID, smooth);
+            }
+
+            throw; // Fallback не задан — пусть ошибка поднимается выше.
         }
-        return mTextures.get(id);
     }
 
-    /**
-    * @brief Динамический «ID» в виде строки.
-    *
-    * Используется для ресурсов, которые:
-    *  - не описаны в enum'ах (моды, редакторы, прототипы),
-    *  - загружаются по строковому ключу/пути в рантайме.
-    *
-    * В текущей реализации строка интерпретируется как прямой путь к файлу.
-    * Это удобно для быстрых экспериментов, но не является каноническим путём движка
-    * (основная система — TextureID + ResourcePaths).
-    */
     const types::TextureResource& ResourceManager::getTexture(const std::string& id, bool smooth) {
-        if (!mDynamicTextures.contains(id)) {
-            mDynamicTextures.load(id, id); // здесь id = путь к файлу
-            mDynamicTextures.get(id).setSmooth(smooth);
+        try {
+            if (!mDynamicTextures.contains(id)) {
+                [[maybe_unused]] const bool wasLoaded = mDynamicTextures.load(id, id);
+                assert(wasLoaded && "[ResourceManager::getTexture(std::string)] "
+                                    "load() вернул false при !contains(id).");
+
+                mDynamicTextures.get(id).setSmooth(smooth);
+            }
+
+            return mDynamicTextures.get(id);
+        } catch (const std::exception& exception) {
+            if (mHasMissingTextureFallback) {
+                message::logDebug(std::string("[ResourceManager::getTexture(std::string)]\n"
+                                              "Не удалось получить текстуру по пути/ID: ") +
+                                  id + ". Используем fallback-текстуру: " +
+                                  std::string(ids::toString(mMissingTextureID)) +
+                                  ". Ошибка: " + exception.what());
+
+                return getTexture(mMissingTextureID, smooth);
+            }
+
+            throw;
         }
-        return mDynamicTextures.get(id);
     }
 
-    /**
-    * @brief Получение текстуры по явно переданному пути (path = строка к файлу).
-    *
-    * Это низкоуровневая загрузка «по прямому пути» (runtime):
-    *  - используется, если путь приходит из внешнего источника (мод, редактор, сетевые данные),
-    *  - полностью обходит систему enum / ResourcePaths.
-    *
-    * Рекомендуется для кода «на краю» (инструменты, моды), а не для ядра движка:
-    * в самом движке предпочтителен путь через TextureID и ResourcePaths.
-    */
     const types::TextureResource& ResourceManager::getTextureByPath(const std::string& path,
                                                                     bool smooth) {
-        // Если ресурс с таким путём уже загружен (в динамическом контейнере) — вернём его
-        if (!mDynamicTextures.contains(path)) {
-            // Используем ResourceLoader, чтобы изолировать низкоуровневую загрузку
-            auto texPtr = loader::ResourceLoader::loadTexture(path, smooth);
-            if (!texPtr) {
-                throw std::runtime_error(
-                    std::string{
-                        "[ResourceManager::getTextureByPath]\nНе удалось загрузить текстуру: "} +
-                    path);
-            }
-            // Вставляем уже загруженный ресурс в ResourceHolder, чтобы избежать двойной загрузки с
-            // диска.
-            mDynamicTextures.insert(path, std::move(texPtr));
-            // NB: ResourceLoader уже применил флаг smooth.
-            // setSmooth вызывается только для ресурсов, загружаемых через ResourceHolder напрямую.
+        // Если ресурс с таким путём уже загружен — просто отдаём его.
+        if (mDynamicTextures.contains(path)) {
+            return mDynamicTextures.get(path);
         }
+
+        auto texturePointer = loader::ResourceLoader::loadTexture(path, smooth);
+        if (!texturePointer) {
+            if (mHasMissingTextureFallback) {
+                message::logDebug(std::string("[ResourceManager::getTextureByPath]\n"
+                                              "Не удалось загрузить текстуру по пути: ") +
+                                  path + ". Используем fallback-текстуру: " +
+                                  std::string(ids::toString(mMissingTextureID)));
+
+                return getTexture(mMissingTextureID, smooth);
+            }
+
+            throw std::runtime_error(std::string("[ResourceManager::getTextureByPath]\n"
+                                                 "Не удалось загрузить текстуру: ") +
+                                     path);
+        }
+
+        // Вставляем уже загруженный ресурс в ResourceHolder, чтобы избежать повторной загрузки.
+        mDynamicTextures.insert(path, std::move(texturePointer));
         return mDynamicTextures.get(path);
     }
 
@@ -86,59 +107,181 @@ namespace core::resources {
     // Шрифты
     // --------------------------------------------------------------------------------------------
 
-    /**
-    * @brief Статический ID, из enum class в resourceIDs.
-    * 
-    * Канонический путь: FontID -> ResourcePaths::get(FontID) -> путь -> ResourceHolder.
-    */
     const types::FontResource& ResourceManager::getFont(ids::FontID id) {
-        if (!mFonts.contains(id)) {
-            const std::string path = paths::ResourcePaths::get(id); // путь берём из JSON-реестра
-            mFonts.load(id, path);
+        try {
+            if (!mFonts.contains(id)) {
+                const std::string& path = paths::ResourcePaths::get(id);
+
+                [[maybe_unused]] const bool wasLoaded = mFonts.load(id, path);
+                assert(wasLoaded && "[ResourceManager::getFont(FontID)] "
+                                    "load() вернул false при !contains(id).");
+            }
+
+            return mFonts.get(id);
+        } catch (const std::exception& exception) {
+            if (mHasMissingFontFallback && id != mMissingFontID) {
+                message::logDebug(std::string("[ResourceManager::getFont(FontID)]\n"
+                                              "Не удалось получить шрифт для ID: ") +
+                                  std::string(ids::toString(id)) + ". Используем fallback-шрифт: " +
+                                  std::string(ids::toString(mMissingFontID)) +
+                                  ". Ошибка: " + exception.what());
+
+                return getFont(mMissingFontID);
+            }
+
+            throw;
         }
-        return mFonts.get(id);
     }
 
-    /**
-    * @brief Динамический шрифт по строковому «ID».
-    *
-    * Как и для текстур, строка в текущей реализации интерпретируется как путь к файлу.
-    * Подходит для модов/инструментов, но не заменяет enum-базовую систему.
-    */
     const types::FontResource& ResourceManager::getFont(const std::string& id) {
-        if (!mDynamicFonts.contains(id)) {
-            mDynamicFonts.load(id, id); // здесь id = путь к файлу
+        try {
+            if (!mDynamicFonts.contains(id)) {
+                [[maybe_unused]] const bool wasLoaded = mDynamicFonts.load(id, id);
+                assert(wasLoaded && "[ResourceManager::getFont(std::string)] "
+                                    "load() вернул false при !contains(id).");
+            }
+
+            return mDynamicFonts.get(id);
+        } catch (const std::exception& exception) {
+            if (mHasMissingFontFallback) {
+                message::logDebug(std::string("[ResourceManager::getFont(std::string)]\n"
+                                              "Не удалось получить шрифт по пути/ID: ") +
+                                  id + ". Используем fallback-шрифт: " +
+                                  std::string(ids::toString(mMissingFontID)) +
+                                  ". Ошибка: " + exception.what());
+
+                return getFont(mMissingFontID);
+            }
+
+            throw;
         }
-        return mDynamicFonts.get(id);
     }
 
     // --------------------------------------------------------------------------------------------
     // Звуки
     // --------------------------------------------------------------------------------------------
 
-    /**
-    * @brief Статический ID, из enum class в resourceIDs.
-    * 
-    * Аналогично текстурам/шрифтам: SoundID -> ResourcePaths::get(SoundID) -> путь.
-    */
     const types::SoundBufferResource& ResourceManager::getSound(ids::SoundID id) {
-        if (!mSounds.contains(id)) {
-            const std::string path = paths::ResourcePaths::get(id);
-            mSounds.load(id, path);
+        try {
+            if (!mSounds.contains(id)) {
+                const std::string& path = paths::ResourcePaths::get(id);
+
+                [[maybe_unused]] const bool wasLoaded = mSounds.load(id, path);
+                assert(wasLoaded && "[ResourceManager::getSound(SoundID)] "
+                                    "load() вернул false при !contains(id).");
+            }
+
+            return mSounds.get(id);
+        } catch (const std::exception& exception) {
+            if (mHasMissingSoundFallback && id != mMissingSoundID) {
+                message::logDebug(std::string("[ResourceManager::getSound(SoundID)]\n"
+                                              "Не удалось получить звук для ID: ") +
+                                  std::string(ids::toString(id)) + ". Используем fallback-звук: " +
+                                  std::string(ids::toString(mMissingSoundID)) +
+                                  ". Ошибка: " + exception.what());
+
+                return getSound(mMissingSoundID);
+            }
+
+            throw;
         }
-        return mSounds.get(id);
     }
 
-    /**
-    * @brief Динамический звук по строковому «ID»
-    * 
-    * (в текущей реализации — прямой путь).
-    */
     const types::SoundBufferResource& ResourceManager::getSound(const std::string& id) {
-        if (!mDynamicSounds.contains(id)) {
-            mDynamicSounds.load(id, id); // здесь id = путь к файлу
+        try {
+            if (!mDynamicSounds.contains(id)) {
+                [[maybe_unused]] const bool wasLoaded = mDynamicSounds.load(id, id);
+                assert(wasLoaded && "[ResourceManager::getSound(std::string)] "
+                                    "load() вернул false при !contains(id).");
+            }
+
+            return mDynamicSounds.get(id);
+        } catch (const std::exception& exception) {
+            if (mHasMissingSoundFallback) {
+                message::logDebug(std::string("[ResourceManager::getSound(std::string)]\n"
+                                              "Не удалось получить звук по пути/ID: ") +
+                                  id + ". Используем fallback-звук: " +
+                                  std::string(ids::toString(mMissingSoundID)) +
+                                  ". Ошибка: " + exception.what());
+
+                return getSound(mMissingSoundID);
+            }
+
+            throw;
         }
-        return mDynamicSounds.get(id);
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Fallback-ресурсы
+    // --------------------------------------------------------------------------------------------
+
+    void ResourceManager::setMissingTextureFallback(ids::TextureID id) {
+        mMissingTextureID = id;
+        mHasMissingTextureFallback = true;
+
+        // Прогреваем/валидируем fallback-текстуру сразу.
+        (void) getTexture(id);
+    }
+
+    void ResourceManager::setMissingFontFallback(ids::FontID id) {
+        mMissingFontID = id;
+        mHasMissingFontFallback = true;
+
+        (void) getFont(id);
+    }
+
+    void ResourceManager::setMissingSoundFallback(ids::SoundID id) {
+        mMissingSoundID = id;
+        mHasMissingSoundFallback = true;
+
+        (void) getSound(id);
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Preload API (массовая предварительная загрузка)
+    // --------------------------------------------------------------------------------------------
+
+    void ResourceManager::preloadAllTextures() {
+        // Идём по реестру путей и прогреваем каждую текстуру.
+        for (const auto& entry : paths::ResourcePaths::getAllTexturePaths()) {
+            const auto textureID = entry.first;
+            (void) getTexture(textureID);
+        }
+    }
+
+    void ResourceManager::preloadAllFonts() {
+        for (const auto& entry : paths::ResourcePaths::getAllFontPaths()) {
+            const auto fontID = entry.first;
+            (void) getFont(fontID);
+        }
+    }
+
+    void ResourceManager::preloadAllSounds() {
+        for (const auto& entry : paths::ResourcePaths::getAllSoundPaths()) {
+            const auto soundID = entry.first;
+            (void) getSound(soundID);
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Метрики
+    // --------------------------------------------------------------------------------------------
+
+    ResourceManager::ResourceMetrics ResourceManager::getMetrics() const noexcept {
+        ResourceMetrics metrics{};
+
+        // На этом этапе используем только размер хранилищ.
+        // Позже сюда можно добавить суммарную память и прочие счётчики.
+        metrics.textureCount = mTextures.size();
+        metrics.dynamicTextureCount = mDynamicTextures.size();
+
+        metrics.fontCount = mFonts.size();
+        metrics.dynamicFontCount = mDynamicFonts.size();
+
+        metrics.soundCount = mSounds.size();
+        metrics.dynamicSoundCount = mDynamicSounds.size();
+
+        return metrics;
     }
 
 } // namespace core::resources

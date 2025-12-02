@@ -3,7 +3,8 @@
 // Purpose: High-level interface for loading and caching engine resources
 //          (textures, fonts, sounds) on top of ResourceHolder + ResourcePaths.
 // Used by: Game, ECS systems (PlayerInitSystem, DebugOverlaySystem, UI, etc.)
-// Related headers: i_resource.h, resource_holder.h, resource_ids.h, resource_paths.h
+// Related headers: texture_resource.h, font_resource.h, soundbuffer_resource.h, resource_holder.h,
+//                  resource_ids.h, resource_paths.h
 // ================================================================================================
 #pragma once
 
@@ -27,8 +28,7 @@ namespace core::resources {
      * Обязанности:
      *  - Предоставляет простой API для запроса ресурсов по enum-ID
      *    (TextureID / FontID / SoundID).
-     *  - Использует ResourcePaths, чтобы сопоставить enum-ID с реальным путём на диске
-     *    (через assets/game/skyguard/config/resources.json).
+     *  - Использует ResourcePaths, чтобы сопоставить enum-ID с реальным путём на диске.
      *  - Кэширует загруженные ресурсы и гарантирует, что каждый файл грузится с диска
      *    не более одного раза.
      *
@@ -39,6 +39,11 @@ namespace core::resources {
      *
      * Ядро движка (геймплей, ECS-системы и т.п.) должно по максимуму использовать
      * вариант №1 — enum-ID + ResourcePaths. Остальные методы — вспомогательные.
+     *
+     * На уровне 4X/больших стратегий поверх этого слоя могут добавляться:
+     *  - стриминговые менеджеры (подкачка чанков);
+     *  - LRU-кэши, разгружающие редко используемые ресурсы.
+     * Интерфейс ResourceManager оставлен максимально простым и стабильным.
      */
     class ResourceManager {
       public:
@@ -49,92 +54,192 @@ namespace core::resources {
         // Текстуры
         // ----------------------------------------------------------------------------------------
 
-        /**
-         * @brief Каноничный способ получить текстуру: по статическому enum-ID.
-         *
-         *  - Путь берётся через ResourcePaths::get(TextureID) из assets/game/skyguard/config/resources.json.
-         *  - Ресурс кэшируется во внутреннем ResourceHolder (mTextures).
-         *
-         * @param id     Идентификатор текстуры (например, TextureID::Player).
-         * @param smooth Если true, к текстуре применяется setSmooth(true) сразу после загрузки.
-         * 
-         * Параметр smooth учитывается только при ПЕРВОЙ загрузке текстуры с данным ID:
-         *  - если текстура ещё не загружена → будет загружена и к ней применится smooth;
-         *  - если уже загружена → флаг smooth игнорируется, возвращается кэшированный ресурс.
-         *
-         * Если позже нужно изменить сглаживание, это делается напрямую через setSmooth(...)
-         * на уже полученной sf::Texture (например, getTexture(id).get().setSmooth(false)).
-         */
+        /// Каноничный способ получить текстуру: по статическому enum-ID.
         const types::TextureResource& getTexture(ids::TextureID id, bool smooth = true);
 
-        /**
-         * @brief Получить текстуру по динамическому строковому ID.
-         *
-         * Текущее поведение:
-         *  - Строка трактуется как прямой путь к файлу (id == filename).
-         *  - Ресурс кэшируется в mDynamicTextures по этому строковому ключу.
-         *
-         * Предполагаемое использование:
-         *  - редакторы, тулзы, прототипы, моддинг;
-         *  - не предназначен как основной путь для геймплейного/движкового кода.
-         */
+        /// Получить текстуру по динамическому строковому ID (сейчас = путь к файлу).
         const types::TextureResource& getTexture(const std::string& id, bool smooth = true);
 
-        /**
-         * @brief Получить текстуру по явному пути к файлу.
-         *
-         * Это самый низкоуровневый вариант:
-         *  - полностью обходится без ResourcePaths и enum-ID;
-         *  - удобен, когда путь пришёл из внешнего источника (моды, сеть, временные JSON и т.п.).
-         *
-         * При этом текстура всё равно кэшируется в mDynamicTextures по строке-пути,
-         * чтобы повторные вызовы с тем же путём не ходили на диск.
-         *
-         * В коде движка по возможности лучше использовать getTexture(TextureID).
-         */
+        /// Получить текстуру по явному пути к файлу (escape hatch, кэшируется как динамическая).
         const types::TextureResource& getTextureByPath(const std::string& path, bool smooth = true);
 
         // ----------------------------------------------------------------------------------------
         // Шрифты
         // ----------------------------------------------------------------------------------------
 
-        /**
-         * @brief Получить шрифт по статическому enum-ID.
-         *
-         *  - Путь берётся через ResourcePaths::get(FontID).
-         *  - Ресурс кэшируется в mFonts.
-         */
+        /// Получить шрифт по статическому enum-ID.
         const types::FontResource& getFont(ids::FontID id);
 
-        /**
-         * @brief Получить шрифт по динамическому строковому ID
-         *        (сейчас строка трактуется как путь к файлу).
-         *
-         * Логика аналогична getTexture(const std::string&):
-         *  - полезно для тулов/модов;
-         *  - движковому коду предпочтительнее enum-ID.
-         */
+        /// Динамический шрифт по строковому «ID» (сейчас = путь к файлу).
         const types::FontResource& getFont(const std::string& id);
 
         // ----------------------------------------------------------------------------------------
         // Звуки
         // ----------------------------------------------------------------------------------------
 
-        /**
-         * @brief Получить звуковой буфер по статическому enum-ID.
-         *
-         *  - Путь берётся через ResourcePaths::get(SoundID).
-         *  - Ресурс кэшируется в mSounds.
-         */
+        /// Получить звуковой буфер по статическому enum-ID.
         const types::SoundBufferResource& getSound(ids::SoundID id);
 
-        /**
-         * @brief Получить звуковой буфер по динамическому строковому ID
-         *        (сейчас строка трактуется как путь к файлу).
-         *
-         * Та же философия, что и для текстур/шрифтов: больше для модов и внешних данных.
-         */
+        /// Динамический звук по строковому «ID» (сейчас = путь к файлу).
         const types::SoundBufferResource& getSound(const std::string& id);
+
+        // ----------------------------------------------------------------------------------------
+        // Fallback-ресурсы («фиолетовый квадрат» и др.)
+        // ----------------------------------------------------------------------------------------
+
+        /**
+         * @brief Задать fallback-текстуру, которая будет использоваться, если:
+         *        - не найден путь в ResourcePaths;
+         *        - текстура не загрузилась с диска;
+         *        - или произошла другая ошибка при getTexture(...).
+         *
+         * Fallback задаётся через TextureID (системная текстура),
+         * чтобы оставаться в рамках общей ресурсной системы.
+         *
+         * При установке fallback-текстура сразу пробуется загрузиться
+         * (через getTexture), чтобы поймать ошибки конфигурации на старте.
+         */
+        void setMissingTextureFallback(ids::TextureID id);
+
+        /// Аналогично для шрифта.
+        void setMissingFontFallback(ids::FontID id);
+
+        /// Аналогично для звука.
+        void setMissingSoundFallback(ids::SoundID id);
+
+        /// Статистика по загруженным ресурсам.
+        /// На этом этапе считаем только количество объектов в кэшах.
+        /// В будущем можно расширить данными о памяти, hit/miss и т.п.
+        struct ResourceMetrics {
+            std::size_t textureCount = 0;
+            std::size_t dynamicTextureCount = 0;
+            std::size_t fontCount = 0;
+            std::size_t dynamicFontCount = 0;
+            std::size_t soundCount = 0;
+            std::size_t dynamicSoundCount = 0;
+        };
+
+        /**
+         * @brief Получить простые метрики по ресурсам.
+         *
+         * На текущем этапе:
+         *  - количество статических и динамических текстур;
+         *  - количество статических и динамических шрифтов;
+         *  - количество статических и динамических звуков.
+         *
+         * Позже сюда можно добавить:
+         *  - суммарное потребление памяти по типам;
+         *  - статистику hit/miss по кэшу;
+         *  - счётчики загрузок/выгрузок.
+         */
+        [[nodiscard]] ResourceMetrics getMetrics() const noexcept;
+
+        // ----------------------------------------------------------------------------------------
+        // Preload API (для экранов загрузки / подготовки больших сцен)
+        // ----------------------------------------------------------------------------------------
+
+        /**
+         * @brief Принудительно загрузить текстуру в кэш.
+         *
+         * Эквивалентно вызову getTexture(id, smooth), но результат явно игнорируется.
+         * Удобно использовать при загрузке уровней/сцен.
+         */
+        void preloadTexture(ids::TextureID id, bool smooth = true) {
+            (void) getTexture(id, smooth);
+        }
+
+        /**
+         * @brief Принудительно загрузить шрифт в кэш.
+         */
+        void preloadFont(ids::FontID id) {
+            (void) getFont(id);
+        }
+
+        /**
+         * @brief Принудительно загрузить звуковой буфер в кэш.
+         */
+        void preloadSound(ids::SoundID id) {
+            (void) getSound(id);
+        }
+
+        /**
+         * @brief Предзагрузка всех текстур, описанных в реестре ResourcePaths.
+         *
+         * Типичный сценарий:
+         *  - при показе экрана загрузки уровня;
+         *  - при инициализации большого UI.
+         *
+         * Важно: порядок и набор ID берутся из ResourcePaths::getAllTexturePaths().
+         */
+        void preloadAllTextures();
+
+        /**
+         * @brief Предзагрузка всех шрифтов, описанных в реестре ResourcePaths.
+         *
+         * Типичный сценарий:
+         *  - при показе экрана загрузки уровня;
+         *  - при инициализации большого UI.
+         *
+         * Важно: порядок и набор ID берутся из ResourcePaths::getAllTexturePaths().
+         */
+        void preloadAllFonts();
+
+        /**
+         * @brief Предзагрузка всех звуков, описанных в реестре ResourcePaths.
+         *
+         * Типичный сценарий:
+         *  - при показе экрана загрузки уровня;
+         *  - при инициализации большого UI.
+         *
+         * Важно: порядок и набор ID берутся из ResourcePaths::getAllTexturePaths().
+         */
+        void preloadAllSounds();
+
+        // ----------------------------------------------------------------------------------------
+        // Управление жизненным циклом ресурсов (подготовка к 4X / большим проектам)
+        // ----------------------------------------------------------------------------------------
+
+        /// Явно выгрузить ресурсы из кэша (осторожно с висячими ссылками!).
+        void unloadTexture(ids::TextureID id) noexcept {
+            mTextures.unload(id);
+        }
+        void unloadTexture(const std::string& id) noexcept {
+            mDynamicTextures.unload(id);
+        }
+
+        void unloadFont(ids::FontID id) noexcept {
+            mFonts.unload(id);
+        }
+        void unloadFont(const std::string& id) noexcept {
+            mDynamicFonts.unload(id);
+        }
+
+        void unloadSound(ids::SoundID id) noexcept {
+            mSounds.unload(id);
+        }
+        void unloadSound(const std::string& id) noexcept {
+            mDynamicSounds.unload(id);
+        }
+
+        /**
+         * @brief Полностью очистить все кэши ресурсов данного менеджера.
+         *
+         * Типичный сценарий:
+         *  - полная перезагрузка игры;
+         *  - переключение на другой крупный сценарий/кампанию;
+         *  - unit-тесты, где нужно гарантированно чистое состояние.
+         *
+         * Важно: fallback-ID остаются, но их ресурсы будут при необходимости
+         * пере-загружены при следующем обращении к getTexture/getFont/getSound.
+         */
+        void clearAll() noexcept {
+            mTextures.clear();
+            mFonts.clear();
+            mSounds.clear();
+            mDynamicTextures.clear();
+            mDynamicFonts.clear();
+            mDynamicSounds.clear();
+        }
 
       private:
         // Хранилища для статических enum-ID (основной путь для движка).
@@ -146,6 +251,24 @@ namespace core::resources {
         holders::ResourceHolder<types::TextureResource, std::string> mDynamicTextures;
         holders::ResourceHolder<types::FontResource, std::string> mDynamicFonts;
         holders::ResourceHolder<types::SoundBufferResource, std::string> mDynamicSounds;
+
+        // Fallback-ресурсы (храним ID, а не указатели, чтобы не ловить висячие ссылки).
+        bool mHasMissingTextureFallback = false;
+        ids::TextureID mMissingTextureID{};
+
+        bool mHasMissingFontFallback = false;
+        ids::FontID mMissingFontID{};
+
+        bool mHasMissingSoundFallback = false;
+        ids::SoundID mMissingSoundID{};
+
+        // ------------------------------------------------------------------------------------
+        // TODO (будущие расширения ResourceManager для 4X / больших проектов):
+        //  - Потокобезопасность и асинхронная загрузка (background streaming).
+        //  - LRU-кэш и бюджеты по памяти для текстур/звукa.
+        //  - Поддержка модов/DLC и override-путей поверх базового реестра.
+        //  - Более богатые метрики (память, hit/miss, профилирование).
+        // ------------------------------------------------------------------------------------
     };
 
 } // namespace core::resources
