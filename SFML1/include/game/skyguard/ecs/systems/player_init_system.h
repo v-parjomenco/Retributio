@@ -70,9 +70,9 @@ namespace game::skyguard::ecs {
                 const auto& cfg = cfgComp.config;
 
                 // Текстура игрока по TextureID из PlayerBlueprint.
-                // Путь для неё берётся из ResourcePaths::get(TextureID) внутри ResourceManager.
-                const sf::Texture& texture =
-                    mResources.getTexture(cfg.sprite.textureId, true).get();
+                // Путь и флаги (smooth/repeated/mipmap) берутся из ResourcePaths::TextureConfig
+                // внутри ResourceManager.
+                const sf::Texture& texture = mResources.getTexture(cfg.sprite.textureId).get();
 
                 // Спрайт
                 sf::Sprite tempSprite(texture);

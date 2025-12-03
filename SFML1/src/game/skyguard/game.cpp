@@ -59,12 +59,45 @@ namespace game::skyguard {
                                          : " (VSync выключён, frameLimit применяется)."));
 
         // ----------------------------------------------------------------------------------------
-        // Загружаем ресурсы/пути из JSON
+        // Инициализация ресурсного слоя (реестр ресурсов + fallback-ресурсы)
         // ----------------------------------------------------------------------------------------
+
+        // Важно: initResources() должен быть вызван до initWorld(),
+        // чтобы ResourceManager уже знал о fallback-ресурсах и реестр
+        // был загружен.
+
+        initResources();
+
+        // ----------------------------------------------------------------------------------------
+        // Создаём ECS-мир и игровые сущности SkyGuard
+        // ----------------------------------------------------------------------------------------
+        initWorld();
+    }
+
+    void Game::initResources() {
+        // Загружаем реестр ресурсов из JSON.
         core::resources::paths::ResourcePaths::loadFromJSON(
             "assets/game/skyguard/config/resources.json");
+        // Настраиваем fallback-ресурсы на уровне ResourceManager.
+        //
+        // Сейчас гарантированно есть только один игровой шрифт — FontID::Default.
+        // Его и используем как "последний рубеж" на случай битых путей или ошибочных ID.
+        mResources.setMissingFontFallback(core::resources::ids::FontID::Default);
 
-        initWorld(); // создаём ECS-мир и сущности
+        // Для текстур и звуков пока специально не выставляем fallback:
+        //  - у нас ещё нет отдельной текстуры-заглушки (фиолетовый квадрат) с собственным TextureID;
+        //  - звуки в текущем билде не используются.
+        //
+        // Как только появится отдельная fallback-текстура:
+        //  1) добавляем её в enum TextureID (например, TextureID::MissingTexture);
+        //  2) регистрируем в resources.json;
+        //  3) включаем строку ниже:
+        //
+        // mResources.setMissingTextureFallback(core::resources::ids::TextureID::MissingTexture);
+        //
+        // Аналогично для звуков, когда появится базовый "beep"/"ui_click" и др.:
+        //
+        // mResources.setMissingSoundFallback(core::resources::ids::SoundID::SomeDefault);
     }
 
     void Game::initWorld() {
@@ -76,9 +109,9 @@ namespace game::skyguard {
             // Создаём сущность игрока
             mPlayerEntity = mWorld.createEntity();
 
-            // Добавляем компонент с конфигурацией игрока из JSON (playerCfg) в ECS-мир
+            // Добавляем компонент с конфигурацией игрока из JSON (playerCfg) в ECS-мир.
             // PlayerInitSystem при первом апдейте создаст остальные компоненты
-            // (Sprite, Transform и т.д.)
+            // (Sprite, Transform и т.д.).
             mWorld.addComponent(mPlayerEntity,
                                 game::skyguard::ecs::PlayerConfigComponent{playerCfg});
 
@@ -93,24 +126,24 @@ namespace game::skyguard {
             mWorld.addSystem<core::ecs::MovementSystem>();
             mWorld.addSystem<core::ecs::RenderSystem>();
             // Эти системы требуют прямого доступа (onResize, onKeyEvent),
-            // поэтому сохраняем указатели
+            // поэтому сохраняем указатели.
             mScalingSystem = &mWorld.addSystem<core::ecs::ScalingSystem>();
             mLockSystem = &mWorld.addSystem<core::ecs::LockSystem>();
             mInputSystem = &mWorld.addSystem<core::ecs::InputSystem>();
             mDebugOverlay = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
 
-            // Привязываем overlay к сервису времени и шрифту (через ResourceManager)
+            // Привязываем overlay к сервису времени и шрифту (через ResourceManager).
             if (mDebugOverlay) {
                 const sf::Font& font =
                     mResources.getFont(core::resources::ids::FontID::Default).get();
 
                 mDebugOverlay->bind(mTime, font);
 
-                // Грузим конфиг для DebugOverlay
+                // Грузим конфиг для DebugOverlay.
                 const auto overlayCfg =
                     cfg::loadDebugOverlayBlueprint("assets/core/config/debug_overlay.json");
 
-                // Применяем стиль
+                // Применяем стиль.
                 mDebugOverlay->applyTextProperties(overlayCfg.text);
 
                 // Итоговое состояние: overlay включён, только если:
@@ -152,15 +185,15 @@ namespace game::skyguard {
         const sf::Time fixedTimeStep = cfg::FIXED_TIME_STEP;
 
         while (mWindow.isOpen()) {
-            // 1. Обновляем время кадра (raw dt, scaled dt, FPS/метрики).
+            // Обновляем время кадра (raw dt, scaled dt, FPS/метрики).
             mTime.tick();
-            // 2. Обрабатываем события окна и ввода.
+            // Обрабатываем события окна и ввода.
             processEvents();
-            // 3. Выполняем один или несколько фиксированных шагов логики.
+            // Выполняем один или несколько фиксированных шагов логики.
             while (mTime.shouldUpdate(fixedTimeStep)) {
                 update(fixedTimeStep);
             }
-            // 4. Отрисовываем текущее состояние мира.
+            // Отрисовываем текущее состояние мира.
             render();
         }
     }
@@ -193,7 +226,7 @@ namespace game::skyguard {
                 sf::Vector2f newSize(static_cast<float>(resized->size.x),
                                      static_cast<float>(resized->size.y));
                 sf::View newView({newSize.x / 2.f, newSize.y / 2.f}, {newSize.x, newSize.y});
-                // Обновляем View окна, чтобы другие поведения и отрисовка видели актуальный вид
+                // Обновляем View окна, чтобы другие поведения и отрисовка видели актуальный вид.
                 mWindow.setView(newView);
                 if (mScalingSystem) {
                     mScalingSystem->onResize(mWorld, newView); // безопасный вызов (null-check)

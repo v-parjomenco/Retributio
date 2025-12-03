@@ -60,7 +60,8 @@ namespace core::ui::ids {
     // string_view -> enum
     // --------------------------------------------------------------------------------------------
 
-    AnchorType anchorFromString(std::string_view name, AnchorType defaultType) noexcept {
+    [[nodiscard]] AnchorType anchorFromString(std::string_view name,
+                                              AnchorType defaultType) noexcept {
 
         if (name == "TopLeft") {
             return AnchorType::TopLeft;
@@ -101,8 +102,8 @@ namespace core::ui::ids {
         return defaultType;
     }
 
-    ScalingBehaviorKind scalingFromString(std::string_view name,
-                                          ScalingBehaviorKind defaultKind) noexcept {
+    [[nodiscard]] ScalingBehaviorKind scalingFromString(std::string_view name,
+                                                        ScalingBehaviorKind defaultKind) noexcept {
 
         if (name == "Uniform") {
             return ScalingBehaviorKind::Uniform;
@@ -119,7 +120,8 @@ namespace core::ui::ids {
         return defaultKind;
     }
 
-    LockBehaviorKind lockFromString(std::string_view name, LockBehaviorKind defaultKind) noexcept {
+    [[nodiscard]] LockBehaviorKind lockFromString(std::string_view name,
+                                                  LockBehaviorKind defaultKind) noexcept {
 
         if (name == "ScreenLock") {
             return LockBehaviorKind::Screen;

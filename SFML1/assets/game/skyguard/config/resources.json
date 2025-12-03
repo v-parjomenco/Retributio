@@ -1,6 +1,11 @@
 {
   "textures": {
-    "Player": "assets/game/skyguard/images/0000su-57.png"
+    "Player": {
+      "path": "assets/game/skyguard/images/0000su-57.png",
+      "smooth": true,
+      "repeated": false,
+      "mipmap": false
+    }
   },
   "fonts": {
     "Default": "assets/core/fonts/Wolgadeutsche.otf"

@@ -55,12 +55,6 @@
     <Filter Include="src\core\ecs\systems">
       <UniqueIdentifier>{ee5fecaa-622f-4059-81d9-b5f2ad5e7b99}</UniqueIdentifier>
     </Filter>
-    <Filter Include="include\core\resources\loader">
-      <UniqueIdentifier>{33527910-44cf-419f-b164-574ad205a23d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="src\core\resources\loader">
-      <UniqueIdentifier>{5573e816-c0d4-411a-a258-ec3ca4841165}</UniqueIdentifier>
-    </Filter>
     <Filter Include="include\core\resources\holders">
       <UniqueIdentifier>{c2fce24f-e7ac-4611-9a91-6eb19938f9b6}</UniqueIdentifier>
     </Filter>
@@ -226,6 +220,12 @@
     <Filter Include="src\core\compiler\platform">
       <UniqueIdentifier>{0c92b304-5ee8-4b2b-b975-18057cab9aa0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\resources\config">
+      <UniqueIdentifier>{54232fc8-b5f0-4eb6-b58f-03a0d0ee005d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\resources\config">
+      <UniqueIdentifier>{137f5c7f-73f6-4f18-8712-90b5eac2155b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -239,9 +239,6 @@
     </ClCompile>
     <ClCompile Include="src\core\ecs\systems\render_system.cpp">
       <Filter>src\core\ecs\systems</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\resources\loader\resource_loader.cpp">
-      <Filter>src\core\resources\loader</Filter>
     </ClCompile>
     <ClCompile Include="src\core\resources\paths\resource_paths.cpp">
       <Filter>src\core\resources\paths</Filter>
@@ -358,9 +355,6 @@
     </ClInclude>
     <ClInclude Include="include\core\ecs\systems\input_system.h">
       <Filter>include\core\ecs\systems</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resources\loader\resource_loader.h">
-      <Filter>include\core\resources\loader</Filter>
     </ClInclude>
     <ClInclude Include="include\core\resources\holders\resource_holder.h">
       <Filter>include\core\resources\holders</Filter>
@@ -481,6 +475,15 @@
     </ClInclude>
     <ClInclude Include="include\game\skyguard\game.h">
       <Filter>include\game\skyguard</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\config\texture_resource_config.h">
+      <Filter>include\core\resources\config</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\config\font_resource_config.h">
+      <Filter>include\core\resources\config</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\config\sound_resource_config.h">
+      <Filter>include\core\resources\config</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

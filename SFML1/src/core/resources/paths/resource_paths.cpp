@@ -19,6 +19,10 @@ namespace {
     using Json = json_utils::json;
     using JsonValidator = json_utils::JsonValidator;
 
+    using TextureConfig = core::resources::paths::ResourcePaths::TextureConfig;
+    using FontConfig = core::resources::paths::ResourcePaths::FontConfig;
+    using SoundConfig = core::resources::paths::ResourcePaths::SoundConfig;
+
     namespace registry_keys {
         constexpr const char* Textures = "textures";
         constexpr const char* Fonts = "fonts";
@@ -26,15 +30,12 @@ namespace {
     } // namespace registry_keys
 
     // --------------------------------------------------------------------------------------------
-    // Универсальный загрузчик карты ID -> путь (DRY principle).
-    // Поддерживает:
-    //  - разные enum'ы (TextureID / FontID / SoundID),
-    //  - разные ключи верхнего уровня в JSON ("textures", "fonts", "sounds"),
-    //  - разные функции парсинга строкового ID -> enum (textureFromString, ...).
+    // Универсальный загрузчик простых карт ID -> Config(path), где value = строка пути.
+    // Используется для FontConfig / SoundConfig.
     // --------------------------------------------------------------------------------------------
-    template <typename EnumID, typename Mapper>
-    void loadResourceMap(const Json& data, const char* keyName, Mapper mapper,
-                         std::unordered_map<EnumID, std::string>& outMap) {
+    template <typename EnumID, typename Mapper, typename Config>
+    void loadSimplePathConfigMap(const Json& data, const char* keyName, Mapper mapper,
+                                 std::unordered_map<EnumID, Config>& outMap) {
 
         outMap.clear();
 
@@ -68,22 +69,115 @@ namespace {
                 continue;
             }
 
-            outMap[*idOpt] = value.get<std::string>();
+            Config cfg;
+            cfg.path = value.get<std::string>();
+            outMap[*idOpt] = std::move(cfg);
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Загрузчик карты TextureID -> TextureConfig.
+    //
+    // Поддерживает один канонический формат JSON:
+    //
+    //  "textures": {
+    //      "Player": {
+    //          "path": "assets/game/skyguard/images/0000su-57.png",
+    //          "smooth": true,
+    //          "repeated": false,
+    //          "mipmap": false
+    //      }
+    //  }
+    //
+    // Поле "mipmap" в JSON мапится на флаг TextureResourceConfig::generateMipmap.
+    // --------------------------------------------------------------------------------------------
+    template <typename Mapper>
+    void loadTextureConfigMap(
+        const Json& data, const char* keyName, Mapper mapper,
+        std::unordered_map<core::resources::ids::TextureID, TextureConfig>& outMap) {
+
+        using core::resources::ids::TextureID;
+
+        outMap.clear();
+
+        if (!data.contains(keyName)) {
+            return;
+        }
+
+        const Json& node = data.at(keyName);
+        if (!node.is_object()) {
+            message::logDebug("[ResourcePaths]\n" + std::string(keyName) +
+                              " не является объектом, пропускаем.");
+            return;
+        }
+
+        outMap.reserve(node.size());
+
+        for (auto it = node.begin(); it != node.end(); ++it) {
+            const std::string& idString = it.key();
+            const Json& value = it.value();
+
+            auto idOpt = mapper(idString);
+            if (!idOpt) {
+                message::logDebug("[ResourcePaths]\nНеизвестный TextureID в resources.json: " +
+                                  idString);
+                continue;
+            }
+
+            if (!value.is_object()) {
+                message::logDebug("[ResourcePaths]\nПропущена текстура '" + idString +
+                                  "': ожидался объект с полями конфигурации.");
+                continue;
+            }
+
+            const Json& object = value;
+            TextureConfig cfg;
+
+            // path — обязателен.
+            const auto pathIterator = object.find("path");
+            if (pathIterator == object.end() || !pathIterator->is_string()) {
+                message::logDebug("[ResourcePaths]\nПропущена текстура '" + idString +
+                                  "': поле 'path' обязательно и должно быть строкой.");
+                continue;
+            }
+
+            cfg.path = pathIterator->get<std::string>();
+
+            // Вспомогательная лямбда для булевых флагов.
+            auto readBooleanWithDefault = [&](const char* fieldName, bool defaultValue) {
+                const auto flagIterator = object.find(fieldName);
+                if (flagIterator == object.end()) {
+                    return defaultValue;
+                }
+                if (!flagIterator->is_boolean()) {
+                    message::logDebug("[ResourcePaths]\nИгнорируем поле '" +
+                                      std::string(fieldName) + "' для текстуры '" + idString +
+                                      "': ожидался boolean. Используем значение по умолчанию.");
+                    return defaultValue;
+                }
+                return flagIterator->get<bool>();
+            };
+
+            cfg.smooth = readBooleanWithDefault("smooth", true);
+            cfg.repeated = readBooleanWithDefault("repeated", false);
+            cfg.generateMipmap = readBooleanWithDefault("mipmap", false);
+
+            outMap[*idOpt] = std::move(cfg);
         }
     }
 
     // --------------------------------------------------------------------------------------------
     // Универсальный геттер с проверкой (DRY principle).
-    // Бросает std::runtime_error, если путь не найден.
+    // Бросает std::runtime_error, если конфиг не найден.
     // --------------------------------------------------------------------------------------------
-    template <typename EnumID>
-        const std::string& getResourcePath(const std::unordered_map<EnumID, std::string>& map,
-                                           EnumID id, const char* typeName) {
+    template <typename EnumID, typename Config>
+    const Config& getResourceConfig(const std::unordered_map<EnumID, Config>& map, EnumID id,
+                                    const char* typeName) {
 
         const auto it = map.find(id);
         if (it == map.end()) {
-            throw std::runtime_error(std::string("[ResourcePaths::get(") + typeName +
-                                     ")]\nНе найден путь для " + typeName + ": " +
+            throw std::runtime_error(std::string("[ResourcePaths::get") + typeName +
+                                     "]\nНе найден ресурс для " + typeName + ": " +
                                      std::string(core::resources::ids::toString(id)));
         }
         return it->second;
@@ -108,18 +202,19 @@ namespace core::resources::paths {
     // Meyer's Singleton pattern для внутренних map'ов (thread-safe initialization).
     // ============================================================================================
 
-    std::unordered_map<ids::TextureID, std::string>& ResourcePaths::getTextureMap() {
-        static std::unordered_map<ids::TextureID, std::string> instance;
+    std::unordered_map<ids::TextureID, ResourcePaths::TextureConfig>&
+    ResourcePaths::getTextureMap() {
+        static std::unordered_map<ids::TextureID, TextureConfig> instance;
         return instance;
     }
 
-    std::unordered_map<ids::FontID, std::string>& ResourcePaths::getFontMap() {
-        static std::unordered_map<ids::FontID, std::string> instance;
+    std::unordered_map<ids::FontID, ResourcePaths::FontConfig>& ResourcePaths::getFontMap() {
+        static std::unordered_map<ids::FontID, FontConfig> instance;
         return instance;
     }
 
-    std::unordered_map<ids::SoundID, std::string>& ResourcePaths::getSoundMap() {
-        static std::unordered_map<ids::SoundID, std::string> instance;
+    std::unordered_map<ids::SoundID, ResourcePaths::SoundConfig>& ResourcePaths::getSoundMap() {
+        static std::unordered_map<ids::SoundID, SoundConfig> instance;
         return instance;
     }
 
@@ -158,26 +253,27 @@ namespace core::resources::paths {
             std::exit(EXIT_FAILURE);
         }
 
-        // Заполнение карт через универсальный шаблон
-        loadResourceMap(data, registry_keys::Textures, ids::textureFromString, getTextureMap());
-        loadResourceMap(data, registry_keys::Fonts, ids::fontFromString, getFontMap());
-        loadResourceMap(data, registry_keys::Sounds, ids::soundFromString, getSoundMap());
+        // Заполнение карт через специализированные загрузчики.
+        loadTextureConfigMap(data, registry_keys::Textures, ids::textureFromString,
+                             getTextureMap());
+        loadSimplePathConfigMap(data, registry_keys::Fonts, ids::fontFromString, getFontMap());
+        loadSimplePathConfigMap(data, registry_keys::Sounds, ids::soundFromString, getSoundMap());
     }
 
     // ============================================================================================
-    // Геттеры
+    // Геттеры конфигураций
     // ============================================================================================
 
-    const std::string& ResourcePaths::get(ids::TextureID id) {
-        return getResourcePath(getTextureMap(), id, "TextureID");
+    const ResourcePaths::TextureConfig& ResourcePaths::getTextureConfig(ids::TextureID id) {
+        return getResourceConfig(getTextureMap(), id, "(TextureID)");
     }
 
-    const std::string& ResourcePaths::get(ids::FontID id) {
-        return getResourcePath(getFontMap(), id, "FontID");
+    const ResourcePaths::FontConfig& ResourcePaths::getFontConfig(ids::FontID id) {
+        return getResourceConfig(getFontMap(), id, "(FontID)");
     }
 
-    const std::string& ResourcePaths::get(ids::SoundID id) {
-        return getResourcePath(getSoundMap(), id, "SoundID");
+    const ResourcePaths::SoundConfig& ResourcePaths::getSoundConfig(ids::SoundID id) {
+        return getResourceConfig(getSoundMap(), id, "(SoundID)");
     }
 
     // ============================================================================================
@@ -200,17 +296,18 @@ namespace core::resources::paths {
     // Геттеры доступа ко всей коллекции сразу (для пакетной загрузки / предзагрузки)
     // ============================================================================================
 
-    const std::unordered_map<ids::TextureID, std::string>&
-    ResourcePaths::getAllTexturePaths() noexcept {
+    const std::unordered_map<ids::TextureID, ResourcePaths::TextureConfig>&
+    ResourcePaths::getAllTextureConfigs() noexcept {
         return getTextureMap();
     }
 
-    const std::unordered_map<ids::FontID, std::string>& ResourcePaths::getAllFontPaths() noexcept {
+    const std::unordered_map<ids::FontID, ResourcePaths::FontConfig>&
+    ResourcePaths::getAllFontConfigs() noexcept {
         return getFontMap();
     }
 
-    const std::unordered_map<ids::SoundID, std::string>&
-    ResourcePaths::getAllSoundPaths() noexcept {
+    const std::unordered_map<ids::SoundID, ResourcePaths::SoundConfig>&
+    ResourcePaths::getAllSoundConfigs() noexcept {
         return getSoundMap();
     }
 

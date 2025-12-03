@@ -27,13 +27,25 @@ namespace game::skyguard {
     class Game {
       public:
         Game();
+
+        Game(const Game&) = delete;
+        Game& operator=(const Game&) = delete;
+
+        Game(Game&&) = delete;
+        Game& operator=(Game&&) = delete;
+
         void run();
 
       private:
         void processEvents();
         void update(const sf::Time& dt);
         void render();
-        void initWorld(); // создаёт ECS-мир и инициализирует сущности SkyGuard
+
+        /// Инициализация ресурсного слоя (ResourcePaths + fallback-ресурсы ResourceManager).
+        void initResources();
+
+        /// Создаёт ECS-мир и инициализирует сущности SkyGuard.
+        void initWorld();
 
       private:
         sf::RenderWindow mWindow;
