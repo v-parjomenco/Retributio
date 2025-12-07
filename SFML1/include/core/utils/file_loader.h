@@ -8,6 +8,7 @@
 // ================================================================================================
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -23,14 +24,16 @@ namespace core::utils {
     class FileLoader {
       public:
         // Текстовые файлы (JSON, конфиги, скрипты)
-        static std::optional<std::string> loadTextFile(const std::string& path);
+        [[nodiscard]] static std::optional<std::string>
+        loadTextFile(const std::string& path);
 
         // Бинарные файлы (изображения, звуки, произвольные данные)
-        static std::optional<std::vector<uint8_t>> loadBinaryFile(const std::string& path);
+        [[nodiscard]] static std::optional<std::vector<std::uint8_t>>
+        loadBinaryFile(const std::string& path);
 
         // Утилиты
-        static bool fileExists(const std::string& path);
-        static bool isReadable(const std::string& path);
+        [[nodiscard]] static bool fileExists(const std::string& path);
+        [[nodiscard]] static bool isReadable(const std::string& path);
     };
 
 } // namespace core::utils

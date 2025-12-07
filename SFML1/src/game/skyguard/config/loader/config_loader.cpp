@@ -2,11 +2,11 @@
 
 #include "game/skyguard/config/loader/config_loader.h"
 
+#include "core/log/log_macros.h"
 #include "core/resources/ids/resource_id_utils.h"
 #include "core/ui/ids/ui_id_utils.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_utils.h"
-#include "core/utils/message.h"
 
 #include "game/skyguard/config/config_keys.h"
 
@@ -14,7 +14,6 @@ namespace {
 
     using core::utils::FileLoader;
 
-    namespace message = core::utils::message;
     namespace keys = game::skyguard::config::keys;
     namespace json_utils = core::utils::json;
     namespace rids = core::resources::ids;
@@ -34,9 +33,11 @@ namespace game::skyguard::config {
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
             // FileLoader уже залогировал низкоуровневую проблему с файлом,
-            // здесь даём пользователю понятный popup и возвращаем дефолтные значения.
-            message::showError("[ConfigLoader]\nНе удалось открыть конфигурацию игрока: " + path +
-                               ".\nБудут использованы значения по умолчанию.");
+            // здесь добавляем высокоуровневый контекст в лог.
+            LOG_ERROR(core::log::cat::Engine,
+                      "[ConfigLoader]\nНе удалось открыть конфигурацию игрока: {}. "
+                      "Будут использованы значения по умолчанию.",
+                      path);
             return blueprints::PlayerBlueprint{}; // дефолт из PlayerBlueprint + properties
         }
         const std::string& fileContent = *fileContentOpt;
@@ -88,9 +89,10 @@ namespace game::skyguard::config {
             if (auto idOpt = rids::textureFromString(textureIdStr)) {
                 cfg.sprite.textureId = *idOpt;
             } else {
-                message::showError("[ConfigLoader]\nНеизвестный texture ID: " + textureIdStr +
-                                   ". Применено значение по умолчанию (" + defaultTextureIdStr +
-                                   ").");
+                LOG_WARN(core::log::cat::Engine,
+                         "[ConfigLoader]\nНеизвестный texture ID: {}. Применено значение по "
+                         "умолчанию ({}).",
+                         textureIdStr, defaultTextureIdStr);
                 // cfg.sprite.textureId уже содержит дефолт — оставляем его без изменений.
             }
         }
@@ -159,9 +161,10 @@ namespace game::skyguard::config {
             cfg.controls.right =
                 json_utils::parseKey(c, keys::Player::CONTROL_RIGHT, cfg.controls.right);
         } else {
-            // Нет блока controls — не фатально, просто сообщаем и оставляем дефолт.
-            message::showError("[ConfigLoader]\nБлок controls отсутствует или имеет неверный тип. "
-                               "Применены значения по умолчанию.");
+            // Нет блока controls — не фатально, просто логируем и оставляем дефолт.
+            LOG_WARN(core::log::cat::Engine,
+                     "[ConfigLoader]\nБлок controls отсутствует или имеет неверный тип. "
+                     "Применены значения по умолчанию.");
         }
 
         // Возвращаем полностью собранную конфигурацию игрока

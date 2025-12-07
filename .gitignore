@@ -45,6 +45,9 @@
 Debug/
 Release/
 x64/
+SFML1/Debug/
+SFML1/Release/
+SFML1/x64/
 bin/
 obj/
 
@@ -61,6 +64,10 @@ obj/
 *.suo
 
 # Logs, temporary files
+logs/
+Debug/logs/
+Release/logs/
+build/**/logs/
 *.log
 *.tmp
 
@@ -96,3 +103,6 @@ Thumbs.db
 
 # Comments
 *.txt
+
+!include/core/debug/
+!src/core/debug/

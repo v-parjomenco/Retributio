@@ -4,11 +4,10 @@
 #include <cstdlib>   // для std::exit, EXIT_FAILURE
 #include <stdexcept> // для std::exception
 
-#include "core/utils/message.h"
+#include "core/log/log_macros.h"
 
 namespace {
     using core::utils::json::json;
-    namespace message = core::utils::message;
 
     // --------------------------------------------------------------------------------------------
     // Внутренние утилиты для парсинга цвета и клавиш
@@ -255,12 +254,17 @@ namespace core::utils::json {
             // Парсинг JSON из строки: текст -> дерево nlohmann::json.
             data = json::parse(fileContent);
         } catch (const std::exception& e) {
-            message::showError("[" + std::string(moduleTag) + "]\nОшибка чтения JSON: " + e.what());
-            std::exit(EXIT_FAILURE);
+            // Критичный конфиг: логируем подробности и завершаем игру через LOG_PANIC.
+            LOG_PANIC(core::log::cat::Config,
+                      "[{}]\nОшибка чтения JSON в файле '{}': {}",
+                      moduleTag,
+                      path,
+                      e.what());
         } catch (...) {
-            message::showError("[" + std::string(moduleTag) +
-                               "]\nНеизвестная ошибка при чтении JSON файла: " + std::string(path));
-            std::exit(EXIT_FAILURE);
+            LOG_PANIC(core::log::cat::Config,
+                      "[{}]\nНеизвестная ошибка при чтении JSON файла '{}'",
+                      moduleTag,
+                      path);
         }
 
         try {
@@ -269,9 +273,11 @@ namespace core::utils::json {
             //  - какие у них типы.
             JsonValidator::validate(data, rules);
         } catch (const std::exception& e) {
-            message::showError("[" + std::string(moduleTag) +
-                               "]\nНеверная структура JSON: " + e.what());
-            std::exit(EXIT_FAILURE);
+            LOG_PANIC(core::log::cat::Config,
+                      "[{}]\nНеверная структура JSON в файле '{}': {}",
+                      moduleTag,
+                      path,
+                      e.what());
         }
 
         return data;
@@ -287,12 +293,17 @@ namespace core::utils::json {
             // Парсинг JSON из строки для некритичных конфигов.
             data = json::parse(fileContent);
         } catch (const std::exception& e) {
-            message::logDebug("[" + std::string(moduleTag) + "]\nНеверный JSON в файле " +
-                              std::string(path) + ": " + e.what());
+            LOG_DEBUG(core::log::cat::Config,
+                      "[{}]\nНеверный JSON в файле '{}': {}",
+                      moduleTag,
+                      path,
+                      e.what());
             return std::nullopt;
         } catch (...) {
-            message::logDebug("[" + std::string(moduleTag) +
-                              "]\nНеизвестная ошибка при разборе JSON: " + std::string(path));
+            LOG_DEBUG(core::log::cat::Config,
+                      "[{}]\nНеизвестная ошибка при разборе JSON: '{}'",
+                      moduleTag,
+                      path);
             return std::nullopt;
         }
 
@@ -302,7 +313,11 @@ namespace core::utils::json {
             // но если они присутствуют, тип должен соответствовать ожиданиям.
             JsonValidator::validate(data, rules);
         } catch (const std::exception& e) {
-            message::logDebug("[" + std::string(moduleTag) + "]\nВалидация: " + e.what());
+            LOG_WARN(core::log::cat::Config,
+                     "[{}]\nВалидация конфигурации для '{}' не прошла: {}",
+                     moduleTag,
+                     path,
+                     e.what());
             return std::nullopt;
         }
 

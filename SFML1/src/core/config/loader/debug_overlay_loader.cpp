@@ -3,15 +3,14 @@
 #include "core/config/loader/debug_overlay_loader.h"
 
 #include "core/config/config_keys.h"
+#include "core/log/log_macros.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_utils.h"
-#include "core/utils/message.h"
 
 namespace {
 
     using core::utils::FileLoader;
 
-    namespace message = core::utils::message;
     namespace keys = core::config::keys;
     namespace json_utils = core::utils::json;
 
@@ -33,8 +32,9 @@ namespace core::config {
         if (!fileContentOpt) {
             // FileLoader уже залогировал низкоуровневую проблему с файлом,
             // здесь мы добавляем контекст более высокого уровня.
-            message::logDebug(
-                "[DebugOverlayBlueprint]\nБудет использована конфигурация по умолчанию: " + path);
+            LOG_DEBUG(core::log::cat::Config,
+                      "[DebugOverlayBlueprint]\nБудет использована конфигурация по умолчанию: {}",
+                      path);
             return cfg;
         }
 

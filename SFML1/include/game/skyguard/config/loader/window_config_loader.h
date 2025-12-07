@@ -18,9 +18,9 @@ namespace game::skyguard::config {
      *
      * Поведение:
      *  - Если файл отсутствует или не читается:
-     *      -> logDebug(...) + возвращаются дефолтные WindowConfig.
+     *      -> лог в core::log (Debug/Info) + возвращаются дефолтные WindowConfig.
      *  - Если JSON некорректен или невалиден:
-     *      -> logDebug(...) + возвращаются дефолтные WindowConfig.
+     *      -> лог в core::log (Debug/Warn) + возвращаются дефолтные WindowConfig.
      *  - Если отдельные поля отсутствуют:
      *      -> используются значения по умолчанию из WindowConfig.
      *

@@ -1,198 +1,216 @@
 #include "pch.h"
 
 #include "core/resources/paths/resource_paths.h"
-#include <cstdlib>
 #include <stdexcept>
 
+#include "core/log/log_macros.h"
 #include "core/resources/ids/resource_id_utils.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_utils.h"
 #include "core/utils/json/json_validator.h"
-#include "core/utils/message.h"
 
 namespace {
 
-    using core::utils::FileLoader;
-    namespace message = core::utils::message;
-    namespace json_utils = core::utils::json;
+        using core::utils::FileLoader;
+        namespace json_utils = core::utils::json;
 
-    using Json = json_utils::json;
-    using JsonValidator = json_utils::JsonValidator;
+        using Json          = json_utils::json;
+        using JsonValidator = json_utils::JsonValidator;
 
-    using TextureConfig = core::resources::paths::ResourcePaths::TextureConfig;
-    using FontConfig = core::resources::paths::ResourcePaths::FontConfig;
-    using SoundConfig = core::resources::paths::ResourcePaths::SoundConfig;
+        using TextureConfig = core::resources::paths::ResourcePaths::TextureConfig;
+        using FontConfig    = core::resources::paths::ResourcePaths::FontConfig;
+        using SoundConfig   = core::resources::paths::ResourcePaths::SoundConfig;
 
-    namespace registry_keys {
-        constexpr const char* Textures = "textures";
-        constexpr const char* Fonts = "fonts";
-        constexpr const char* Sounds = "sounds";
-    } // namespace registry_keys
+        namespace registry_keys {
+            constexpr const char* Textures = "textures";
+            constexpr const char* Fonts    = "fonts";
+            constexpr const char* Sounds   = "sounds";
+        } // namespace registry_keys
 
-    // --------------------------------------------------------------------------------------------
-    // Универсальный загрузчик простых карт ID -> Config(path), где value = строка пути.
-    // Используется для FontConfig / SoundConfig.
-    // --------------------------------------------------------------------------------------------
-    template <typename EnumID, typename Mapper, typename Config>
-    void loadSimplePathConfigMap(const Json& data, const char* keyName, Mapper mapper,
-                                 std::unordered_map<EnumID, Config>& outMap) {
+        // ----------------------------------------------------------------------------------------
+        // Универсальный загрузчик простых карт ID -> Config(path), где value = строка пути.
+        // Используется для FontConfig / SoundConfig.
+        // ----------------------------------------------------------------------------------------
+        template <typename EnumID, typename Mapper, typename Config>
+        void loadSimplePathConfigMap(const Json& data,
+                                     const char* keyName,
+                                     Mapper mapper,
+                                     std::unordered_map<EnumID, Config>& outMap) {
 
-        outMap.clear();
+            outMap.clear();
 
-        // Ключ может отсутствовать (например, звуки ещё не используются).
-        if (!data.contains(keyName)) {
-            return;
-        }
-
-        const Json& node = data.at(keyName);
-        if (!node.is_object()) {
-            message::logDebug("[ResourcePaths]\n" + std::string(keyName) +
-                              " не является объектом, пропускаем.");
-            return;
-        }
-
-        outMap.reserve(node.size());
-
-        for (auto it = node.begin(); it != node.end(); ++it) {
-            const std::string& idStr = it.key();
-            const Json& value = it.value();
-
-            if (!value.is_string()) {
-                message::logDebug("[ResourcePaths]\nПропущен " + std::string(keyName) + " '" +
-                                  idStr + "': значение должно быть строкой пути.");
-                continue;
+            // Ключ может отсутствовать (например, звуки ещё не используются).
+            if (!data.contains(keyName)) {
+                return;
             }
 
-            auto idOpt = mapper(idStr);
-            if (!idOpt) {
-                message::logDebug("[ResourcePaths]\nНеизвестный ID в resources.json: " + idStr);
-                continue;
+            const Json& node = data.at(keyName);
+            if (!node.is_object()) {
+                LOG_WARN(core::log::cat::Engine,
+                         "[ResourcePaths]\n{} не является объектом, пропускаем весь блок.",
+                         keyName);
+                return;
             }
 
-            Config cfg;
-            cfg.path = value.get<std::string>();
-            outMap[*idOpt] = std::move(cfg);
-        }
-    }
+            outMap.reserve(node.size());
 
-    // --------------------------------------------------------------------------------------------
-    // Загрузчик карты TextureID -> TextureConfig.
-    //
-    // Поддерживает один канонический формат JSON:
-    //
-    //  "textures": {
-    //      "Player": {
-    //          "path": "assets/game/skyguard/images/0000su-57.png",
-    //          "smooth": true,
-    //          "repeated": false,
-    //          "mipmap": false
-    //      }
-    //  }
-    //
-    // Поле "mipmap" в JSON мапится на флаг TextureResourceConfig::generateMipmap.
-    // --------------------------------------------------------------------------------------------
-    template <typename Mapper>
-    void loadTextureConfigMap(
-        const Json& data, const char* keyName, Mapper mapper,
-        std::unordered_map<core::resources::ids::TextureID, TextureConfig>& outMap) {
+            for (auto it = node.begin(); it != node.end(); ++it) {
+                const std::string& idStr = it.key();
+                const Json&        value = it.value();
 
-        using core::resources::ids::TextureID;
-
-        outMap.clear();
-
-        if (!data.contains(keyName)) {
-            return;
-        }
-
-        const Json& node = data.at(keyName);
-        if (!node.is_object()) {
-            message::logDebug("[ResourcePaths]\n" + std::string(keyName) +
-                              " не является объектом, пропускаем.");
-            return;
-        }
-
-        outMap.reserve(node.size());
-
-        for (auto it = node.begin(); it != node.end(); ++it) {
-            const std::string& idString = it.key();
-            const Json& value = it.value();
-
-            auto idOpt = mapper(idString);
-            if (!idOpt) {
-                message::logDebug("[ResourcePaths]\nНеизвестный TextureID в resources.json: " +
-                                  idString);
-                continue;
-            }
-
-            if (!value.is_object()) {
-                message::logDebug("[ResourcePaths]\nПропущена текстура '" + idString +
-                                  "': ожидался объект с полями конфигурации.");
-                continue;
-            }
-
-            const Json& object = value;
-            TextureConfig cfg;
-
-            // path — обязателен.
-            const auto pathIterator = object.find("path");
-            if (pathIterator == object.end() || !pathIterator->is_string()) {
-                message::logDebug("[ResourcePaths]\nПропущена текстура '" + idString +
-                                  "': поле 'path' обязательно и должно быть строкой.");
-                continue;
-            }
-
-            cfg.path = pathIterator->get<std::string>();
-
-            // Вспомогательная лямбда для булевых флагов.
-            auto readBooleanWithDefault = [&](const char* fieldName, bool defaultValue) {
-                const auto flagIterator = object.find(fieldName);
-                if (flagIterator == object.end()) {
-                    return defaultValue;
+                if (!value.is_string()) {
+                    LOG_WARN(core::log::cat::Engine,
+                             "[ResourcePaths]\nПропущен {} '{}': "
+                             "значение должно быть строкой пути.",
+                             keyName,
+                             idStr);
+                    continue;
                 }
-                if (!flagIterator->is_boolean()) {
-                    message::logDebug("[ResourcePaths]\nИгнорируем поле '" +
-                                      std::string(fieldName) + "' для текстуры '" + idString +
-                                      "': ожидался boolean. Используем значение по умолчанию.");
-                    return defaultValue;
+
+                auto idOpt = mapper(idStr);
+                if (!idOpt) {
+                    LOG_WARN(core::log::cat::Engine,
+                             "[ResourcePaths]\nНеизвестный ID в resources.json: {}",
+                             idStr);
+                    continue;
                 }
-                return flagIterator->get<bool>();
-            };
 
-            cfg.smooth = readBooleanWithDefault("smooth", true);
-            cfg.repeated = readBooleanWithDefault("repeated", false);
-            cfg.generateMipmap = readBooleanWithDefault("mipmap", false);
-
-            outMap[*idOpt] = std::move(cfg);
+                Config cfg;
+                cfg.path       = value.get<std::string>();
+                outMap[*idOpt] = std::move(cfg);
+            }
         }
-    }
 
-    // --------------------------------------------------------------------------------------------
-    // Универсальный геттер с проверкой (DRY principle).
-    // Бросает std::runtime_error, если конфиг не найден.
-    // --------------------------------------------------------------------------------------------
-    template <typename EnumID, typename Config>
-    const Config& getResourceConfig(const std::unordered_map<EnumID, Config>& map, EnumID id,
-                                    const char* typeName) {
+        // ----------------------------------------------------------------------------------------
+        // Загрузчик карты TextureID -> TextureConfig.
+        //
+        // Поддерживает один канонический формат JSON:
+        //
+        //  "textures": {
+        //      "Player": {
+        //          "path": "assets/game/skyguard/images/0000su-57.png",
+        //          "smooth": true,
+        //          "repeated": false,
+        //          "mipmap": false
+        //      }
+        //  }
+        //
+        // Поле "mipmap" в JSON мапится на флаг TextureResourceConfig::generateMipmap.
+        // ----------------------------------------------------------------------------------------
+        template <typename Mapper>
+        void loadTextureConfigMap(
+            const Json& data,
+            const char* keyName,
+            Mapper mapper,
+            std::unordered_map<core::resources::ids::TextureID, TextureConfig>& outMap) {
 
-        const auto it = map.find(id);
-        if (it == map.end()) {
-            throw std::runtime_error(std::string("[ResourcePaths::get") + typeName +
-                                     "]\nНе найден ресурс для " + typeName + ": " +
-                                     std::string(core::resources::ids::toString(id)));
+            using core::resources::ids::TextureID;
+
+            outMap.clear();
+
+            if (!data.contains(keyName)) {
+                return;
+            }
+
+            const Json& node = data.at(keyName);
+            if (!node.is_object()) {
+                LOG_WARN(core::log::cat::Engine,
+                         "[ResourcePaths]\n{} не является объектом, пропускаем весь блок.",
+                         keyName);
+                return;
+            }
+
+            outMap.reserve(node.size());
+
+            for (auto it = node.begin(); it != node.end(); ++it) {
+                const std::string& idString = it.key();
+                const Json&        value    = it.value();
+
+                auto idOpt = mapper(idString);
+                if (!idOpt) {
+                    LOG_WARN(core::log::cat::Engine,
+                             "[ResourcePaths]\nНеизвестный TextureID в resources.json: {}",
+                             idString);
+                    continue;
+                }
+
+                if (!value.is_object()) {
+                    LOG_WARN(core::log::cat::Engine,
+                             "[ResourcePaths]\nПропущена текстура '{}': ожидался объект с "
+                             "полями конфигурации.",
+                             idString);
+                    continue;
+                }
+
+                const Json& object = value;
+                TextureConfig cfg;
+
+                // path — обязателен.
+                const auto pathIterator = object.find("path");
+                if (pathIterator == object.end() || !pathIterator->is_string()) {
+                    LOG_WARN(core::log::cat::Engine,
+                             "[ResourcePaths]\nПропущена текстура '{}': поле 'path' обязательно "
+                             "и должно быть строкой.",
+                             idString);
+                    continue;
+                }
+
+                cfg.path = pathIterator->get<std::string>();
+
+                // Вспомогательная лямбда для булевых флагов.
+                auto readBooleanWithDefault = [&](const char* fieldName, bool defaultValue) {
+                    const auto flagIterator = object.find(fieldName);
+                    if (flagIterator == object.end()) {
+                        return defaultValue;
+                    }
+                    if (!flagIterator->is_boolean()) {
+                        LOG_WARN(core::log::cat::Engine,
+                                 "[ResourcePaths]\nИгнорируем поле '{}' для текстуры '{}': "
+                                 "ожидался boolean. Используем значение по умолчанию.",
+                                 fieldName,
+                                 idString);
+                        return defaultValue;
+                    }
+                    return flagIterator->get<bool>();
+                };
+
+                cfg.smooth         = readBooleanWithDefault("smooth", true);
+                cfg.repeated       = readBooleanWithDefault("repeated", false);
+                cfg.generateMipmap = readBooleanWithDefault("mipmap", false);
+
+                outMap[*idOpt] = std::move(cfg);
+            }
         }
-        return it->second;
-    }
 
-    // --------------------------------------------------------------------------------------------
-    // Валидация JSON-структуры базового реестра ресурсов.
-    // --------------------------------------------------------------------------------------------
-    void validateResourceRegistry(const Json& data) {
-        JsonValidator::validate(data, {
-                                          {registry_keys::Textures, {Json::value_t::object}, true},
-                                          {registry_keys::Fonts, {Json::value_t::object}, true},
-                                          {registry_keys::Sounds, {Json::value_t::object}, false},
-                                      });
-    }
+        // ----------------------------------------------------------------------------------------
+        // Универсальный геттер с проверкой (DRY principle).
+        // Бросает std::runtime_error, если конфиг не найден.
+        // ----------------------------------------------------------------------------------------
+        template <typename EnumID, typename Config>
+        const Config& getResourceConfig(const std::unordered_map<EnumID, Config>& map,
+                                        EnumID                                     id,
+                                        const char*                                typeName) {
+
+            const auto it = map.find(id);
+            if (it == map.end()) {
+                throw std::runtime_error(std::string("[ResourcePaths::get") + typeName +
+                                         "]\nНе найден ресурс для " + typeName + ": " +
+                                         std::string(core::resources::ids::toString(id)));
+            }
+            return it->second;
+        }
+
+        // ----------------------------------------------------------------------------------------
+        // Валидация JSON-структуры базового реестра ресурсов.
+        // ----------------------------------------------------------------------------------------
+        void validateResourceRegistry(const Json& data) {
+            JsonValidator::validate(data,
+                                    {
+                                        {registry_keys::Textures, {Json::value_t::object}, true},
+                                        {registry_keys::Fonts, {Json::value_t::object}, true},
+                                        {registry_keys::Sounds, {Json::value_t::object}, false},
+                                    });
+        }
 
 } // namespace
 
@@ -226,8 +244,9 @@ namespace core::resources::paths {
         // Чтение файла
         const auto fileContentOpt = FileLoader::loadTextFile(filename);
         if (!fileContentOpt) {
-            message::showError("[ResourcePaths]\nНе удалось открыть реестр ресурсов: " + filename);
-            std::exit(EXIT_FAILURE);
+            LOG_PANIC(core::log::cat::Engine,
+                      "[ResourcePaths]\nНе удалось открыть реестр ресурсов: {}",
+                      filename);
         }
 
         // Парсинг JSON
@@ -235,29 +254,38 @@ namespace core::resources::paths {
         try {
             data = Json::parse(*fileContentOpt);
         } catch (const std::exception& e) {
-            message::showError("[ResourcePaths]\nОшибка парсинга JSON в " + filename + ": " +
-                               e.what());
-            std::exit(EXIT_FAILURE);
+            LOG_PANIC(core::log::cat::Engine,
+                      "[ResourcePaths]\nОшибка парсинга JSON в '{}': {}",
+                      filename,
+                      e.what());
         } catch (...) {
-            message::showError("[ResourcePaths]\nНеизвестная ошибка при парсинге JSON: " +
-                               filename);
-            std::exit(EXIT_FAILURE);
+            LOG_PANIC(core::log::cat::Engine,
+                      "[ResourcePaths]\nНеизвестная ошибка при парсинге JSON: '{}'",
+                      filename);
         }
 
         // Валидация структуры
         try {
             validateResourceRegistry(data);
         } catch (const std::exception& e) {
-            message::showError("[ResourcePaths]\nНеверная структура JSON: " +
-                               std::string(e.what()));
-            std::exit(EXIT_FAILURE);
+            LOG_PANIC(core::log::cat::Engine,
+                      "[ResourcePaths]\nНеверная структура JSON: {}",
+                      e.what());
         }
 
         // Заполнение карт через специализированные загрузчики.
-        loadTextureConfigMap(data, registry_keys::Textures, ids::textureFromString,
+        loadTextureConfigMap(data,
+                             registry_keys::Textures,
+                             ids::textureFromString,
                              getTextureMap());
-        loadSimplePathConfigMap(data, registry_keys::Fonts, ids::fontFromString, getFontMap());
-        loadSimplePathConfigMap(data, registry_keys::Sounds, ids::soundFromString, getSoundMap());
+        loadSimplePathConfigMap(data,
+                                registry_keys::Fonts,
+                                ids::fontFromString,
+                                getFontMap());
+        loadSimplePathConfigMap(data,
+                                registry_keys::Sounds,
+                                ids::soundFromString,
+                                getSoundMap());
     }
 
     // ============================================================================================

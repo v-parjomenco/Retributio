@@ -96,10 +96,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SFML_STATIC;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>C:\dev\SFML-3.0.2\include;$(ProjectDir)include</AdditionalIncludeDirectories>
-      <AdditionalOptions> /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
       <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
@@ -110,7 +110,7 @@
       <DisableSpecificWarnings>4738</DisableSpecificWarnings>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\dev\SFML-3.0.2\lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>sfml-main-d.lib;sfml-graphics-s-d.lib;freetype.lib;sfml-window-s-d.lib;opengl32.lib;winmm.lib;gdi32.lib;sfml-audio-s-d.lib;flac.lib;vorbisenc.lib;vorbisfile.lib;vorbis.lib;ogg.lib;sfml-network-s-d.lib;ws2_32.lib;sfml-system-s-d.lib;winmm.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
@@ -124,10 +124,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SFML_STATIC;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>C:\dev\SFML-3.0.2\include;$(ProjectDir)include</AdditionalIncludeDirectories>
-      <AdditionalOptions> /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
       <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
@@ -150,10 +150,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SFML_STATIC;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>C:\dev\SFML-3.0.2-64\include;$(ProjectDir)include</AdditionalIncludeDirectories>
-      <AdditionalOptions> /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
@@ -163,7 +163,7 @@
       <DisableSpecificWarnings>4738</DisableSpecificWarnings>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\dev\SFML-3.0.2-64\lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>sfml-main-d.lib;sfml-graphics-s-d.lib;freetype.lib;sfml-window-s-d.lib;opengl32.lib;winmm.lib;gdi32.lib;sfml-audio-s-d.lib;flac.lib;vorbisenc.lib;vorbisfile.lib;vorbis.lib;ogg.lib;sfml-network-s-d.lib;ws2_32.lib;sfml-system-s-d.lib;winmm.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
@@ -177,10 +177,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SFML_STATIC;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>C:\dev\SFML-3.0.2-64\include;$(ProjectDir)include</AdditionalIncludeDirectories>
-      <AdditionalOptions> /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
       <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
@@ -203,6 +203,8 @@
     <ClCompile Include="src\core\ecs\systems\debug_overlay_system.cpp" />
     <ClCompile Include="src\core\ecs\systems\movement_system.cpp" />
     <ClCompile Include="src\core\ecs\systems\render_system.cpp" />
+    <ClCompile Include="src\core\log\logging.cpp" />
+    <ClCompile Include="src\core\log\log_level.cpp" />
     <ClCompile Include="src\core\resources\ids\resource_ids.cpp" />
     <ClCompile Include="src\core\resources\paths\resource_paths.cpp" />
     <ClCompile Include="src\core\resources\resource_manager.cpp" />
@@ -230,7 +232,6 @@
   <ItemGroup>
     <ClInclude Include="include\core\compiler\platform\windows.h" />
     <ClInclude Include="include\core\compiler\warnings.h" />
-    <ClInclude Include="include\core\config.h" />
     <ClInclude Include="include\core\config\blueprints\debug_overlay_blueprint.h" />
     <ClInclude Include="include\core\config\config_keys.h" />
     <ClInclude Include="include\core\config\engine_settings.h" />
@@ -241,6 +242,7 @@
     <ClInclude Include="include\core\config\properties\movement_properties.h" />
     <ClInclude Include="include\core\config\properties\sprite_properties.h" />
     <ClInclude Include="include\core\config\properties\text_properties.h" />
+    <ClInclude Include="include\core\debug\debug_config.h" />
     <ClInclude Include="include\core\ecs\components\keyboard_control_component.h" />
     <ClInclude Include="include\core\ecs\components\lock_behavior_component.h" />
     <ClInclude Include="include\core\ecs\components\movement_stats_component.h" />
@@ -261,6 +263,11 @@
     <ClInclude Include="include\core\ecs\systems\scaling_system.h" />
     <ClInclude Include="include\core\ecs\system_manager.h" />
     <ClInclude Include="include\core\ecs\world.h" />
+    <ClInclude Include="include\core\log\logging.h" />
+    <ClInclude Include="include\core\log\log_categories.h" />
+    <ClInclude Include="include\core\log\log_defaults.h" />
+    <ClInclude Include="include\core\log\log_level.h" />
+    <ClInclude Include="include\core\log\log_macros.h" />
     <ClInclude Include="include\core\resources\config\font_resource_config.h" />
     <ClInclude Include="include\core\resources\config\sound_resource_config.h" />
     <ClInclude Include="include\core\resources\config\texture_resource_config.h" />
@@ -272,6 +279,7 @@
     <ClInclude Include="include\core\resources\types\font_resource.h" />
     <ClInclude Include="include\core\resources\types\soundbuffer_resource.h" />
     <ClInclude Include="include\core\resources\types\texture_resource.h" />
+    <ClInclude Include="include\core\time\time_config.h" />
     <ClInclude Include="include\core\time\time_service.h" />
     <ClInclude Include="include\core\ui\anchor_policy.h" />
     <ClInclude Include="include\core\ui\anchor_utils.h" />
@@ -281,7 +289,6 @@
     <ClInclude Include="include\core\utils\file_loader.h" />
     <ClInclude Include="include\core\utils\json\json_utils.h" />
     <ClInclude Include="include\core\utils\json\json_validator.h" />
-    <ClInclude Include="include\core\utils\message.h" />
     <ClInclude Include="include\game\skyguard\config\blueprints\player_blueprint.h" />
     <ClInclude Include="include\game\skyguard\config\config_keys.h" />
     <ClInclude Include="include\game\skyguard\config\loader\config_loader.h" />

@@ -226,6 +226,18 @@
     <Filter Include="src\core\resources\config">
       <UniqueIdentifier>{137f5c7f-73f6-4f18-8712-90b5eac2155b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\log">
+      <UniqueIdentifier>{dc6ceb77-15ab-4354-a029-8610f8937dba}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\log">
+      <UniqueIdentifier>{205df397-ac2e-44a0-aa25-db8b5f38324d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\debug">
+      <UniqueIdentifier>{617f4405-cb3a-4d12-b40b-32c6284fe6c2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\debug">
+      <UniqueIdentifier>{b8f755f4-9e45-4234-a140-6ee661260b2a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -288,11 +300,14 @@
     <ClCompile Include="src\core\resources\ids\resource_ids.cpp">
       <Filter>src\core\resources\ids</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\log\logging.cpp">
+      <Filter>src\core\log</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\log\log_level.cpp">
+      <Filter>src\core\log</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\core\config.h">
-      <Filter>include\core</Filter>
-    </ClInclude>
     <ClInclude Include="include\third_party\json.hpp">
       <Filter>include\third_party</Filter>
     </ClInclude>
@@ -379,9 +394,6 @@
     </ClInclude>
     <ClInclude Include="include\core\ui\anchor_utils.h">
       <Filter>include\core\ui</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\utils\message.h">
-      <Filter>include\core\utils</Filter>
     </ClInclude>
     <ClInclude Include="include\core\ecs\system_manager.h">
       <Filter>include\core\ecs</Filter>
@@ -484,6 +496,27 @@
     </ClInclude>
     <ClInclude Include="include\core\resources\config\sound_resource_config.h">
       <Filter>include\core\resources\config</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\log\log_level.h">
+      <Filter>include\core\log</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\log\log_categories.h">
+      <Filter>include\core\log</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\log\logging.h">
+      <Filter>include\core\log</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\log\log_defaults.h">
+      <Filter>include\core\log</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\log\log_macros.h">
+      <Filter>include\core\log</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\time\time_config.h">
+      <Filter>include\core\time</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\debug\debug_config.h">
+      <Filter>include\core\debug</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

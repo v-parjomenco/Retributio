@@ -52,7 +52,10 @@ namespace core::resources::types {
         }
 
         /// @brief Количество сэмплов в буфере (включая все каналы).
-        [[nodiscard]] std::size_t getSampleCount() const noexcept {
+        ///
+        /// В SFML 3 getSampleCount() возвращает 64-битное значение (std::uint64_t),
+        /// поэтому наружу тоже отдаём std::uint64_t, без сужения до size_t.
+        [[nodiscard]] std::uint64_t getSampleCount() const noexcept {
             return mBuffer.getSampleCount();
         }
 
@@ -60,8 +63,8 @@ namespace core::resources::types {
         ///
         /// SFML 3 хранит аудио как массив 16-битных сэмплов (std::int16_t),
         /// getSampleCount() возвращает общее количество сэмплов по всем каналам.
-        [[nodiscard]] std::size_t getMemorySize() const noexcept {
-            return mBuffer.getSampleCount() * sizeof(std::int16_t);
+        [[nodiscard]] std::uint64_t getMemorySize() const noexcept {
+            return mBuffer.getSampleCount() * static_cast<std::uint64_t>(sizeof(std::int16_t));
         }
 
       private:

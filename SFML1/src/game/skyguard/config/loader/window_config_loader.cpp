@@ -2,9 +2,9 @@
 
 #include "game/skyguard/config/loader/window_config_loader.h"
 
+#include "core/log/log_macros.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_utils.h"
-#include "core/utils/message.h"
 
 #include "game/skyguard/config/config_keys.h"
 
@@ -12,7 +12,6 @@ namespace {
 
     using core::utils::FileLoader;
 
-    namespace message = core::utils::message;
     namespace json_utils = core::utils::json;
     namespace gk = game::skyguard::config::keys::Game;
 
@@ -30,10 +29,9 @@ namespace game::skyguard::config {
         // ----------------------------------------------------------------------------------------
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
-            message::logDebug(
-                "[SkyGuard::WindowConfig]\nФайл не найден или не читается, используются "
-                "значения по умолчанию: " +
-                path);
+            LOG_DEBUG(core::log::cat::Engine,
+                      "[SkyGuard::WindowConfig]\nФайл не найден или не читается, используются "
+                      "значения по умолчанию: ", path);
             return cfg;
         }
 

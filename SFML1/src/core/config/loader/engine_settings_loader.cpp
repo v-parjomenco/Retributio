@@ -3,15 +3,14 @@
 #include "core/config/loader/engine_settings_loader.h"
 
 #include "core/config/config_keys.h"
+#include "core/log/log_macros.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_utils.h"
-#include "core/utils/message.h"
 
 namespace {
 
     using core::utils::FileLoader;
 
-    namespace message = core::utils::message;
     namespace json_utils = core::utils::json;
     namespace eng_keys = core::config::keys::EngineSettings;
 
@@ -29,10 +28,9 @@ namespace core::config {
         // ----------------------------------------------------------------------------------------
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
-            message::logDebug(
-                "[EngineSettings]\nФайл не найден или не читается, используются значения по "
-                "умолчанию: " +
-                path);
+            LOG_DEBUG(core::log::cat::Config,
+                      "[EngineSettings]\nФайл не найден или не читается, используются значения "
+                      "по умолчанию: {}", path);
             return cfg;
         }
 

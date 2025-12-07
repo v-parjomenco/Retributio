@@ -7,14 +7,16 @@
 #include "core/config/engine_settings.h"
 #include "core/config/loader/debug_overlay_loader.h"
 #include "core/config/loader/engine_settings_loader.h"
+#include "core/debug/debug_config.h"
 #include "core/ecs/systems/debug_overlay_system.h"
 #include "core/ecs/systems/input_system.h"
 #include "core/ecs/systems/lock_system.h"
 #include "core/ecs/systems/movement_system.h"
 #include "core/ecs/systems/render_system.h"
 #include "core/ecs/systems/scaling_system.h"
+#include "core/log/log_macros.h"
 #include "core/resources/paths/resource_paths.h"
-#include "core/utils/message.h"
+#include "core/time/time_config.h"
 
 #include "game/skyguard/config/loader/config_loader.h"
 #include "game/skyguard/config/loader/window_config_loader.h"
@@ -51,12 +53,13 @@ namespace game::skyguard {
         }
 
         // Логируем итоговые настройки рендеринга один раз при запуске игры.
-        core::utils::message::logDebug(
-            "[EngineSettings]\nVSync: " +
-            std::string(engineSettings.vsyncEnabled ? "enabled" : "disabled") +
-            ", frameLimit: " + std::to_string(engineSettings.frameLimit) +
-            (engineSettings.vsyncEnabled ? " (VSync включён, frameLimit игнорируется)."
-                                         : " (VSync выключён, frameLimit применяется)."));
+        LOG_INFO(core::log::cat::Engine,
+                 "[EngineSettings]\nVSync: {}, frameLimit: {}{}",
+                 (engineSettings.vsyncEnabled ? "enabled" : "disabled"),
+                 engineSettings.frameLimit,
+                 (engineSettings.vsyncEnabled
+                      ? " (VSync включён, frameLimit игнорируется)."
+                      : " (VSync выключён, frameLimit применяется)."));
 
         // ----------------------------------------------------------------------------------------
         // Инициализация ресурсного слоя (реестр ресурсов + fallback-ресурсы)
@@ -100,67 +103,56 @@ namespace game::skyguard {
         // mResources.setMissingSoundFallback(core::resources::ids::SoundID::SomeDefault);
     }
 
+    // initWorld() без try / catch — все исключения уходят наверх в main()
     void Game::initWorld() {
-        try {
-            // Создаём blueprint игрока (data-driven, собранный из properties)
-            auto playerCfg =
-                skycfg::ConfigLoader::loadPlayerConfig("assets/game/skyguard/config/player.json");
 
-            // Создаём сущность игрока
-            mPlayerEntity = mWorld.createEntity();
+        // Создаём blueprint игрока (data-driven, собранный из properties)
+        auto playerCfg =
+            skycfg::ConfigLoader::loadPlayerConfig("assets/game/skyguard/config/player.json");
 
-            // Добавляем компонент с конфигурацией игрока из JSON (playerCfg) в ECS-мир.
-            // PlayerInitSystem при первом апдейте создаст остальные компоненты
-            // (Sprite, Transform и т.д.).
-            mWorld.addComponent(mPlayerEntity,
-                                game::skyguard::ecs::PlayerConfigComponent{playerCfg});
+        // Создаём сущность игрока
+        mPlayerEntity = mWorld.createEntity();
 
-            // ------------------------------------------------------------------------------------
-            // Подключаем ECS-системы
-            // ------------------------------------------------------------------------------------
-            // Передаём в PlayerInitSystem базовый размер view из текущего окна,
-            // чтобы якоря и базовые размеры масштабирования были согласованы с реальным окном.
-            const sf::Vector2f baseViewSize = mWindow.getView().getSize();
-            mWorld.addSystem<game::skyguard::ecs::PlayerInitSystem>(mResources, baseViewSize);
+        // Добавляем компонент с конфигурацией игрока из JSON (playerCfg) в ECS-мир.
+        // PlayerInitSystem при первом апдейте создаст остальные компоненты
+        // (Sprite, Transform и т.д.).
+        mWorld.addComponent(mPlayerEntity,
+                            game::skyguard::ecs::PlayerConfigComponent{playerCfg});
 
-            mWorld.addSystem<core::ecs::MovementSystem>();
-            mWorld.addSystem<core::ecs::RenderSystem>();
-            // Эти системы требуют прямого доступа (onResize, onKeyEvent),
-            // поэтому сохраняем указатели.
-            mScalingSystem = &mWorld.addSystem<core::ecs::ScalingSystem>();
-            mLockSystem = &mWorld.addSystem<core::ecs::LockSystem>();
-            mInputSystem = &mWorld.addSystem<core::ecs::InputSystem>();
-            mDebugOverlay = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
+        // ------------------------------------------------------------------------------------
+        // Подключаем ECS-системы
+        // ------------------------------------------------------------------------------------
+        // Передаём в PlayerInitSystem базовый размер view из текущего окна,
+        // чтобы якоря и базовые размеры масштабирования были согласованы с реальным окном.
+        const sf::Vector2f baseViewSize = mWindow.getView().getSize();
+        mWorld.addSystem<game::skyguard::ecs::PlayerInitSystem>(mResources, baseViewSize);
 
-            // Привязываем overlay к сервису времени и шрифту (через ResourceManager).
-            if (mDebugOverlay) {
-                const sf::Font& font =
-                    mResources.getFont(core::resources::ids::FontID::Default).get();
+        mWorld.addSystem<core::ecs::MovementSystem>();
+        mWorld.addSystem<core::ecs::RenderSystem>();
+        // Эти системы требуют прямого доступа (onResize, onKeyEvent),
+        // поэтому сохраняем указатели.
+        mScalingSystem  = &mWorld.addSystem<core::ecs::ScalingSystem>();
+        mLockSystem     = &mWorld.addSystem<core::ecs::LockSystem>();
+        mInputSystem    = &mWorld.addSystem<core::ecs::InputSystem>();
+        mDebugOverlay   = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
 
-                mDebugOverlay->bind(mTime, font);
+        // Привязываем overlay к сервису времени и шрифту (через ResourceManager).
+        if (mDebugOverlay) {
+            const sf::Font& font = mResources.getFont(core::resources::ids::FontID::Default).get();
 
-                // Грузим конфиг для DebugOverlay.
-                const auto overlayCfg =
-                    cfg::loadDebugOverlayBlueprint("assets/core/config/debug_overlay.json");
+            mDebugOverlay->bind(mTime, font);
 
-                // Применяем стиль.
-                mDebugOverlay->applyTextProperties(overlayCfg.text);
+            // Грузим конфиг для DebugOverlay.
+            const auto overlayCfg =
+                cfg::loadDebugOverlayBlueprint("assets/core/config/debug_overlay.json");
 
-                // Итоговое состояние: overlay включён, только если:
-                //  - конфиг debug_overlay.json его не отключил;
-                //  - сборка разрешает overlay (Debug=true, Release=false) через SHOW_FPS_OVERLAY.
-                mDebugOverlay->setEnabled(overlayCfg.enabled && cfg::SHOW_FPS_OVERLAY);
-            }
-        } catch (const std::exception& e) {
-            // Кросс-платформенная обработка ошибок
-#ifdef _WIN32
-            core::utils::message::showError(std::string("Ошибка при инициализации ECS: ") +
-                                            e.what());
-            core::utils::message::holdOnExit();
-#else
-            std::cerr << "Ошибка при инициализации ECS: " << e.what() << std::endl;
-#endif
-            mWorld = std::move(core::ecs::World()); // fallback: создаём безопасный пустой мир
+            // Применяем стиль.
+            mDebugOverlay->applyTextProperties(overlayCfg.text);
+
+            // Итоговое состояние: overlay включён, только если:
+            //  - конфиг debug_overlay.json его не отключил;
+            //  - сборка разрешает overlay (Debug=true, Release=false) через SHOW_FPS_OVERLAY.
+            mDebugOverlay->setEnabled(overlayCfg.enabled && cfg::SHOW_FPS_OVERLAY);
         }
     }
 

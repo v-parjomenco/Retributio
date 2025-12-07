@@ -2,7 +2,7 @@
 
 #include "core/ui/ids/ui_id_utils.h"
 
-#include "core/utils/message.h"
+#include "core/log/log_macros.h"
 
 namespace core::ui::ids {
 
@@ -61,7 +61,7 @@ namespace core::ui::ids {
     // --------------------------------------------------------------------------------------------
 
     [[nodiscard]] AnchorType anchorFromString(std::string_view name,
-                                              AnchorType defaultType) noexcept {
+                                              AnchorType       defaultType) noexcept {
 
         if (name == "TopLeft") {
             return AnchorType::TopLeft;
@@ -95,14 +95,16 @@ namespace core::ui::ids {
         }
 
         // Неизвестное значение — лог + откат на defaultType.
-        core::utils::message::showError(std::string("[Anchor]\nНеизвестное значение anchor: ") +
-                                        std::string{name} + ". Применено значение по умолчанию (" +
-                                        std::string{toString(defaultType)} + ").");
+        LOG_WARN(core::log::cat::Engine,
+                 "[Anchor]\nНеизвестное значение anchor: {}. "
+                 "Применено значение по умолчанию ({}).",
+                 name,
+                 toString(defaultType));
 
         return defaultType;
     }
 
-    [[nodiscard]] ScalingBehaviorKind scalingFromString(std::string_view name,
+    [[nodiscard]] ScalingBehaviorKind scalingFromString(std::string_view   name,
                                                         ScalingBehaviorKind defaultKind) noexcept {
 
         if (name == "Uniform") {
@@ -112,10 +114,11 @@ namespace core::ui::ids {
             return ScalingBehaviorKind::None;
         }
 
-        core::utils::message::showError(
-            std::string("[ScalingBehavior]\nНеизвестное значение resize_scaling: ") +
-            std::string{name} + ". Применено значение по умолчанию (" +
-            std::string{toString(defaultKind)} + ").");
+        LOG_WARN(core::log::cat::Engine,
+                 "[ScalingBehavior]\nНеизвестное значение resize_scaling: {}. "
+                 "Применено значение по умолчанию ({}).",
+                 name,
+                 toString(defaultKind));
 
         return defaultKind;
     }
@@ -130,10 +133,11 @@ namespace core::ui::ids {
             return LockBehaviorKind::World;
         }
 
-        core::utils::message::showError(
-            std::string("[LockBehavior]\nНеизвестное значение lock_behavior: ") +
-            std::string{name} + ". Применено значение по умолчанию (" +
-            std::string{toString(defaultKind)} + ").");
+        LOG_WARN(core::log::cat::Engine,
+                 "[LockBehavior]\nНеизвестное значение lock_behavior: {}. "
+                 "Применено значение по умолчанию ({}).",
+                 name,
+                 toString(defaultKind));
 
         return defaultKind;
     }

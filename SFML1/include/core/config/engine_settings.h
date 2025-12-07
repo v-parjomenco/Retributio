@@ -2,7 +2,7 @@
 // File: core/config/engine_settings.h
 // Purpose: Runtime engine settings (VSync, frame limit, etc.), loaded from JSON.
 // Used by: main/game loop (window setup), renderer bootstrap.
-// Related headers: core/config/loader/engine_settings_loader.h, core/config.h
+// Related headers: core/config/loader/engine_settings_loader.h
 // ================================================================================================
 #pragma once
 

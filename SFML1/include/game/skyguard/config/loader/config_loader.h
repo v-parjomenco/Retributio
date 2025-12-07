@@ -34,11 +34,13 @@ namespace game::skyguard::config {
      *
      * Поведение:
      *  - Если файл не может быть прочитан:
-     *      -> showError(...) + возврат значения PlayerBlueprint по умолчанию.
+     *      -> лог в core::log (Error) + возврат значения PlayerBlueprint по умолчанию.
      *  - Если информация в JSON невалидна или искажена:
-     *      -> showError(...) + std::exit(EXIT_FAILURE).
+     *      -> parseAndValidateCritical логирует через core::log и инициирует фатальное
+     *         завершение (panic).
      *  - Если структура JSON неверна:
-     *      -> showError(...) + std::exit(EXIT_FAILURE).
+     *      -> parseAndValidateCritical логирует через core::log и инициирует фатальное
+     *         завершение (panic).
      */
         static blueprints::PlayerBlueprint loadPlayerConfig(const std::string& path);
     };

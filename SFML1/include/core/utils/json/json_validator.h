@@ -1,7 +1,10 @@
 // ================================================================================================
 // File: core/utils/json/json_validator.h
-// Purpose: Lightweight schema-like validation helper for JSON configs
-// Used by: json_utils::parseAndValidateCritical/NonCritical, ConfigLoader, debug blueprints
+// Purpose: Lightweight schema-like validation helper for JSON configs.
+// Used by: json_utils::parseAndValidateCritical/NonCritical, config loaders, debug blueprints.
+// Notes:
+//  - Pure structural validation: no logging, no UI, no engine-level dependencies.
+//  - On violation throws std::runtime_error with human-readable description.
 // ================================================================================================
 #pragma once
 
@@ -11,8 +14,6 @@
 
 #include "third_party/json_silent.hpp"
 
-#include "core/utils/message.h"
-
 namespace core::utils::json {
 
     /**
@@ -20,6 +21,7 @@ namespace core::utils::json {
      *
      * Проверяет, что ключи присутствуют и имеют допустимые типы данных.
      * Поддерживает несколько возможных типов для одного ключа.
+     * Не занимается логированием/показом сообщений — только выбрасывает исключения.
      */
     class JsonValidator {
       public:
@@ -33,25 +35,18 @@ namespace core::utils::json {
 
         /**
          * @brief Проверяет, что JSON содержит все обязательные ключи и правильные типы.
-         * @param data - JSON объект (player.json)
-         * @param rules - список правил
-         * @throws std::runtime_error при нарушении
+         * @param data  JSON-объект (конфиг)
+         * @param rules Список правил для ключей.
+         * @throws std::runtime_error при нарушении хотя бы одного правила.
          */
         static void validate(const json& data, const std::vector<KeyRule>& rules) {
             for (const auto& rule : rules) {
-
-                // Нужно включить когда будет запись логов, а не всплывающие сообщения
-                //#ifdef _DEBUG
-                //                DEBUG_MSG("[JsonValidator]\nПроверка ключа: " + rule.name);
-                //#endif
-
                 if (!data.contains(rule.name)) {
                     if (rule.required) {
                         throw std::runtime_error("\nConfig validation error: missing key '" +
                                                  rule.name + "'");
-                    } else {
-                        continue;
                     }
+                    continue;
                 }
 
                 const auto& value = data.at(rule.name);
@@ -67,7 +62,7 @@ namespace core::utils::json {
 
                 if (!valid) {
                     std::string expected;
-                    for (size_t i = 0; i < rule.allowedTypes.size(); ++i) {
+                    for (std::size_t i = 0; i < rule.allowedTypes.size(); ++i) {
                         expected += typeName(rule.allowedTypes[i]);
                         if (i + 1 < rule.allowedTypes.size()) {
                             expected += " or ";
