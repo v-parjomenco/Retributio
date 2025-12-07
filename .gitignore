@@ -41,15 +41,20 @@
 # debug information files
 *.dwo
 
-# Builds
-Debug/
-Release/
-x64/
-SFML1/Debug/
-SFML1/Release/
-SFML1/x64/
-bin/
-obj/
+# Builds (только корневые и билд-папки, НЕ исходники)
+/Debug/
+/Release/
+/x64/
+/SFML1/Debug/
+/SFML1/Release/
+/SFML1/x64/
+/bin/
+/obj/
+/build/
+**/build/Debug/
+**/build/Release/
+**/cmake-build-*/Debug/
+**/cmake-build-*/Release/
 
 # IDE/Editor
 *.user
@@ -103,6 +108,3 @@ Thumbs.db
 
 # Comments
 *.txt
-
-!include/core/debug/
-!src/core/debug/
