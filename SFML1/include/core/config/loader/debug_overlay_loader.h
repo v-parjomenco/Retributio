@@ -16,9 +16,17 @@ namespace core::config {
      * @brief Загружает JSON из файла и парсит данные в DebugOverlayBlueprint.
      *
      * Поведение:
-     *  - Если файла нет / не читается           -> лог + дефолт из DebugOverlayBlueprint.
-     *  - Если JSON некорректен или невалиден    -> лог + дефолт из DebugOverlayBlueprint.
-     *  - Если отдельные поля отсутствуют        -> дефолт из DebugOverlayBlueprint.
+     *  - Если файл отсутствует или не читается:
+     *      -> FileLoader логирует низкоуровневую I/O-проблему (Engine/DEBUG),
+     *         loader логирует высокоуровневый контекст (Config/WARN)
+     *         и возвращает дефолтный DebugOverlayBlueprint.
+     *  - Если JSON некорректен или структура невалидна:
+     *      -> json_utils::parseAndValidateNonCritical(...) логирует в Config
+     *         и возвращает std::nullopt, loader в этом случае
+     *         возвращает дефолтный DebugOverlayBlueprint.
+     *  - Если отдельные поля отсутствуют или имеют неверный тип:
+     *      -> используются значения по умолчанию из DebugOverlayBlueprint
+     *         без падения игры.
      */
     [[nodiscard]] DebugOverlayBlueprint loadDebugOverlayBlueprint(const std::string& path);
 

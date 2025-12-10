@@ -30,7 +30,8 @@ namespace core::config {
         // ----------------------------------------------------------------------------------------
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
-            LOG_ERROR(core::log::cat::Config,
+            // Type B config: I/O-ошибка → WARN + безопасные дефолты (см. общую политику логирования).
+            LOG_WARN(core::log::cat::Config,
                       "[EngineSettings]\nФайл настроек движка не найден или не читается: {}. "
                       "Используются значения по умолчанию (vsyncEnabled = {}, frameLimit = {}).",
                       path, cfg.vsyncEnabled, cfg.frameLimit);

@@ -34,7 +34,7 @@ namespace game::skyguard::config {
      *
      * Поведение:
      *  - Если файл не может быть прочитан:
-     *      -> лог в core::log (Error) + возврат значения PlayerBlueprint по умолчанию.
+     *      -> лог в core::log (Config/WARN) + возврат значения PlayerBlueprint по умолчанию.
      *  - Если информация в JSON невалидна или искажена:
      *      -> parseAndValidateCritical логирует через core::log и инициирует фатальное
      *         завершение (panic).

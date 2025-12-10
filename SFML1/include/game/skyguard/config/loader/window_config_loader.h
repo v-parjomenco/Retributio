@@ -18,7 +18,7 @@ namespace game::skyguard::config {
      *
      * Поведение:
      *  - Если файл отсутствует или не читается:
-     *      -> лог в core::log (Config/Debug) + возвращаются дефолтные WindowConfig.
+     *      -> лог в core::log (Config/WARN) + возвращаются дефолтные WindowConfig.
      *  - Если JSON некорректен или невалиден:
      *      -> parseAndValidateNonCritical(...) вернёт std::nullopt,
      *         в лог уже будут записаны сообщения, а loader вернёт дефолтные WindowConfig.

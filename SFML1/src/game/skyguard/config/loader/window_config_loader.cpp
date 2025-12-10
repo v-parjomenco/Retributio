@@ -30,9 +30,9 @@ namespace game::skyguard::config {
         // ----------------------------------------------------------------------------------------
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
-            LOG_DEBUG(core::log::cat::Config,
-                      "[SkyGuard::WindowConfig]\nФайл не найден или не читается, используются "
-                      "значения по умолчанию: {}", path);
+            LOG_WARN(core::log::cat::Config,
+                      "[SkyGuard::WindowConfig]\nФайл не найден или не читается: {}. "
+                      "Используются значения по умолчанию: {}", path);
             return cfg;
         }
 

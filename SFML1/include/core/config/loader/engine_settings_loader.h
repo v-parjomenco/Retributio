@@ -18,8 +18,8 @@ namespace core::config {
      *
      * Поведение:
      *  - Если файл отсутствует или не читается:
-     *      -> LOG_ERROR(...) + возвращаются дефолтные EngineSettings
-     *         (vsyncEnabled, frameLimit из значений по умолчанию структуры).
+     *      -> LOG_WARN(...) (категория Config) + возвращаются дефолтные
+     *         EngineSettings (vsyncEnabled, frameLimit из значений по умолчанию структуры).
      *  - Если JSON некорректен или структура невалидна:
      *      -> json_utils::parseAndValidateNonCritical(...) вернёт std::nullopt,
      *         в лог уже будут записаны сообщения о проблеме,

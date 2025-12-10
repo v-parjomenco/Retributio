@@ -31,11 +31,12 @@ namespace core::config {
         */
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
-            // FileLoader уже залогировал низкоуровневую проблему с файлом,
-            // здесь мы добавляем контекст более высокого уровня (уровня конфига).
-            LOG_DEBUG(core::log::cat::Config,
-                      "[DebugOverlayBlueprint]\nБудет использована конфигурация по умолчанию: {}",
-                      path);
+            // FileLoader уже залогировал низкоуровневую I/O-проблему (Engine/DEBUG).
+            // Здесь фиксируем высокоуровневый эффект: overlay уходит на дефолт (Type C → WARN).
+            LOG_WARN(core::log::cat::Config,
+                     "[DebugOverlayBlueprint]\nФайл конфигурации debug overlay не найден или "
+                     "не читается: {}. Будет использована конфигурация по умолчанию.",
+                     path);
             return cfg;
         }
 

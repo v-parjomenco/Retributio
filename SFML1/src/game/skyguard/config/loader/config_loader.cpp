@@ -32,12 +32,12 @@ namespace game::skyguard::config {
         // ----------------------------------------------------------------------------------------
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
-            // FileLoader уже залогировал низкоуровневую проблему с файлом,
-            // здесь добавляем высокоуровневый контекст в лог.
-            LOG_ERROR(core::log::cat::Config,
-                      "[ConfigLoader]\nНе удалось открыть конфигурацию игрока: {}. "
-                      "Будут использованы значения по умолчанию.",
-                      path);
+            // Type B config: I/O-ошибка → WARN + дефолтный PlayerBlueprint.
+            // FileLoader уже залогировал низкоуровневую I/O-проблему (Engine/DEBUG).
+            LOG_WARN(core::log::cat::Config,
+                     "[ConfigLoader]\nНе удалось открыть конфигурацию игрока: {}. "
+                     "Будут использованы значения по умолчанию.",
+                     path);
             return blueprints::PlayerBlueprint{}; // дефолт из PlayerBlueprint + properties
         }
         const std::string& fileContent = *fileContentOpt;
