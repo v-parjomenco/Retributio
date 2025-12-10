@@ -21,34 +21,35 @@ namespace {
 namespace core::config {
 
     EngineSettings loadEngineSettings(const std::string& path) {
-        EngineSettings cfg; // стартуем с дефолтов (источник истины №1)
+        // Стартуем с безопасных дефолтов (источник истины №1 для значений по умолчанию).        
+        EngineSettings cfg{};
 
         // ----------------------------------------------------------------------------------------
-        // Низкоуровневое чтение файла
+        // Низкоуровневое чтение файла.
+        // Ошибка здесь НЕ фатальная: движок может работать с дефолтами.
         // ----------------------------------------------------------------------------------------
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
-            LOG_DEBUG(core::log::cat::Config,
-                      "[EngineSettings]\nФайл не найден или не читается, используются значения "
-                      "по умолчанию: {}", path);
+            LOG_ERROR(core::log::cat::Config,
+                      "[EngineSettings]\nФайл настроек движка не найден или не читается: {}. "
+                      "Используются значения по умолчанию (vsyncEnabled = {}, frameLimit = {}).",
+                      path, cfg.vsyncEnabled, cfg.frameLimit);
             return cfg;
         }
 
-        const std::string& fileContent = *fileContentOpt;
-
         // ----------------------------------------------------------------------------------------
         // Парсинг + валидация как НЕ критичного конфига.
-        // При любой ошибке: остаёмся на дефолтных EngineSettings.
+        // При ошибке parseAndValidateNonCritical вернёт std::nullopt и запишет подробности в лог.        
         // ----------------------------------------------------------------------------------------
-        auto dataOpt = json_utils::parseAndValidateNonCritical(
-            fileContent, path, "EngineSettings",
+        const auto dataOpt = json_utils::parseAndValidateNonCritical(
+            *fileContentOpt, path, "EngineSettings",
             {
                 {eng_keys::VSYNC, {Json::value_t::boolean}, false},
                 {eng_keys::FRAME_LIMIT,
                  {Json::value_t::number_integer, Json::value_t::number_unsigned},
                  false},
-            });
-
+            }
+        );
         if (!dataOpt) {
             return cfg;
         }
@@ -59,10 +60,7 @@ namespace core::config {
         // Заполнение полей из JSON с fallback на EngineSettings по умолчанию.
         // ----------------------------------------------------------------------------------------
 
-        // vsync (bool)
         cfg.vsyncEnabled = json_utils::parseValue<bool>(data, eng_keys::VSYNC, cfg.vsyncEnabled);
-
-        // frameLimit (unsigned)
         cfg.frameLimit =
             json_utils::parseValue<unsigned>(data, eng_keys::FRAME_LIMIT, cfg.frameLimit);
 

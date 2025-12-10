@@ -164,7 +164,7 @@ namespace core::utils {
             // и это не просто "дошли до конца файла".
             if (!ifs && !ifs.eof()) {
                 LOG_DEBUG(core::log::cat::Engine,
-                          "[FileLoader]\nОшибка чтения бинарного файла: ", path);
+                          "[FileLoader]\nОшибка чтения бинарного файла: {}", path);
                 return std::nullopt;
             }
         }

@@ -18,14 +18,22 @@ namespace core::config {
      *
      * Поведение:
      *  - Если файл отсутствует или не читается:
-     *      -> logDebug(...) + возвращаются дефолтные EngineSettings.
-     *  - Если JSON некорректен или невалиден:
-     *      -> logDebug(...) + возвращаются дефолтные EngineSettings.
-     *  - Если отдельные поля отсутствуют:
-     *      -> используются значения по умолчанию из EngineSettings.
+     *      -> LOG_ERROR(...) + возвращаются дефолтные EngineSettings
+     *         (vsyncEnabled, frameLimit из значений по умолчанию структуры).
+     *  - Если JSON некорректен или структура невалидна:
+     *      -> json_utils::parseAndValidateNonCritical(...) вернёт std::nullopt,
+     *         в лог уже будут записаны сообщения о проблеме,
+     *         а loader вернёт дефолтные EngineSettings.
+     *  - Если отдельные поля отсутствуют или имеют неподходящий тип:
+     *      -> используются значения по умолчанию из EngineSettings,
+     *         при необходимости пишем предупреждения в лог (категория Config).
      *
-     * То есть это НЕ критичный конфиг: игра продолжает работать с дефолтами.
+     * Таким образом:
+     *  - отсутствие файла и битый JSON — НЕ критично, движок работает с дефолтами;
+     *  - критичными считаются только те конфиги, которые ломают архитектурные инварианты
+     *    (ресурсы, blueprints и т.п.), а EngineSettings — user/dev-тюнинг.
      */
-    EngineSettings loadEngineSettings(const std::string& path);
+
+    [[nodiscard]] EngineSettings loadEngineSettings(const std::string& path);
 
 } // namespace core::config

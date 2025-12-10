@@ -1,8 +1,6 @@
 #include "pch.h"
 
 #include "core/utils/json/json_utils.h"
-#include <cstdlib>   // для std::exit, EXIT_FAILURE
-#include <stdexcept> // для std::exception
 
 #include "core/log/log_macros.h"
 
@@ -37,12 +35,16 @@ namespace {
 
                 try {
                     if (s.size() == 6) {
-                        return {hexToByte(s.substr(0, 2)), hexToByte(s.substr(2, 2)),
-                                hexToByte(s.substr(4, 2)), 255};
+                        return {hexToByte(s.substr(0, 2)),
+                                hexToByte(s.substr(2, 2)),
+                                hexToByte(s.substr(4, 2)),
+                                255};
                     }
                     if (s.size() == 8) {
-                        return {hexToByte(s.substr(0, 2)), hexToByte(s.substr(2, 2)),
-                                hexToByte(s.substr(4, 2)), hexToByte(s.substr(6, 2))};
+                        return {hexToByte(s.substr(0, 2)),
+                                hexToByte(s.substr(2, 2)),
+                                hexToByte(s.substr(4, 2)),
+                                hexToByte(s.substr(6, 2))};
                     }
                 } catch (...) {
                     // Любая ошибка в разборе — возвращаем fallback.
@@ -133,7 +135,9 @@ namespace core::utils::json {
     // --------------------------------------------------------------------------------------------
 
     template <>
-    float parseValue<float>(const json& data, const std::string& key, const float& defaultValue) {
+    float parseValue<float>(const json& data,
+                            std::string_view key,
+                            const float& defaultValue) {
         if (!data.contains(key)) {
             return defaultValue;
         }
@@ -146,10 +150,9 @@ namespace core::utils::json {
     }
 
     template <>
-    std::string
-    parseValue<std::string>(const json& data,
-                            const std::string& key, // NOLINT(bugprone-easily-swappable-parameters)
-                            const std::string& defaultValue) {
+    std::string parseValue<std::string>(const json& data,
+                                        std::string_view key,
+                                        const std::string& defaultValue) {
         if (data.contains(key) && data.at(key).is_string()) {
             return data.at(key).get<std::string>();
         }
@@ -157,7 +160,8 @@ namespace core::utils::json {
     }
 
     template <>
-    sf::Vector2f parseValue<sf::Vector2f>(const json& data, const std::string& key,
+    sf::Vector2f parseValue<sf::Vector2f>(const json& data,
+                                          std::string_view key,
                                           const sf::Vector2f& defaultValue) {
         if (!data.contains(key)) {
             return defaultValue;
@@ -183,7 +187,9 @@ namespace core::utils::json {
     }
 
     template <>
-    bool parseValue<bool>(const json& data, const std::string& key, const bool& defaultValue) {
+    bool parseValue<bool>(const json& data,
+                          std::string_view key,
+                          const bool& defaultValue) {
         if (!data.contains(key)) {
             return defaultValue;
         }
@@ -195,7 +201,8 @@ namespace core::utils::json {
     }
 
     template <>
-    unsigned parseValue<unsigned>(const json& data, const std::string& key,
+    unsigned parseValue<unsigned>(const json& data,
+                                  std::string_view key,
                                   const unsigned& defaultValue) {
         if (!data.contains(key)) {
             return defaultValue;
@@ -220,7 +227,8 @@ namespace core::utils::json {
     // Клавиатурный парсер
     // --------------------------------------------------------------------------------------------
 
-    sf::Keyboard::Key parseKey(const json& data, const std::string& key,
+    sf::Keyboard::Key parseKey(const json& data,
+                               std::string_view key,
                                sf::Keyboard::Key defaultValue) {
         // Если нет поля или это не строка → возвращаем defaultValue.
         if (!data.contains(key) || !data.at(key).is_string()) {
@@ -234,7 +242,9 @@ namespace core::utils::json {
     // Парсер цвета
     // --------------------------------------------------------------------------------------------
 
-    sf::Color parseColor(const json& data, const std::string& key, const sf::Color& defaultValue) {
+    sf::Color parseColor(const json& data,
+                         std::string_view key,
+                         const sf::Color& defaultValue) {
         // Если в JSON нет ключа → возвращаем defaultValue.
         if (!data.contains(key)) {
             return defaultValue;
@@ -246,7 +256,8 @@ namespace core::utils::json {
     // Общие хелперы для парсинга и валидации JSON-конфигов
     // --------------------------------------------------------------------------------------------
 
-    json parseAndValidateCritical(const std::string& fileContent, std::string_view path,
+    json parseAndValidateCritical(const std::string& fileContent,
+                                  std::string_view path,
                                   const char* moduleTag,
                                   const std::vector<JsonValidator::KeyRule>& rules) {
         json data;
@@ -284,7 +295,8 @@ namespace core::utils::json {
     }
 
     std::optional<json>
-    parseAndValidateNonCritical(const std::string& fileContent, std::string_view path,
+    parseAndValidateNonCritical(const std::string& fileContent,
+                                std::string_view path,
                                 const char* moduleTag,
                                 const std::vector<JsonValidator::KeyRule>& rules) {
 

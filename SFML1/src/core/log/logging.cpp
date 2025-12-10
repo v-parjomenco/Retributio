@@ -387,7 +387,7 @@ namespace {
         }
     }
 
-    void panic(std::string_view category,
+    [[noreturn]] void panic(std::string_view category,
                std::string_view message,
                const char* file,
                int line) {

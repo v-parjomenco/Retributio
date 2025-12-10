@@ -15,11 +15,11 @@ namespace core::config {
     /**
      * @brief Загружает JSON из файла и парсит данные в DebugOverlayBlueprint.
      *
-     * Возможное поведение:
-     *  - Если файла нет / не читается           -> logDebug(...) + дефолт из DebugOverlayBlueprint.
-     *  - Если JSON некорректен или невалиден    -> logDebug(...) + дефолт из DebugOverlayBlueprint.
+     * Поведение:
+     *  - Если файла нет / не читается           -> лог + дефолт из DebugOverlayBlueprint.
+     *  - Если JSON некорректен или невалиден    -> лог + дефолт из DebugOverlayBlueprint.
      *  - Если отдельные поля отсутствуют        -> дефолт из DebugOverlayBlueprint.
      */
-    DebugOverlayBlueprint loadDebugOverlayBlueprint(const std::string& path);
+    [[nodiscard]] DebugOverlayBlueprint loadDebugOverlayBlueprint(const std::string& path);
 
 } // namespace core::config

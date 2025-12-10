@@ -2,9 +2,9 @@
 // File: core/debug/debug_config.h
 // Purpose: Compile-time debug configuration (overlay, exit UX, debug hotkeys).
 // Notes:
-//  - Эти флаги и хоткеи предназначены для разработчиков, а не для игроков.
-//  - Gameplay-контролы (WASD, действия, биндинги) настраиваются через JSON.
-//  - В Release-сборке overlay и debug-пауза по умолчанию отключены.
+//  - These flags and hotkeys are intended for developers, not players.
+//  - Gameplay controls (WASD, actions, bindings) are configured via JSON.
+//  - In the Release build, the overlay and debug pause are disabled by default.
 // ================================================================================================
 #pragma once
 

@@ -27,7 +27,7 @@ namespace core::resources {
                        "while !contains(key).");
 
                 if (!wasLoaded) {
-                    LOG_ERROR(core::log::cat::Engine,
+                    LOG_ERROR(core::log::cat::Resources,
                               "[ResourceManager] ResourceHolder::load(...) вернул false для "
                               "текстуры '{}'",
                               config.path);
@@ -39,7 +39,7 @@ namespace core::resources {
 
                 if (config.generateMipmap) {
                     if (!textureResource.generateMipmap()) {
-                        LOG_WARN(core::log::cat::Engine,
+                        LOG_WARN(core::log::cat::Resources,
                                  "[ResourceManager::ensureTextureLoadedWithConfig]\n"
                                  "Не удалось сгенерировать mipmap для текстуры: {}",
                                  config.path);
@@ -63,7 +63,7 @@ namespace core::resources {
                        "while !contains(key).");
 
                 if (!wasLoaded) {
-                    LOG_ERROR(core::log::cat::Engine,
+                    LOG_ERROR(core::log::cat::Resources,
                               "[ResourceManager] ResourceHolder::load(...) вернул false для "
                               "шрифта '{}'",
                               config.path);
@@ -86,7 +86,7 @@ namespace core::resources {
                        "while !contains(key).");
 
                 if (!wasLoaded) {
-                    LOG_ERROR(core::log::cat::Engine,
+                    LOG_ERROR(core::log::cat::Resources,
                               "[ResourceManager] ResourceHolder::load(...) вернул false для "
                               "звука '{}'",
                               config.path);
@@ -109,7 +109,7 @@ namespace core::resources {
         } catch (const std::exception& exception) {
             // Если задан fallback и это не сам fallback-ID — пробуем вернуть его.
             if (mHasMissingTextureFallback && id != mMissingTextureID) {
-                LOG_WARN(core::log::cat::Engine,
+                LOG_WARN(core::log::cat::Resources,
                          "[ResourceManager::getTexture(TextureID)]\n"
                          "Не удалось получить текстуру для ID: {}. "
                          "Используется fallback-текстура: {}. Ошибка: {}",
@@ -135,7 +135,7 @@ namespace core::resources {
             return ensureTextureLoadedWithConfig(mDynamicTextures, id, config);
         } catch (const std::exception& exception) {
             if (mHasMissingTextureFallback) {
-                LOG_WARN(core::log::cat::Engine,
+                LOG_WARN(core::log::cat::Resources,
                          "[ResourceManager::getTexture(std::string)]\n"
                          "Не удалось получить текстуру по строковому ID: {}. "
                          "Используется fallback-текстура: {}. Ошибка: {}",
@@ -161,7 +161,7 @@ namespace core::resources {
             return ensureTextureLoadedWithConfig(mDynamicTextures, path, config);
         } catch (const std::exception& exception) {
             if (mHasMissingTextureFallback) {
-                LOG_WARN(core::log::cat::Engine,
+                LOG_WARN(core::log::cat::Resources,
                          "[ResourceManager::getTextureByPath]\n"
                          "Не удалось загрузить текстуру по пути: {}. "
                          "Используется fallback-текстура: {}. Ошибка: {}",
@@ -186,7 +186,7 @@ namespace core::resources {
             return ensureFontLoadedWithConfig(mFonts, id, fontConfig);
         } catch (const std::exception& exception) {
             if (mHasMissingFontFallback && id != mMissingFontID) {
-                LOG_WARN(core::log::cat::Engine,
+                LOG_WARN(core::log::cat::Resources,
                          "[ResourceManager::getFont(FontID)]\n"
                          "Не удалось получить шрифт для ID: {}. "
                          "Используется fallback-шрифт: {}. Ошибка: {}",
@@ -209,7 +209,7 @@ namespace core::resources {
             return ensureFontLoadedWithConfig(mDynamicFonts, id, config);
         } catch (const std::exception& exception) {
             if (mHasMissingFontFallback) {
-                LOG_WARN(core::log::cat::Engine,
+                LOG_WARN(core::log::cat::Resources,
                          "[ResourceManager::getFont(std::string)]\n"
                          "Не удалось получить шрифт по строковому ID: {}. "
                          "Используется fallback-шрифт: {}. Ошибка: {}",
@@ -234,7 +234,7 @@ namespace core::resources {
             return ensureSoundLoadedWithConfig(mSounds, id, soundConfig);
         } catch (const std::exception& exception) {
             if (mHasMissingSoundFallback && id != mMissingSoundID) {
-                LOG_WARN(core::log::cat::Engine,
+                LOG_WARN(core::log::cat::Resources,
                          "[ResourceManager::getSound(SoundID)]\n"
                          "Не удалось получить звук для ID: {}. "
                          "Используется fallback-звук: {}. Ошибка: {}",
@@ -257,7 +257,7 @@ namespace core::resources {
             return ensureSoundLoadedWithConfig(mDynamicSounds, id, config);
         } catch (const std::exception& exception) {
             if (mHasMissingSoundFallback) {
-                LOG_WARN(core::log::cat::Engine,
+                LOG_WARN(core::log::cat::Resources,
                          "[ResourceManager::getSound(std::string)]\n"
                          "Не удалось получить звук по строковому ID: {}. "
                          "Используется fallback-звук: {}. Ошибка: {}",
@@ -302,15 +302,15 @@ namespace core::resources {
     // Метрики
     // --------------------------------------------------------------------------------------------
 
-    ResourceManager::ResourceMetrics ResourceManager::getMetrics() const noexcept {
-        ResourceMetrics metrics{};
-        metrics.textureCount        = mTextures.size();
-        metrics.dynamicTextureCount = mDynamicTextures.size();
-        metrics.fontCount           = mFonts.size();
-        metrics.dynamicFontCount    = mDynamicFonts.size();
-        metrics.soundCount          = mSounds.size();
-        metrics.dynamicSoundCount   = mDynamicSounds.size();
-        return metrics;
+ResourceManager::ResourceMetrics ResourceManager::getMetrics() const noexcept {
+        return ResourceMetrics{
+            .textureCount = mTextures.size(),
+            .dynamicTextureCount = mDynamicTextures.size(),
+            .fontCount = mFonts.size(),
+            .dynamicFontCount = mDynamicFonts.size(),
+            .soundCount = mSounds.size(),
+            .dynamicSoundCount = mDynamicSounds.size(),
+        };
     }
 
     // --------------------------------------------------------------------------------------------

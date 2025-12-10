@@ -31,7 +31,7 @@ namespace core::config {
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
             // FileLoader уже залогировал низкоуровневую проблему с файлом,
-            // здесь мы добавляем контекст более высокого уровня.
+            // здесь мы добавляем контекст более высокого уровня (уровня конфига).
             LOG_DEBUG(core::log::cat::Config,
                       "[DebugOverlayBlueprint]\nБудет использована конфигурация по умолчанию: {}",
                       path);
@@ -41,7 +41,7 @@ namespace core::config {
         const std::string& fileContent = *fileContentOpt;
 
         /**
-        * @brief Общий helper: парсинг + валидация для НЕ критичного конфига.
+        * @brief Общий helper: парсинг + валидация НЕ критичного конфига.
         * При любой ошибке:
         *  - в лог пишется debug-сообщение,
         *  - возвращаем std::nullopt.

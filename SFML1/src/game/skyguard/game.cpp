@@ -2,7 +2,6 @@
 
 #include "game/skyguard/game.h"
 #include <cassert>
-#include <iostream>
 
 #include "core/config/engine_settings.h"
 #include "core/config/loader/debug_overlay_loader.h"
@@ -53,7 +52,7 @@ namespace game::skyguard {
         }
 
         // Логируем итоговые настройки рендеринга один раз при запуске игры.
-        LOG_INFO(core::log::cat::Engine,
+        LOG_INFO(core::log::cat::Gameplay,
                  "[EngineSettings]\nVSync: {}, frameLimit: {}{}",
                  (engineSettings.vsyncEnabled ? "enabled" : "disabled"),
                  engineSettings.frameLimit,

@@ -3,61 +3,178 @@
 ## 📁 **Project Structure**
 ```text
 SFML1/
-├─ assets/                     # Game assets
-│  ├─ config/                  # JSON configs (e.g. player.json)
-│  ├─ fonts/                   # Fonts (e.g. Wolgadeutsche.otf)
-│  ├─ images/                  # Sprites and textures
-│  └─ sounds/                  # Sound effects and music
-│
-├─ data/                       # Engine data and definitions
-│  └─ definitions/             # Resource definitions (e.g. resources.json)
-│
-├─ include/                    # Header files (engine API)
-│  ├─ core/                    # Core engine logic
-│  │  ├─ config/               # Config keys and loader
-│  │  ├─ ecs/                  # Entity–Component–System framework
-│  │  │  ├─ components/        # Component definitions
-│  │  │  ├─ systems/           # Game logic systems (render, movement, etc.)
-│  │  │  └─ detail/            # Internal ECS mechanisms
-│  │  ├─ resources/            # Resource management layer
-│  │  │  ├─ holders/           # Generic resource holders (templates)
-│  │  │  ├─ ids/               # Enum identifiers and string helpers
-│  │  │  ├─ loader/            # Resource loading logic
-│  │  │  ├─ paths/             # Resource path definitions
-│  │  │  └─ types/             # Resource type wrappers (texture, font, sound)
-│  │  ├─ ui/                   # UI behaviors, anchors, scaling & lock policies
-│  │  └─ utils/                # Core utilities (JSON, messaging, etc.)
-│  │     └─ json/              # JSON parsing & validation helpers
-│  │
-│  ├─ entities/                # Game entities (Player, NPCs, etc.)
-│  ├─ graphics/                # Rendering utilities (future expansion)
-│  ├─ third_party/             # External libraries (e.g. nlohmann/json)
-│  └─ utils/                   # Global helper utilities
-│
-├─ src/                        # Source code (.cpp implementations)
-│  ├─ core/                    # Core engine source
-│  │  ├─ config/               # Config loader implementation
-│  │  ├─ ecs/                  # ECS framework implementation
-│  │  │  ├─ components/        # Component logic (if specialized)
-│  │  │  ├─ systems/           # System logic (movement, rendering, etc.)
-│  │  │  └─ detail/            # Internal ECS routines
-│  │  ├─ resources/            # Resource manager, holders, loader, paths, types
-│  │  │  ├─ holders/           # Template implementations for holders
-│  │  │  ├─ ids/               # Resource ID utilities
-│  │  │  ├─ loader/            # ResourceLoader implementations
-│  │  │  ├─ paths/             # Path resolver logic
-│  │  │  └─ types/             # Resource type behavior
-│  │  ├─ ui/                   # UI systems (anchor, scaling, lock behavior)
-│  │  └─ utils/                # Utility and JSON implementation
-│  │     └─ json/              # JSON parsing & validation code
-│  │
-│  ├─ entities/                # Entity logic implementations
-│  ├─ graphics/                # Graphics helpers and rendering classes
-│  ├─ third_party/             # Stubs or wrappers for external code (rarely used)
-│  └─ utils/                   # Standalone helper functions
-│
-├─ CREDITS.md                  # Contributors and acknowledgements
-├─ README.md                   # Project documentation
-├─ SFML1.sln                   # Visual Studio solution
-└─ LICENSE.MIT                 # MIT License
+├─ docs/
+│  └─ architecture/
+├─ tools/
+└─ SFML1/
+   ├─ SFML1.vcxproj
+   ├─ SFML1.vcxproj.filters
+   ├─ SFML1.vcxproj.user
+   ├─ assets/
+   │  ├─ core/
+   │  │  ├─ config/
+   │  │  └─ fonts/
+   │  └─ game/
+   │     └─ skyguard/
+   │        ├─ config/
+   │        ├─ images/
+   │        └─ sounds/
+   ├─ include/
+   │  ├─ core/
+   │  │  ├─ compiler/
+   │  │  │  ├─ platform/
+   │  │  │  │  └─ windows.h
+   │  │  │  └─ warnings.h
+   │  │  ├─ config/
+   │  │  │  ├─ blueprints/
+   │  │  │  │  └─ debug_overlay_blueprint.h
+   │  │  │  ├─ config_keys.h
+   │  │  │  ├─ engine_settings.h
+   │  │  │  ├─ loader/
+   │  │  │  │  ├─ debug_overlay_loader.h
+   │  │  │  │  └─ engine_settings_loader.h
+   │  │  │  └─ properties/
+   │  │  │     ├─ anchor_properties.h
+   │  │  │     ├─ controls_properties.h
+   │  │  │     ├─ movement_properties.h
+   │  │  │     ├─ sprite_properties.h
+   │  │  │     └─ text_properties.h
+   │  │  ├─ debug/
+   │  │  │  └─ debug_config.h
+   │  │  ├─ ecs/
+   │  │  │  ├─ component_storage.h
+   │  │  │  ├─ components/
+   │  │  │  │  ├─ keyboard_control_component.h
+   │  │  │  │  ├─ lock_behavior_component.h
+   │  │  │  │  ├─ movement_stats_component.h
+   │  │  │  │  ├─ scaling_behavior_component.h
+   │  │  │  │  ├─ sprite_component.h
+   │  │  │  │  ├─ transform_component.h
+   │  │  │  │  └─ velocity_component.h
+   │  │  │  ├─ entity.h
+   │  │  │  ├─ entity_manager.h
+   │  │  │  ├─ registry.h
+   │  │  │  ├─ system.h
+   │  │  │  ├─ system_manager.h
+   │  │  │  ├─ systems/
+   │  │  │  │  ├─ debug_overlay_system.h
+   │  │  │  │  ├─ input_system.h
+   │  │  │  │  ├─ lock_system.h
+   │  │  │  │  ├─ movement_system.h
+   │  │  │  │  ├─ render_system.h
+   │  │  │  │  └─ scaling_system.h
+   │  │  │  └─ world.h
+   │  │  ├─ log/
+   │  │  │  ├─ log_categories.h
+   │  │  │  ├─ log_defaults.h
+   │  │  │  ├─ log_level.h
+   │  │  │  ├─ log_macros.h
+   │  │  │  └─ logging.h
+   │  │  ├─ resources/
+   │  │  │  ├─ config/
+   │  │  │  │  ├─ font_resource_config.h
+   │  │  │  │  ├─ sound_resource_config.h
+   │  │  │  │  └─ texture_resource_config.h
+   │  │  │  ├─ holders/
+   │  │  │  │  ├─ resource_holder.h
+   │  │  │  │  └─ resource_holder.inl
+   │  │  │  ├─ ids/
+   │  │  │  │  ├─ resource_id_utils.h
+   │  │  │  │  └─ resource_ids.h
+   │  │  │  ├─ paths/
+   │  │  │  │  └─ resource_paths.h
+   │  │  │  ├─ resource_manager.h
+   │  │  │  └─ types/
+   │  │  │     ├─ font_resource.h
+   │  │  │     ├─ soundbuffer_resource.h
+   │  │  │     └─ texture_resource.h
+   │  │  ├─ time/
+   │  │  │  ├─ time_config.h
+   │  │  │  └─ time_service.h
+   │  │  ├─ ui/
+   │  │  │  ├─ anchor_policy.h
+   │  │  │  ├─ anchor_utils.h
+   │  │  │  ├─ ids/
+   │  │  │  │  └─ ui_id_utils.h
+   │  │  │  ├─ lock_behavior.h
+   │  │  │  └─ scaling_behavior.h
+   │  │  └─ utils/
+   │  │     ├─ file_loader.h
+   │  │     └─ json/
+   │  │        ├─ json_utils.h
+   │  │        └─ json_validator.h
+   │  ├─ game/
+   │  │  └─ skyguard/
+   │  │     ├─ config/
+   │  │     │  ├─ blueprints/
+   │  │     │  │  └─ player_blueprint.h
+   │  │     │  ├─ config_keys.h
+   │  │     │  ├─ loader/
+   │  │     │  │  ├─ config_loader.h
+   │  │     │  │  └─ window_config_loader.h
+   │  │     │  └─ window_config.h
+   │  │     ├─ ecs/
+   │  │     │  ├─ components/
+   │  │     │  │  └─ player_config_component.h
+   │  │     │  └─ systems/
+   │  │     │     └─ player_init_system.h
+   │  │     └─ game.h
+   │  ├─ pch.h
+   │  └─ third_party/
+   │     ├─ json.hpp
+   │     └─ json_silent.hpp
+   ├─ src/
+   │  ├─ core/
+   │  │  ├─ compiler/
+   │  │  │  └─ platform/
+   │  │  ├─ config/
+   │  │  │  ├─ blueprints/
+   │  │  │  ├─ loader/
+   │  │  │  │  ├─ debug_overlay_loader.cpp
+   │  │  │  │  └─ engine_settings_loader.cpp
+   │  │  │  └─ properties/
+   │  │  ├─ debug/
+   │  │  ├─ ecs/
+   │  │  │  ├─ components/
+   │  │  │  └─ systems/
+   │  │  │     ├─ debug_overlay_system.cpp
+   │  │  │     ├─ movement_system.cpp
+   │  │  │     └─ render_system.cpp
+   │  │  ├─ log/
+   │  │  │  ├─ log_level.cpp
+   │  │  │  └─ logging.cpp
+   │  │  ├─ resources/
+   │  │  │  ├─ config/
+   │  │  │  ├─ holders/
+   │  │  │  ├─ ids/
+   │  │  │  │  └─ resource_ids.cpp
+   │  │  │  ├─ paths/
+   │  │  │  │  └─ resource_paths.cpp
+   │  │  │  ├─ resource_manager.cpp
+   │  │  │  └─ types/
+   │  │  ├─ time/
+   │  │  │  └─ time_service.cpp
+   │  │  ├─ ui/
+   │  │  │  ├─ anchor_policy.cpp
+   │  │  │  ├─ ids/
+   │  │  │  │  └─ ui_id_utils.cpp
+   │  │  │  ├─ lock_behavior.cpp
+   │  │  │  └─ scaling_behavior.cpp
+   │  │  └─ utils/
+   │  │     ├─ file_loader.cpp
+   │  │     └─ json/
+   │  │        └─ json_utils.cpp
+   │  ├─ game/
+   │  │  └─ skyguard/
+   │  │     ├─ config/
+   │  │     │  ├─ blueprints/
+   │  │     │  └─ loader/
+   │  │     │     ├─ config_loader.cpp
+   │  │     │     └─ window_config_loader.cpp
+   │  │     ├─ ecs/
+   │  │     │  ├─ components/
+   │  │     │  └─ systems/
+   │  │     └─ game.cpp
+   │  └─ pch.cpp
+   └─ main_skyguard.cpp
 ```

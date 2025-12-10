@@ -95,7 +95,7 @@ namespace core::ui::ids {
         }
 
         // Неизвестное значение — лог + откат на defaultType.
-        LOG_WARN(core::log::cat::Engine,
+        LOG_WARN(core::log::cat::UI,
                  "[Anchor]\nНеизвестное значение anchor: {}. "
                  "Применено значение по умолчанию ({}).",
                  name,
@@ -114,7 +114,7 @@ namespace core::ui::ids {
             return ScalingBehaviorKind::None;
         }
 
-        LOG_WARN(core::log::cat::Engine,
+        LOG_WARN(core::log::cat::UI,
                  "[ScalingBehavior]\nНеизвестное значение resize_scaling: {}. "
                  "Применено значение по умолчанию ({}).",
                  name,
@@ -133,7 +133,7 @@ namespace core::ui::ids {
             return LockBehaviorKind::World;
         }
 
-        LOG_WARN(core::log::cat::Engine,
+        LOG_WARN(core::log::cat::UI,
                  "[LockBehavior]\nНеизвестное значение lock_behavior: {}. "
                  "Применено значение по умолчанию ({}).",
                  name,

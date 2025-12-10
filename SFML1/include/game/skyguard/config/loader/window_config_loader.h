@@ -18,14 +18,15 @@ namespace game::skyguard::config {
      *
      * Поведение:
      *  - Если файл отсутствует или не читается:
-     *      -> лог в core::log (Debug/Info) + возвращаются дефолтные WindowConfig.
+     *      -> лог в core::log (Config/Debug) + возвращаются дефолтные WindowConfig.
      *  - Если JSON некорректен или невалиден:
-     *      -> лог в core::log (Debug/Warn) + возвращаются дефолтные WindowConfig.
+     *      -> parseAndValidateNonCritical(...) вернёт std::nullopt,
+     *         в лог уже будут записаны сообщения, а loader вернёт дефолтные WindowConfig.
      *  - Если отдельные поля отсутствуют:
      *      -> используются значения по умолчанию из WindowConfig.
      *
      * То есть это НЕ критичный конфиг: игра может стартовать и без него.
      */
-    WindowConfig loadWindowConfig(const std::string& path);
+    [[nodiscard]] WindowConfig loadWindowConfig(const std::string& path);
 
 } // namespace game::skyguard::config
