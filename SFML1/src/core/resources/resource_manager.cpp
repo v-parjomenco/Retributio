@@ -19,6 +19,8 @@ namespace core::resources {
         ensureTextureLoadedWithConfig(Cache&                       cache,
                                       const Key&                   key,
                                       const TextureResourceConfig& config) {
+            bool loadedNow = false;
+
             if (!cache.contains(key)) {
                 [[maybe_unused]] const bool wasLoaded = cache.load(key, config.path);
 
@@ -27,13 +29,18 @@ namespace core::resources {
                        "while !contains(key).");
 
                 if (!wasLoaded) {
-                    LOG_ERROR(core::log::cat::Resources,
-                              "[ResourceManager] ResourceHolder::load(...) вернул false для "
-                              "текстуры '{}'",
-                              config.path);
+                    throw std::runtime_error("[ResourceManager::ensureTextureLoadedWithConfig] "
+                                             "не удалось загрузить текстуру, path='" +
+                                             config.path + "'");
+                } else {
+                    loadedNow = true;
                 }
+            }
 
-                auto& textureResource = cache.get(key);
+            auto& textureResource = cache.get(key);
+
+            // Если реально только что загрузили — применяем флаги
+            if (loadedNow) {
                 textureResource.setSmooth(config.smooth);
                 textureResource.setRepeated(config.repeated);
 
@@ -47,7 +54,7 @@ namespace core::resources {
                 }
             }
 
-            return cache.get(key);
+            return textureResource;
         }
 
         template <typename Cache, typename Key>
@@ -63,10 +70,10 @@ namespace core::resources {
                        "while !contains(key).");
 
                 if (!wasLoaded) {
-                    LOG_ERROR(core::log::cat::Resources,
-                              "[ResourceManager] ResourceHolder::load(...) вернул false для "
-                              "шрифта '{}'",
-                              config.path);
+                    throw std::runtime_error(
+                        "[ResourceManager::ensureFontLoadedWithConfig] "
+                        "не удалось загрузить шрифт, path='" + config.path + "'"
+                    );
                 }
             }
 
@@ -86,10 +93,10 @@ namespace core::resources {
                        "while !contains(key).");
 
                 if (!wasLoaded) {
-                    LOG_ERROR(core::log::cat::Resources,
-                              "[ResourceManager] ResourceHolder::load(...) вернул false для "
-                              "звука '{}'",
-                              config.path);
+                    throw std::runtime_error(
+                        "[ResourceManager::ensureSoundLoadedWithConfig] "
+                        "не удалось загрузить звук, path='" + config.path + "'"
+                    );
                 }
             }
 
@@ -112,7 +119,7 @@ namespace core::resources {
                 LOG_WARN(core::log::cat::Resources,
                          "[ResourceManager::getTexture(TextureID)]\n"
                          "Не удалось получить текстуру для ID: {}. "
-                         "Используется fallback-текстура: {}. Ошибка: {}",
+                         "Используется fallback-текстура: {}. Детали: {}",
                          ids::toString(id),
                          ids::toString(mMissingTextureID),
                          exception.what());

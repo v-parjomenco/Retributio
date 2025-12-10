@@ -21,7 +21,8 @@ namespace {
 namespace core::config {
 
     DebugOverlayBlueprint loadDebugOverlayBlueprint(const std::string& path) {
-        DebugOverlayBlueprint cfg; // стартуем с дефолтных значений
+        // Стартуем с безопасных дефолтов (источник истины №1 для значений по умолчанию).
+        DebugOverlayBlueprint cfg{};
 
         /**
         * @brief Низкоуровневое чтение файла через FileLoader.

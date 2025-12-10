@@ -39,12 +39,13 @@ namespace core::utils::json {
      */
     template <typename T>
     T parseValue(const json& data, std::string_view key, const T& defaultValue) {
-        if (!data.contains(key)) {
+        const auto it = data.find(key);
+        if (it == data.end()) {
             return defaultValue;
         }
 
         try {
-            return data.at(key).get<T>();
+            return it->get<T>();
         } catch (const std::exception&) {
             // Generic-случай: не логируем и не бросаем.
             // JSON в этом месте считается "мягким" — просто возвращаем fallback.
@@ -169,13 +170,13 @@ namespace core::utils::json {
      */
     template <typename T>
     std::optional<T> getOptional(const json& data, const char* key) {
-        if (!data.contains(key)) {
+        const auto it = data.find(key);
+        if (it == data.end()) {
             return std::nullopt;
         }
 
         try {
-            const auto& node = data.at(key);
-            return node.get<T>();
+            return it->get<T>();
         } catch (const std::exception& /*e*/) {
             // Здесь при желании можно вызвать logDebug, но без showError/std::exit.
             return std::nullopt;

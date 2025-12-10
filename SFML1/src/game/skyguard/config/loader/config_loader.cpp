@@ -75,7 +75,7 @@ namespace game::skyguard::config {
 
         // Используем PlayerBlueprint, в котором лежат properties::Sprite/Movement/Anchor/Controls
         blueprints::PlayerBlueprint
-            cfg; // создаём со значениями по умолчанию из properties (enum-дефолты)
+            cfg{}; // создаём со значениями по умолчанию из properties (enum-дефолты)
 
         // ----------------------------------------------------------------------------------------
         // Текстура: строковый ID ("Player" из player.json) → enum TextureID
@@ -159,10 +159,9 @@ namespace game::skyguard::config {
         // ----------------------------------------------------------------------------------------
         // Управляющие клавиши
         // ----------------------------------------------------------------------------------------
-        if (data.contains(keys::Player::CONTROLS) &&
-            data.at(keys::Player::CONTROLS).is_object()) {
-
-            const auto& c = data.at(keys::Player::CONTROLS);
+        const auto controlsIt = data.find(keys::Player::CONTROLS);
+        if (controlsIt != data.end() && controlsIt->is_object()) {
+            const auto& c = *controlsIt;
 
             cfg.controls.up =
                 json_utils::parseKey(c, keys::Player::CONTROL_UP, cfg.controls.up);

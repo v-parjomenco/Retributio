@@ -54,12 +54,12 @@ namespace core::log::defaults {
      */
     inline Config makeDefaultConfig() noexcept {
         Config cfg{};
-        cfg.minLevel       = MinLevel;
+        cfg.minLevel = MinLevel;
         cfg.consoleEnabled = ConsoleEnabled;
-        cfg.fileEnabled    = FileEnabled;
-        cfg.flushOnError   = FlushOnError;
-        cfg.logDirectory   = LogDirectory;
-        cfg.maxFiles       = MaxLogFiles;
+        cfg.fileEnabled = FileEnabled;
+        cfg.flushOnError = FlushOnError;
+        cfg.logDirectory = LogDirectory;
+        cfg.maxFiles = MaxLogFiles;
         return cfg;
     }
 

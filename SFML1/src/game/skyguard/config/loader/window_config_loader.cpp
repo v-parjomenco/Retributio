@@ -22,7 +22,8 @@ namespace {
 namespace game::skyguard::config {
 
     WindowConfig loadWindowConfig(const std::string& path) {
-        WindowConfig cfg; // дефолт = источник истины №1
+        // Стартуем с безопасных дефолтов (источник истины №1 для значений по умолчанию).
+        WindowConfig cfg{};
 
         // ----------------------------------------------------------------------------------------
         // Низкоуровневое чтение файла

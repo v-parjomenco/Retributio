@@ -106,8 +106,8 @@ namespace {
                 // На этом этапе core::log уже инициализирован (см. порядок в main),
                 // поэтому LOG_WARN безопасен: LOG_WARN в таком случае просто не блокирует запуск.
                 LOG_WARN(core::log::cat::Engine,
-                         "Failed to create named mutex for single instance "
-                         "(GetLastError() = {}). Continuing without guard.",
+                         "Не удалось создать именованный мьютекс для единственного экземпляра "
+                         "(GetLastError() = {}). Продолжение без защиты.",
                          static_cast<unsigned long>(GetLastError()));
                 acquired_ = true;
                 return;
@@ -396,7 +396,7 @@ int main(int argc, char* argv[])
     if (!instanceGuard.acquired()) {
         // Тут уже могли показать MessageBox (Windows) или stderr (Linux).
         LOG_WARN(core::log::cat::Engine,
-                 "Another instance is already running. Exiting.");
+                 "Другой экземпляр приложения уже запущен. Выход.");
         try {
             core::log::shutdown();
         } catch (...) {
@@ -408,7 +408,7 @@ int main(int argc, char* argv[])
 
     // 5. Запускаем игру под safety-net из try/catch.
     try {
-        LOG_INFO(core::log::cat::Engine, "Starting SkyGuard game...");
+        LOG_INFO(core::log::cat::Engine, "Launching SkyGuard...");
 
         ScopedTimer timer("Game session");
 
@@ -418,7 +418,7 @@ int main(int argc, char* argv[])
         LOG_INFO(core::log::cat::Engine, "SkyGuard game finished cleanly.");
     } catch (const std::exception& e) {
         LOG_ERROR(core::log::cat::Engine,
-                  "Unhandled exception in main(): {}",
+                  "Необработанное исключение в main(): {}",
                   e.what());
 
         /// Диалог + пауза только на верхнем уровне
@@ -434,7 +434,7 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     } catch (...) {
         LOG_ERROR(core::log::cat::Engine,
-                  "Unhandled non-std exception in main().");
+                  "Необработанное нестандартное исключение в main().");
 
         showUserErrorDialog(
             "Произошла неизвестная ошибка.\n"

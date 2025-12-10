@@ -75,8 +75,9 @@ namespace core::resources::holders {
     // noexcept подчёркивает отсутствие исключений: только поиск в unordered_map.
     template <typename Resource, typename Identifier>
     [[nodiscard]] bool
-    ResourceHolder<Resource, Identifier>::contains(const Identifier& id) const noexcept {
-        return mResourceMap.find(id) != mResourceMap.end();
+    ResourceHolder<Resource, Identifier>::contains(const Identifier& id) const noexcept {        
+        const auto it = mResourceMap.find(id);
+        return it != mResourceMap.end();
     }
 
     // --------------------------------------------------------------------------------------------

@@ -57,8 +57,8 @@ namespace game::skyguard {
                  (engineSettings.vsyncEnabled ? "enabled" : "disabled"),
                  engineSettings.frameLimit,
                  (engineSettings.vsyncEnabled
-                      ? " (VSync включён, frameLimit игнорируется)."
-                      : " (VSync выключён, frameLimit применяется)."));
+                      ? " (VSync enabled, frameLimit ignored)."
+                      : " (VSync disabled, frameLimit applied)."));
 
         // ----------------------------------------------------------------------------------------
         // Инициализация ресурсного слоя (реестр ресурсов + fallback-ресурсы)

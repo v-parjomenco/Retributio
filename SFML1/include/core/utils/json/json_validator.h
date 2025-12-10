@@ -41,19 +41,20 @@ namespace core::utils::json {
          */
         static void validate(const json& data, const std::vector<KeyRule>& rules) {
             for (const auto& rule : rules) {
-                if (!data.contains(rule.name)) {
+                const auto it = data.find(rule.name);
+                if (it == data.end()) {
                     if (rule.required) {
-                        throw std::runtime_error("\nConfig validation error: missing key '" +
-                                                 rule.name + "'");
+                        throw std::runtime_error(
+                            "\nConfig validation error: missing key '" + rule.name + "'"
+                        );
                     }
                     continue;
                 }
 
-                const auto& value = data.at(rule.name);
-                const auto type = value.type();
+                const auto type = it->type();
 
                 bool valid = false;
-                for (auto allowed : rule.allowedTypes) {
+                for (const auto allowed : rule.allowedTypes) {
                     if (type == allowed) {
                         valid = true;
                         break;
@@ -62,6 +63,8 @@ namespace core::utils::json {
 
                 if (!valid) {
                     std::string expected;
+                    expected.reserve(rule.allowedTypes.size() * 8); // маленькая микро-оптимизация
+
                     for (std::size_t i = 0; i < rule.allowedTypes.size(); ++i) {
                         expected += typeName(rule.allowedTypes[i]);
                         if (i + 1 < rule.allowedTypes.size()) {
@@ -69,9 +72,11 @@ namespace core::utils::json {
                         }
                     }
 
-                    throw std::runtime_error("\nConfig validation error: key '" + rule.name +
-                                             "' has wrong type (" + typeName(type) +
-                                             "), expected " + expected);
+                    throw std::runtime_error(
+                        "\nConfig validation error: key '" + rule.name +
+                        "' has wrong type (" + typeName(type) +
+                        "), expected " + expected
+                    );
                 }
             }
         }

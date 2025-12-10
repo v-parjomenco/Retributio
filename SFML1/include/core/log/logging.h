@@ -31,7 +31,7 @@ namespace core::log {
         bool            consoleEnabled = true;
         /// @brief Включён ли вывод в файл (logs/*.log).		
         bool            fileEnabled    = true;
-        /// @brief Должен ли лог-файл сбрасывать буфер при Error+ (Error/Critical).		
+        /// @brief Должен ли лог-файл сбрасывать буфер при Error+ (Error/Critical).
         bool            flushOnError   = true;
         /// @brief Каталог, куда складываются лог-файлы (например, "logs").		
         std::string logDirectory = "logs";

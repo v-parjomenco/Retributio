@@ -31,51 +31,47 @@ namespace {
     // Используется для FontConfig / SoundConfig.
     // --------------------------------------------------------------------------------------------
     template <typename EnumID, typename Mapper, typename Config>
-    void loadSimplePathConfigMap(const Json& data,
-                                 std::string_view keyName,
-                                 Mapper mapper,
+    void loadSimplePathConfigMap(const Json& data, std::string_view keyName, Mapper mapper,
                                  std::unordered_map<EnumID, Config>& outMap) {
 
         outMap.clear();
 
         // Ключ может отсутствовать (например, звуки ещё не используются).
-        if (!data.contains(keyName)) {
+        const auto it = data.find(keyName);
+        if (it == data.end()) {
             return;
         }
 
-        const Json& node = data.at(keyName);
+        const Json& node = *it;
         if (!node.is_object()) {
             LOG_WARN(core::log::cat::Resources,
-                     "[ResourcePaths]\n{} не является объектом, пропускаем весь блок.",
-                     keyName);
+                     "[ResourcePaths]\n{} не является объектом, пропускаем весь блок.", keyName);
             return;
         }
 
         outMap.reserve(node.size());
 
-        for (auto it = node.begin(); it != node.end(); ++it) {
-            std::string_view idStr = it.key();
-            const Json&      value = it.value();
+        for (auto nodeIt = node.begin(); nodeIt != node.end(); ++nodeIt) {
+            std::string_view idStr = nodeIt.key();
+            const Json& value = nodeIt.value();
 
             if (!value.is_string()) {
                 LOG_WARN(core::log::cat::Resources,
                          "[ResourcePaths]\nПропущен {} '{}': "
                          "значение должно быть строкой пути.",
-                         keyName,
-                         idStr);
+                         keyName, idStr);
                 continue;
             }
 
             auto idOpt = mapper(idStr);
             if (!idOpt) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourcePaths]\nНеизвестный ID в resources.json: {}",
-                         idStr);
+                         "[ResourcePaths]\nНеизвестный ID в resources.json: {}", idStr);
                 continue;
             }
 
-            Config cfg;
-            cfg.path       = value.get<std::string>();
+            Config cfg{};
+            cfg.path = value.get<std::string>();
             outMap[*idOpt] = std::move(cfg);
         }
     }
@@ -107,11 +103,12 @@ namespace {
 
         outMap.clear();
 
-        if (!data.contains(keyName)) {
+        const auto it = data.find(keyName);
+        if (it == data.end()) {
             return;
         }
 
-        const Json& node = data.at(keyName);
+        const Json& node = *it;
         if (!node.is_object()) {
             LOG_WARN(core::log::cat::Resources,
                      "[ResourcePaths]\n{} не является объектом, пропускаем весь блок.",
@@ -121,9 +118,9 @@ namespace {
 
         outMap.reserve(node.size());
 
-        for (auto it = node.begin(); it != node.end(); ++it) {
-            std::string_view idString = it.key();
-            const Json&      value    = it.value();
+        for (auto nodeIt = node.begin(); nodeIt != node.end(); ++nodeIt) {
+            std::string_view idString = nodeIt.key();
+            const Json&      value    = nodeIt.value();
 
             auto idOpt = mapper(idString);
             if (!idOpt) {
@@ -141,7 +138,7 @@ namespace {
                 continue;
             }
 
-            TextureConfig cfg;
+            TextureConfig cfg{};
 
             // path — обязателен.
             const auto pathIterator = value.find("path");
@@ -289,15 +286,18 @@ namespace core::resources::paths {
     // ============================================================================================
 
     bool ResourcePaths::contains(ids::TextureID id) noexcept {
-        return getTextureMap().find(id) != getTextureMap().end();
+        const auto& map = getTextureMap();
+        return map.find(id) != map.end();
     }
 
     bool ResourcePaths::contains(ids::FontID id) noexcept {
-        return getFontMap().find(id) != getFontMap().end();
+        const auto& map = getFontMap();
+        return map.find(id) != map.end();
     }
 
     bool ResourcePaths::contains(ids::SoundID id) noexcept {
-        return getSoundMap().find(id) != getSoundMap().end();
+        const auto& map = getSoundMap();
+        return map.find(id) != map.end();
     }
 
     // ============================================================================================

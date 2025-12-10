@@ -71,7 +71,7 @@ namespace {
      * Используется в parseKey и ConfigLoader при обработке controls.
      * Внешний API для пользователей — core::utils::json::parseKey(...).
      */
-    sf::Keyboard::Key parseKeyString(const std::string& name) {
+    sf::Keyboard::Key parseKeyString(std::string_view name) {
         using K = sf::Keyboard::Key;
 
         if (name == "W") {
@@ -138,11 +138,12 @@ namespace core::utils::json {
     float parseValue<float>(const json& data,
                             std::string_view key,
                             const float& defaultValue) {
-        if (!data.contains(key)) {
+        const auto it = data.find(key);
+        if (it == data.end()) {
             return defaultValue;
         }
 
-        const auto& v = data.at(key);
+        const auto& v = *it;
         if (v.is_number()) {
             return v.get<float>();
         }
@@ -153,8 +154,14 @@ namespace core::utils::json {
     std::string parseValue<std::string>(const json& data,
                                         std::string_view key,
                                         const std::string& defaultValue) {
-        if (data.contains(key) && data.at(key).is_string()) {
-            return data.at(key).get<std::string>();
+        const auto it = data.find(key);
+        if (it == data.end()) {
+            return defaultValue;
+        }
+
+        const auto& v = *it;
+        if (v.is_string()) {
+            return v.get<std::string>();
         }
         return defaultValue;
     }
@@ -163,11 +170,13 @@ namespace core::utils::json {
     sf::Vector2f parseValue<sf::Vector2f>(const json& data,
                                           std::string_view key,
                                           const sf::Vector2f& defaultValue) {
-        if (!data.contains(key)) {
+        const auto it = data.find(key);
+        if (it == data.end()) {
             return defaultValue;
         }
 
-        const auto& value = data.at(key);
+        const auto& value = *it;
+
         // 1) Одно число → одинаковый масштаб по X и Y.
         if (value.is_number()) {
             float v = value.get<float>();
@@ -190,10 +199,12 @@ namespace core::utils::json {
     bool parseValue<bool>(const json& data,
                           std::string_view key,
                           const bool& defaultValue) {
-        if (!data.contains(key)) {
+        const auto it = data.find(key);
+        if (it == data.end()) {
             return defaultValue;
         }
-        const auto& v = data.at(key);
+
+        const auto& v = *it;
         if (v.is_boolean()) {
             return v.get<bool>();
         }
@@ -204,10 +215,12 @@ namespace core::utils::json {
     unsigned parseValue<unsigned>(const json& data,
                                   std::string_view key,
                                   const unsigned& defaultValue) {
-        if (!data.contains(key)) {
+        const auto it = data.find(key);
+        if (it == data.end()) {
             return defaultValue;
         }
-        const auto& v = data.at(key);
+
+        const auto& v = *it;
 
         // Предпочитаем корректный беззнаковый тип.
         if (v.is_number_unsigned()) {
@@ -231,11 +244,14 @@ namespace core::utils::json {
                                std::string_view key,
                                sf::Keyboard::Key defaultValue) {
         // Если нет поля или это не строка → возвращаем defaultValue.
-        if (!data.contains(key) || !data.at(key).is_string()) {
+        const auto it = data.find(key);
+        if (it == data.end() || !it->is_string()) {
             return defaultValue;
         }
-        const std::string name = data.at(key).get<std::string>();
-        return parseKeyString(name);
+
+        // Zero-copy доступ к строке внутри JSON.
+        const auto& nameRef = it->get_ref<const std::string&>();
+        return parseKeyString(std::string_view{nameRef});
     }
 
     // --------------------------------------------------------------------------------------------
@@ -246,10 +262,12 @@ namespace core::utils::json {
                          std::string_view key,
                          const sf::Color& defaultValue) {
         // Если в JSON нет ключа → возвращаем defaultValue.
-        if (!data.contains(key)) {
+        const auto it = data.find(key);
+        if (it == data.end()) {
             return defaultValue;
         }
-        return parseColorValue(data.at(key), defaultValue);
+
+        return parseColorValue(*it, defaultValue);
     }
 
     // --------------------------------------------------------------------------------------------
