@@ -23,10 +23,14 @@
 #include "game/skyguard/ecs/components/player_config_component.h"
 #include "game/skyguard/ecs/systems/player_init_system.h"
 
-// Движковые дефолты: fixed timestep, рендер-политики, debug overlay, holdOnExit.
-namespace cfg = ::core::config;
+// Движковые конфиги (vsync, frame limit и т.п.).
+namespace cfg       = ::core::config;
+// Движковые настройки времени (fixed timestep и т.п.).
+namespace timecfg   = ::core::time;
+// Debug-флаги и хоткеи (overlay, hold on exit и т.п.).
+namespace dbg = ::core::debug;
 // Специфические игровые конфиги/blueprints для SkyGuard (player.json, window и т.п.).
-namespace skycfg = ::game::skyguard::config;
+namespace skycfg    = ::game::skyguard::config;
 
 namespace game::skyguard {
 
@@ -151,7 +155,7 @@ namespace game::skyguard {
             // Итоговое состояние: overlay включён, только если:
             //  - конфиг debug_overlay.json его не отключил;
             //  - сборка разрешает overlay (Debug=true, Release=false) через SHOW_FPS_OVERLAY.
-            mDebugOverlay->setEnabled(overlayCfg.enabled && cfg::SHOW_FPS_OVERLAY);
+            mDebugOverlay->setEnabled(overlayCfg.enabled && dbg::SHOW_FPS_OVERLAY);
         }
     }
 
@@ -173,7 +177,7 @@ namespace game::skyguard {
     void Game::run() {
         assert(mWindow.isOpen()); // проверка, что окно открылось
 
-        const sf::Time fixedTimeStep = cfg::FIXED_TIME_STEP;
+        const sf::Time fixedTimeStep = timecfg::FIXED_TIME_STEP;
 
         while (mWindow.isOpen()) {
             // Обновляем время кадра (raw dt, scaled dt, FPS/метрики).
@@ -203,7 +207,7 @@ namespace game::skyguard {
                 if (mInputSystem) {
                     mInputSystem->onKeyEvent(keyPressed->code, true);
                 }
-                if (mDebugOverlay && keyPressed->code == cfg::HOTKEY_TOGGLE_OVERLAY) {
+                if (mDebugOverlay && keyPressed->code == dbg::HOTKEY_TOGGLE_OVERLAY) {
                     mDebugOverlay->setEnabled(!mDebugOverlay->isEnabled());
                 }
             } else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) {

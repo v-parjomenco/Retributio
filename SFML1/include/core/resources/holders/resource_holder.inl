@@ -39,7 +39,7 @@ namespace core::resources::holders {
                 "\nID: " + core::resources::ids::idToString(id));
         }
 
-        // Вставляем загруженный ресурс в карту:
+        // Вставляем загруженный ресурс в map:
         // std::move(resource) передаёт владение в mResourceMap.
         mResourceMap.emplace(id, std::move(resource));
         return true;

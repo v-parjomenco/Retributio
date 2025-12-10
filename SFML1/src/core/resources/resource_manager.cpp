@@ -309,7 +309,7 @@ namespace core::resources {
     // Метрики
     // --------------------------------------------------------------------------------------------
 
-ResourceManager::ResourceMetrics ResourceManager::getMetrics() const noexcept {
+    ResourceManager::ResourceMetrics ResourceManager::getMetrics() const noexcept {
         return ResourceMetrics{
             .textureCount = mTextures.size(),
             .dynamicTextureCount = mDynamicTextures.size(),

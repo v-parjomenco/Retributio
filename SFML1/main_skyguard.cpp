@@ -352,10 +352,10 @@ namespace {
 #endif
     }
 
-    /// Пауза при выходе (зависит от core::config::DEBUG_HOLD_ON_EXIT)
+    /// Пауза при выходе (зависит от core::debug::DEBUG_HOLD_ON_EXIT)
     void holdOnExit()
     {
-        if constexpr (::core::config::DEBUG_HOLD_ON_EXIT) {
+        if constexpr (::core::debug::DEBUG_HOLD_ON_EXIT) {
 #ifdef _WIN32
             showNativeMessageBox("Нажмите OK, чтобы выйти.", "Завершение", MB_OK);
 #else

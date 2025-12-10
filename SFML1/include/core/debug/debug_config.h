@@ -10,7 +10,7 @@
 
 #include <SFML/Window/Keyboard.hpp>
 
-namespace core::config {
+namespace core::debug {
 
     // --------------------------------------------------------------------------------------------
     // Debug overlay (DebugOverlaySystem)
@@ -53,4 +53,4 @@ namespace core::config {
     inline constexpr bool DEBUG_HOLD_ON_EXIT = false;
 #endif
 
-} // namespace core::config
+} // namespace core::debug

@@ -9,7 +9,7 @@
 
 #include <SFML/System/Time.hpp>
 
-namespace core::config {
+namespace core::time {
 
     /**
      * @brief Fixed timestep used by the engine update loop.
@@ -21,4 +21,4 @@ namespace core::config {
      */
     inline const sf::Time FIXED_TIME_STEP = sf::seconds(1.f / 60.f);
 
-} // namespace core::config
+} // namespace core::time

@@ -59,10 +59,17 @@ namespace core::resources::holders {
          * @param filename Путь к файлу.
          * @param args     Дополнительные параметры для loadFromFile (если нужны конкретному типу).
          *
-         * @return true  — ресурс был реально загружен впервые;
-         * @return false — ресурс с таким ID уже существовал, загрузка не выполнялась.
+         * @return true  — ресурс был реально загружен впервые -> он добавляется в map.
+         * @return false — ресурс с таким ID уже существовал -> загрузка не выполнялась,
+         *                 map не изменяется.
          *
-         * В случае ошибки чтения/парсинга файла выбрасывается std::runtime_error.
+         * Если Resource::loadFromFile(...) вернул false (ошибка чтения/парсинга файла):
+         *      * генерируется std::runtime_error и ресурс не добавляется в map.
+         * 
+         * ВАЖНО:
+         *  - ResourceHolder сам ничего не логирует;
+         *  - ответственность за логирование/фоллбеки лежит на вызывающем коде
+         *    (обычно ResourceManager).
          */
         template <typename... Args>
         [[nodiscard]] bool load(const Identifier& id, const std::string& filename, Args&&... args);
