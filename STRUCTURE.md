@@ -1,8 +1,6 @@
 # **SkyGuard** *(name subject to change)*
 
 ## 📁 **Project Structure**
-```text
-# Project structure
 
 High-level layout of the SFML1 / SkyGuard repository.  
 
@@ -64,10 +62,11 @@ High-level layout of the SFML1 / SkyGuard repository.
    │  │     │  └─ systems/    # Game-specific ECS systems
    │  │     └─ game.h         # SkyGuard Game facade (composition root)
    │  ├─ pch.h                # Precompiled header
+   │  ├─ nlohmann/			  # nlohmann-json
    │  └─ third_party/
-   │     ├─ json.hpp          # nlohmann-json
-   │     ├─ json_silent.hpp   # Variant used where exceptions are undesirable
-   │     └─ LICENSE.MIT       # Upstream license
+   │     ├─ json_fwd.hpp      # Wrapper over <nlohmann/json_fwd.hpp> for lightweight forward declarations
+   │     ├─ json_silent.hpp   # Wrapper over <nlohmann/json.hpp> with warning suppression for json internals
+   │     └─ LICENSE.MIT       # Upstream license (nlohmann/json)
    ├─ src/
    │  ├─ core/                # Implementations mirroring include/core
    │  │  ├─ compiler/

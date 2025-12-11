@@ -89,7 +89,9 @@ SFML1/
 ├─ include/
 │  ├─ core/                  # Engine headers (ECS, resources, time, UI, logging)
 │  ├─ game/skyguard/         # SkyGuard-specific headers
-│  └─ third_party/           # nlohmann-json (vendored)
+│  ├─ nlohmann/			     # nlohmann-json (vendored)
+│  ├─ third_party/           # Thin wrappers over nlohmann-json (json_silent, json_fwd, LICENSE)
+│  └─ pch.h                  # Precompiled header (shared across core/game)
 ├─ src/
 │  ├─ core/                  # Engine implementations
 │  └─ game/skyguard/         # Game implementations

@@ -14,6 +14,13 @@
 
 #include "third_party/json_silent.hpp"
 
+#ifdef _MSC_VER
+// C5045: "Spectre mitigation" шум при проходе по вектору правил.
+// JsonValidator — чисто инфраструктурный слой, поэтому глушим ворнинг локально.
+#pragma warning(push)
+#pragma warning(disable : 5045)
+#endif
+
 namespace core::utils::json {
 
     /**
@@ -109,3 +116,7 @@ namespace core::utils::json {
     };
 
 } // namespace core::utils::json
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif

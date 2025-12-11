@@ -4,6 +4,14 @@
 
 #include "core/log/log_macros.h"
 
+#ifdef _MSC_VER
+// C5045: сообщение о том, что компилятор МОГ БЫ вставить защиту от Spectre,
+// если бы был включён /Qspectre. Для JSON-хелперов это чистый шум, поэтому
+// подавляем ворнинг локально, чтобы /WX не ломал Release-сборку.
+#pragma warning(push)
+#pragma warning(disable : 5045)
+#endif
+
 namespace {
     using core::utils::json::json;
 
@@ -357,3 +365,7 @@ namespace core::utils::json {
     }
 
 } // namespace core::utils::json
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
