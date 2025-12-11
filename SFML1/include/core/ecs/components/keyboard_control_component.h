@@ -16,18 +16,22 @@ namespace core::ecs {
      * Важно:
      *  - это чистые данные (какие клавиши считать "вверх/вниз/влево/вправо");
      *  - логика интерпретации нажатий живёт в InputSystem;
-     *  - значения по умолчанию (WASD) подходят для прототипа,
-     *    но в игре раскладка должна читаться из JSON (data-driven).
+     *  - реальные значения должны приходить из конфигов/blueprint'ов
+     *    (core::config::properties::ControlsProperties), а не из дефолтов компонента.
+     *
+     * По умолчанию компонента — "пустая" (Unknown). Это сознательное решение:
+     *  - единственный источник дефолтов (WASD) — конфиговый слой;
+     *  - init-система обязана заполнить поля при создании сущности.
      *
      * Таким образом:
      *  - ECS остаётся универсальной;
-     *  - конкретная игра (SkyGuard, платформер и т.д.) задаёт раскладку через конфиг.
+     *  - конкретная игра задаёт раскладку через JSON (data-driven).
      */
     struct KeyboardControlComponent {
-        sf::Keyboard::Key up = sf::Keyboard::Key::W;
-        sf::Keyboard::Key down = sf::Keyboard::Key::S;
-        sf::Keyboard::Key left = sf::Keyboard::Key::A;
-        sf::Keyboard::Key right = sf::Keyboard::Key::D;
+        sf::Keyboard::Key up = sf::Keyboard::Key::Unknown;
+        sf::Keyboard::Key down = sf::Keyboard::Key::Unknown;
+        sf::Keyboard::Key left = sf::Keyboard::Key::Unknown;
+        sf::Keyboard::Key right = sf::Keyboard::Key::Unknown;
     };
 
 } // namespace core::ecs

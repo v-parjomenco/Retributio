@@ -328,6 +328,8 @@ namespace core::utils::json {
                       moduleTag,
                       path,
                       e.what());
+            // В Release LOG_DEBUG вырезается, но e всё равно считается "осознанно использованной".
+            (void) e;
             return std::nullopt;
         } catch (...) {
             LOG_DEBUG(core::log::cat::Config,

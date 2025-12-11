@@ -106,7 +106,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
-      <TreatWarningAsError>false</TreatWarningAsError>
+      <TreatWarningAsError>true</TreatWarningAsError>
       <DisableSpecificWarnings>4738</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -134,7 +134,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <TreatWarningAsError>false</TreatWarningAsError>
+      <TreatWarningAsError>true</TreatWarningAsError>
       <DisableSpecificWarnings>4738</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -159,7 +159,7 @@
       <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <TreatWarningAsError>false</TreatWarningAsError>
+      <TreatWarningAsError>true</TreatWarningAsError>
       <DisableSpecificWarnings>4738</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -186,7 +186,7 @@
       <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <TreatWarningAsError>false</TreatWarningAsError>
+      <TreatWarningAsError>true</TreatWarningAsError>
       <DisableSpecificWarnings>4738</DisableSpecificWarnings>
     </ClCompile>
     <Link>

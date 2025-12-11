@@ -2,7 +2,6 @@
 
 #include "core/resources/paths/resource_paths.h"
 #include <stdexcept>
-#include <string_view>
 
 #include "core/log/log_macros.h"
 #include "core/resources/ids/resource_id_utils.h"

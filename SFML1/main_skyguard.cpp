@@ -85,6 +85,8 @@ namespace {
                       "[TIMER] {} took {} ms",
                       name_,
                       elapsed);
+            // В Release LOG_DEBUG может быть вырезан, но мы всё равно хотим избежать C4189.
+            (void) elapsed;
         }
 
     private:

@@ -116,9 +116,9 @@ namespace game::skyguard::ecs {
 
                 // Параметры движения из cfg.movement
                 world.addComponent(entity, core::ecs::MovementStatsComponent{
-                                               cfg.movement.speed,        // maxSpeed
-                                               cfg.movement.acceleration, // acceleration
-                                               cfg.movement.friction      // friction
+                                               cfg.movement.maxSpeed,
+                                               cfg.movement.acceleration,
+                                               cfg.movement.friction
                                            });
 
                 // Управление с клавиатуры — берём из JSON (или из дефолтов properties)

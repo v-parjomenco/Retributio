@@ -111,8 +111,8 @@ namespace game::skyguard::config {
         cfg.sprite.scale =
             json_utils::parseValue<sf::Vector2f>(data, keys::Player::SCALE, cfg.sprite.scale);
 
-        cfg.movement.speed =
-            json_utils::parseValue<float>(data, keys::Player::SPEED, cfg.movement.speed);
+        cfg.movement.maxSpeed =
+            json_utils::parseValue<float>(data, keys::Player::SPEED, cfg.movement.maxSpeed);
         cfg.movement.acceleration = json_utils::parseValue<float>(
             data, keys::Player::ACCELERATION, cfg.movement.acceleration);
         cfg.movement.friction =

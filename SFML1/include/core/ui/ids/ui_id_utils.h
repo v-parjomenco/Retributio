@@ -28,14 +28,15 @@ namespace core::ui::ids {
     // string_view -> enum (парсинг JSON / пользовательского ввода)
     // --------------------------------------------------------------------------------------------
 
-    AnchorType anchorFromString(std::string_view name,
-                                AnchorType defaultType = AnchorType::None) noexcept;
+    [[nodiscard]] AnchorType
+    anchorFromString(std::string_view name,
+                     AnchorType defaultType = AnchorType::None) noexcept;
 
-    ScalingBehaviorKind
+    [[nodiscard]] ScalingBehaviorKind
     scalingFromString(std::string_view name,
                       ScalingBehaviorKind defaultKind = ScalingBehaviorKind::None) noexcept;
 
-    LockBehaviorKind
+    [[nodiscard]] LockBehaviorKind
     lockFromString(std::string_view name,
                    LockBehaviorKind defaultKind = LockBehaviorKind::World) noexcept;
 
