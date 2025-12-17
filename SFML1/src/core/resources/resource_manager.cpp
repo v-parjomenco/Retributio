@@ -47,7 +47,7 @@ namespace core::resources {
                 if (config.generateMipmap) {
                     if (!textureResource.generateMipmap()) {
                         LOG_WARN(core::log::cat::Resources,
-                                 "[ResourceManager::ensureTextureLoadedWithConfig]\n"
+                                 "[ResourceManager::ensureTextureLoadedWithConfig] "
                                  "Не удалось сгенерировать mipmap для текстуры: {}",
                                  config.path);
                     }
@@ -117,7 +117,7 @@ namespace core::resources {
             // Если задан fallback и это не сам fallback-ID — пробуем вернуть его.
             if (mHasMissingTextureFallback && id != mMissingTextureID) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourceManager::getTexture(TextureID)]\n"
+                         "[ResourceManager::getTexture(TextureID)] "
                          "Не удалось получить текстуру для ID: {}. "
                          "Используется fallback-текстура: {}. Детали: {}",
                          ids::toString(id),
@@ -143,7 +143,7 @@ namespace core::resources {
         } catch (const std::exception& exception) {
             if (mHasMissingTextureFallback) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourceManager::getTexture(std::string)]\n"
+                         "[ResourceManager::getTexture(std::string)] "
                          "Не удалось получить текстуру по строковому ID: {}. "
                          "Используется fallback-текстура: {}. Ошибка: {}",
                          id,
@@ -169,7 +169,7 @@ namespace core::resources {
         } catch (const std::exception& exception) {
             if (mHasMissingTextureFallback) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourceManager::getTextureByPath]\n"
+                         "[ResourceManager::getTextureByPath] "
                          "Не удалось загрузить текстуру по пути: {}. "
                          "Используется fallback-текстура: {}. Ошибка: {}",
                          path,
@@ -194,7 +194,7 @@ namespace core::resources {
         } catch (const std::exception& exception) {
             if (mHasMissingFontFallback && id != mMissingFontID) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourceManager::getFont(FontID)]\n"
+                         "[ResourceManager::getFont(FontID)] "
                          "Не удалось получить шрифт для ID: {}. "
                          "Используется fallback-шрифт: {}. Ошибка: {}",
                          ids::toString(id),
@@ -217,7 +217,7 @@ namespace core::resources {
         } catch (const std::exception& exception) {
             if (mHasMissingFontFallback) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourceManager::getFont(std::string)]\n"
+                         "[ResourceManager::getFont(std::string)] "
                          "Не удалось получить шрифт по строковому ID: {}. "
                          "Используется fallback-шрифт: {}. Ошибка: {}",
                          id,
@@ -242,7 +242,7 @@ namespace core::resources {
         } catch (const std::exception& exception) {
             if (mHasMissingSoundFallback && id != mMissingSoundID) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourceManager::getSound(SoundID)]\n"
+                         "[ResourceManager::getSound(SoundID)] "
                          "Не удалось получить звук для ID: {}. "
                          "Используется fallback-звук: {}. Ошибка: {}",
                          ids::toString(id),
@@ -265,7 +265,7 @@ namespace core::resources {
         } catch (const std::exception& exception) {
             if (mHasMissingSoundFallback) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourceManager::getSound(std::string)]\n"
+                         "[ResourceManager::getSound(std::string)] "
                          "Не удалось получить звук по строковому ID: {}. "
                          "Используется fallback-звук: {}. Ошибка: {}",
                          id,

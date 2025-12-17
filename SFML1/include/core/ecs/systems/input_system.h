@@ -1,13 +1,12 @@
 // ================================================================================================
 // File: core/ecs/systems/input_system.h
-// Purpose: Map global keyboard state to per-entity target velocity
+// Purpose: Map global keyboard state to per-entity target velocity (EnTT backend)
 // Used by: Game loop (event forwarding), World/SystemManager
 // Related headers: keyboard_control_component.h, movement_stats_component.h, velocity_component.h
 // ================================================================================================
 #pragma once
 
 #include <array>
-#include <cmath>
 
 #include <SFML/Window/Keyboard.hpp>
 
@@ -21,88 +20,64 @@ namespace core::ecs {
 
     /**
      * @brief Система ввода: преобразует глобальное состояние клавиатуры
-     * в целевую скорость для сущностей.
+     *        в целевую скорость для сущностей.
      *
      * Поток данных:
      *  - Game пересылает события KeyPressed/KeyReleased в onKeyEvent(...);
      *  - InputSystem хранит текущее состояние всех клавиш (bool-массив);
      *  - update():
-     *      * по KeyboardControlComponent определяет, какие клавиши считаются up/down/left/right
-     *      * вычисляет нормализованный вектор направления
-     *      * множит на MovementStatsComponent::maxSpeed и пишет в VelocityComponent::linear.
+     *      * берёт раскладку из KeyboardControlComponent
+     *      * вычисляет направление (-1/0/1 по осям)
+     *      * нормализует диагональ (чтобы не было быстрее)
+     *      * пишет скорость в VelocityComponent::linear,
+     *        используя maxSpeed из MovementStatsComponent.
      *
-     * Таким образом:
-     *  - раскладка управления и параметры движения задаются через компоненты (data-driven);
-     *  - система остаётся универсальной для любых игр (SkyGuard, платформер, 4X и т.д.).
+     * Замечания:
+     *  - Система не читает события напрямую из SFML (чтобы не тащить Event в ECS);
+     *  - Система не знает ничего о конкретной игре: раскладка и параметры в компонентах.
      */
     class InputSystem final : public ISystem {
       public:
-        InputSystem() {
-            mKeyDown.fill(false);
-        }
+        InputSystem() = default;
 
         /// @brief Обновить состояние одной клавиши.
-        /// @param code код клавиши SFML
-        /// @param pressed true, если нажата; false, если отпущена
-        void onKeyEvent(sf::Keyboard::Key code, bool pressed) {
-            if (code == sf::Keyboard::Key::Unknown) {
+        void onKeyEvent(sf::Keyboard::Key code, bool pressed) noexcept {
+            const auto index = tryKeyIndex(code);
+            if (index == kInvalidIndex) {
                 return;
             }
-
-            const auto idx = static_cast<int>(code);
-            if (idx < 0) {
-                return;
-            }
-
-            const auto index = static_cast<std::size_t>(idx);
-            if (index >= mKeyDown.size()) {
-                return;
-            }
-
             mKeyDown[index] = pressed;
         }
 
         void update(World& world, float) override {
-            auto& controls  = world.storage<KeyboardControlComponent>();
-            auto& stats     = world.storage<MovementStatsComponent>();
-            auto& velos     = world.storage<VelocityComponent>();
+            auto view =
+                world.view<KeyboardControlComponent, MovementStatsComponent, VelocityComponent>();
 
-            for (auto& [entity, cc] : controls) {
-                auto* st = stats.get(entity);
-                auto* v = velos.get(entity);
-                if (!st || !v) {
-                    continue;
-                }
-
-                // Вычисляем направление по раскладке сущности и глобальному состоянию клавиш
+            view.each([this](const KeyboardControlComponent& controls,
+                             const MovementStatsComponent& stats, VelocityComponent& velocity) {
                 float dirX = 0.f;
                 float dirY = 0.f;
 
-                if (isDown(cc.left)) {
+                if (isDown(controls.left)) {
                     dirX -= 1.f;
                 }
-                if (isDown(cc.right)) {
+                if (isDown(controls.right)) {
                     dirX += 1.f;
                 }
-                if (isDown(cc.up)) {
+                if (isDown(controls.up)) {
                     dirY -= 1.f;
                 }
-                if (isDown(cc.down)) {
+                if (isDown(controls.down)) {
                     dirY += 1.f;
                 }
 
-                // Нормализация по диагонали, чтобы вправо+вверх не было быстрее, чем просто вправо
-                if (dirX != 0.f || dirY != 0.f) {
-                    const float lenSq = dirX * dirX + dirY * dirY;
-                    const float invLen = 1.f / std::sqrt(lenSq);
-                    dirX *= invLen;
-                    dirY *= invLen;
-
-                    v->linear = {dirX * st->maxSpeed, dirY * st->maxSpeed};
-                } else {
-                    v->linear = {0.f, 0.f};
+                if (dirX != 0.f && dirY != 0.f) {
+                    dirX *= kInvSqrt2;
+                    dirY *= kInvSqrt2;
                 }
-            }
+
+                velocity.linear = {dirX * stats.maxSpeed, dirY * stats.maxSpeed};
+            });
         }
 
         void render(World&, sf::RenderWindow&) override {
@@ -110,21 +85,29 @@ namespace core::ecs {
         }
 
       private:
-        // Используем KeyCount из SFML 3.0.2, чтобы не держать магическое число.
-        std::array<bool, sf::Keyboard::KeyCount> mKeyDown;
+        static constexpr std::size_t kInvalidIndex = static_cast<std::size_t>(-1);
+        static constexpr float kInvSqrt2 = 0.70710678118f; // 1/sqrt(2)
 
-        bool isDown(sf::Keyboard::Key key) const {
-            const auto idx = static_cast<int>(key);
-            if (idx < 0) {
-                return false;
+        // KeyCount из SFML — размер массива (избавляет от магических чисел).
+        std::array<bool, sf::Keyboard::KeyCount> mKeyDown{};
+
+        [[nodiscard]] std::size_t tryKeyIndex(sf::Keyboard::Key key) const noexcept {
+            // Unknown в SFML может быть отрицательным значением.
+            if (key == sf::Keyboard::Key::Unknown) {
+                return kInvalidIndex;
             }
 
-            const auto index = static_cast<std::size_t>(idx);
-            if (index >= mKeyDown.size()) {
-                return false;
+            const int idx = static_cast<int>(key);
+            if (idx < 0 || idx >= static_cast<int>(mKeyDown.size())) {
+                return kInvalidIndex;
             }
 
-            return mKeyDown[index];
+            return static_cast<std::size_t>(idx);
+        }
+
+        [[nodiscard]] bool isDown(sf::Keyboard::Key key) const noexcept {
+            const auto index = tryKeyIndex(key);
+            return (index != kInvalidIndex) ? mKeyDown[index] : false;
         }
     };
 

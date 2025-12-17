@@ -14,30 +14,45 @@ namespace core::ui {
 
     /**
      * @brief Тип политики фиксации позиции при изменении размера окна.
-     *
-     * World  - жить в мировых координатах, LockSystem не трогает позицию спрайта
-     *          (кроме синхронизации Transform).
-     * Screen - фиксировать относительное положение на экране (как HUD).
-     *
-     * Строковые имена ("WorldLock", "ScreenLock") и маппинг string <-> enum
-     * живут в core::ui::ids::lockFromString / core::ui::ids::toString.
      */
-    enum class LockBehaviorKind { World, Screen };
+    enum class LockBehaviorKind {
+        World, // жить в мировых координатах
+        Screen // фиксировать относительное положение на экране (HUD)
+    };
 
     /**
-     * @brief Логика ScreenLock-политики.
+     * @brief Логика ScreenLock-политики (СТАРАЯ ВЕРСИЯ для sf::Sprite).
      *
-     * Состояние:
-     *  - previousViewSize — размер view при предыдущем вызове;
-     *  - initialized      — флаг, использовался ли компонент (для дебага/отладки).
-     *
-     * Контракт:
-     *  - при создании сущности previousViewSize должен быть инициализирован
-     *    базовым размером окна (reference size) — это делает PlayerInitSystem;
-     *  - на каждом onResize LockSystem вызывает applyScreenLock с текущим view;
-     *  - функция пересчитывает позицию спрайта в пропорциях к новому размеру.
+     * DEPRECATED: Используется только старыми системами.
+     * Новые системы должны использовать computeScreenLockPosition().
      */
     void applyScreenLock(sf::Sprite& sprite, const sf::View& view, sf::Vector2f& previousViewSize,
                          bool& initialized);
+
+    // ============================================================================================
+    // ID-BASED ECS HELPERS (Phase 3)
+    // ============================================================================================
+
+    /**
+     * @brief Вычисление новой позиции для ScreenLock БЕЗ мутации sf::Sprite (data-driven).
+     *
+     * Старый подход:
+     *   applyScreenLock(sprite, view, previousViewSize, initialized);
+     *
+     * Новый подход:
+     *   sf::Vector2f newPos = computeScreenLockPosition(currentPos, prevViewSize, newViewSize);
+     *   transformComp.position = newPos;
+     */
+    inline sf::Vector2f computeScreenLockPosition(const sf::Vector2f& currentPosition,
+                                                  const sf::Vector2f& previousViewSize,
+                                                  const sf::Vector2f& newViewSize) {
+        const float previousWidth = std::max(1.f, previousViewSize.x);
+        const float previousHeight = std::max(1.f, previousViewSize.y);
+
+        const sf::Vector2f relativePosition = {currentPosition.x / previousWidth,
+                                               currentPosition.y / previousHeight};
+
+        return {newViewSize.x * relativePosition.x, newViewSize.y * relativePosition.y};
+    }
 
 } // namespace core::ui

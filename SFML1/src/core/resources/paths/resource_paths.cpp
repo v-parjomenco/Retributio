@@ -6,7 +6,7 @@
 #include "core/log/log_macros.h"
 #include "core/resources/ids/resource_id_utils.h"
 #include "core/utils/file_loader.h"
-#include "core/utils/json/json_utils.h"
+#include "core/utils/json/json_document.h"
 
 namespace {
 
@@ -44,7 +44,7 @@ namespace {
         const Json& node = *it;
         if (!node.is_object()) {
             LOG_WARN(core::log::cat::Resources,
-                     "[ResourcePaths]\n{} не является объектом, пропускаем весь блок.", keyName);
+                     "[ResourcePaths] {} не является объектом, пропускаем весь блок.", keyName);
             return;
         }
 
@@ -56,7 +56,7 @@ namespace {
 
             if (!value.is_string()) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourcePaths]\nПропущен {} '{}': "
+                         "[ResourcePaths] Пропущен {} '{}': "
                          "значение должно быть строкой пути.",
                          keyName, idStr);
                 continue;
@@ -65,7 +65,7 @@ namespace {
             auto idOpt = mapper(idStr);
             if (!idOpt) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourcePaths]\nНеизвестный ID в resources.json: {}", idStr);
+                         "[ResourcePaths] Неизвестный ID в resources.json: {}", idStr);
                 continue;
             }
 
@@ -110,7 +110,7 @@ namespace {
         const Json& node = *it;
         if (!node.is_object()) {
             LOG_WARN(core::log::cat::Resources,
-                     "[ResourcePaths]\n{} не является объектом, пропускаем весь блок.",
+                     "[ResourcePaths] {} не является объектом, пропускаем весь блок.",
                      keyName);
             return;
         }
@@ -124,14 +124,14 @@ namespace {
             auto idOpt = mapper(idString);
             if (!idOpt) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourcePaths]\nНеизвестный TextureID в resources.json: {}",
+                         "[ResourcePaths] Неизвестный TextureID в resources.json: {}",
                          idString);
                 continue;
             }
 
             if (!value.is_object()) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourcePaths]\nПропущена текстура '{}': ожидался объект с "
+                         "[ResourcePaths] Пропущена текстура '{}': ожидался объект с "
                          "полями конфигурации.",
                          idString);
                 continue;
@@ -143,7 +143,7 @@ namespace {
             const auto pathIterator = value.find("path");
             if (pathIterator == value.end() || !pathIterator->is_string()) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourcePaths]\nПропущена текстура '{}': поле 'path' обязательно "
+                         "[ResourcePaths] Пропущена текстура '{}': поле 'path' обязательно "
                          "и должно быть строкой.",
                          idString);
                 continue;
@@ -160,7 +160,7 @@ namespace {
                     }
                     if (!flagIterator->is_boolean()) {
                         LOG_WARN(core::log::cat::Resources,
-                                 "[ResourcePaths]\nИгнорируем поле '{}' для текстуры '{}': "
+                                 "[ResourcePaths] Игнорируем поле '{}' для текстуры '{}': "
                                  "ожидался boolean. Используем значение по умолчанию.",
                                  fieldName,
                                  idString);
@@ -191,7 +191,7 @@ namespace {
             // Последний рубеж, программная ошибка, которая должна либо ловиться
             // вызывающим кодом с логом, либо падать через глобальный обработчик
             throw std::runtime_error(std::string("[ResourcePaths::get") + typeName +
-                                     "]\nНе найден ресурс для " + typeName + ": " +
+                                     "] Не найден ресурс для " + typeName + ": " +
                                      std::string(core::resources::ids::toString(id)));
         }
         return it->second;
@@ -234,7 +234,7 @@ namespace core::resources::paths {
         const auto fileContentOpt = FileLoader::loadTextFile(filename);
         if (!fileContentOpt) {
             LOG_PANIC(core::log::cat::Resources,
-                      "[ResourcePaths]\nНе удалось открыть реестр ресурсов: {}",
+                      "[ResourcePaths] Не удалось открыть реестр ресурсов: {}",
                       filename);
         }
 

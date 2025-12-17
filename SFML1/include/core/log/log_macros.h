@@ -16,40 +16,34 @@ namespace core::log {
     // Макросы объявлены ниже вне namespace.
 } // namespace core::log
 
-// ------------------------------------------------------------------------------------------------
-// Основные макросы логирования:
-//
-//   LOG_INFO(core::log::cat::Resources, "Loaded {} textures", count);
-//   LOG_ERROR(core::log::cat::Config,   "Failed to parse config '{}'", path);
-//
-// В Debug-сборках LOG_TRACE / LOG_DEBUG активны,
-// в Release они вырезаются на уровне препроцессора.
-// ------------------------------------------------------------------------------------------------
-
 #ifdef _DEBUG
 
     #define LOG_TRACE(category, formatStr, ...)                                          \
         do {                                                                             \
-            ::core::log::detail::logf_impl(                                              \
-                ::core::log::Level::Trace,                                               \
-                (category),                                                              \
-                __FILE__,                                                                \
-                __LINE__,                                                                \
-                (formatStr) __VA_OPT__(,) __VA_ARGS__);                                  \
+            if (::core::log::wouldLog(::core::log::Level::Trace, (category))) {          \
+                ::core::log::detail::logf_impl(                                          \
+                    ::core::log::Level::Trace,                                           \
+                    (category),                                                          \
+                    __FILE__,                                                            \
+                    __LINE__,                                                            \
+                    (formatStr) __VA_OPT__(,) __VA_ARGS__);                              \
+            }                                                                            \
         } while (0)
 
     #define LOG_DEBUG(category, formatStr, ...)                                          \
         do {                                                                             \
-            ::core::log::detail::logf_impl(                                              \
-                ::core::log::Level::Debug,                                               \
-                (category),                                                              \
-                __FILE__,                                                                \
-                __LINE__,                                                                \
-                (formatStr) __VA_OPT__(,) __VA_ARGS__);                                  \
+            if (::core::log::wouldLog(::core::log::Level::Debug, (category))) {          \
+                ::core::log::detail::logf_impl(                                          \
+                    ::core::log::Level::Debug,                                           \
+                    (category),                                                          \
+                    __FILE__,                                                            \
+                    __LINE__,                                                            \
+                    (formatStr) __VA_OPT__(,) __VA_ARGS__);                              \
+            }                                                                            \
         } while (0)
 
 #else
-    // В Release-сборке Trace/Debug полностью вырезаются
+
     #define LOG_TRACE(category, formatStr, ...)                                          \
         do { (void)0; } while (0)
 
@@ -60,58 +54,51 @@ namespace core::log {
 
 #define LOG_INFO(category, formatStr, ...)                                               \
     do {                                                                                 \
-        ::core::log::detail::logf_impl(                                                  \
-            ::core::log::Level::Info,                                                    \
-            (category),                                                                  \
-            __FILE__,                                                                    \
-            __LINE__,                                                                    \
-            (formatStr) __VA_OPT__(,) __VA_ARGS__);                                      \
+        if (::core::log::wouldLog(::core::log::Level::Info, (category))) {               \
+            ::core::log::detail::logf_impl(                                              \
+                ::core::log::Level::Info,                                                \
+                (category),                                                              \
+                __FILE__,                                                                \
+                __LINE__,                                                                \
+                (formatStr) __VA_OPT__(,) __VA_ARGS__);                                  \
+        }                                                                                \
     } while (0)
 
 #define LOG_WARN(category, formatStr, ...)                                               \
     do {                                                                                 \
-        ::core::log::detail::logf_impl(                                                  \
-            ::core::log::Level::Warning,                                                 \
-            (category),                                                                  \
-            __FILE__,                                                                    \
-            __LINE__,                                                                    \
-            (formatStr) __VA_OPT__(,) __VA_ARGS__);                                      \
+        if (::core::log::wouldLog(::core::log::Level::Warning, (category))) {            \
+            ::core::log::detail::logf_impl(                                              \
+                ::core::log::Level::Warning,                                             \
+                (category),                                                              \
+                __FILE__,                                                                \
+                __LINE__,                                                                \
+                (formatStr) __VA_OPT__(,) __VA_ARGS__);                                  \
+        }                                                                                \
     } while (0)
 
 #define LOG_ERROR(category, formatStr, ...)                                              \
     do {                                                                                 \
-        ::core::log::detail::logf_impl(                                                  \
-            ::core::log::Level::Error,                                                   \
-            (category),                                                                  \
-            __FILE__,                                                                    \
-            __LINE__,                                                                    \
-            (formatStr) __VA_OPT__(,) __VA_ARGS__);                                      \
+        if (::core::log::wouldLog(::core::log::Level::Error, (category))) {              \
+            ::core::log::detail::logf_impl(                                              \
+                ::core::log::Level::Error,                                               \
+                (category),                                                              \
+                __FILE__,                                                                \
+                __LINE__,                                                                \
+                (formatStr) __VA_OPT__(,) __VA_ARGS__);                                  \
+        }                                                                                \
     } while (0)
 
 #define LOG_CRITICAL(category, formatStr, ...)                                           \
     do {                                                                                 \
-        ::core::log::detail::logf_impl(                                                  \
-            ::core::log::Level::Critical,                                                \
-            (category),                                                                  \
-            __FILE__,                                                                    \
-            __LINE__,                                                                    \
-            (formatStr) __VA_OPT__(,) __VA_ARGS__);                                      \
+        if (::core::log::wouldLog(::core::log::Level::Critical, (category))) {           \
+            ::core::log::detail::logf_impl(                                              \
+                ::core::log::Level::Critical,                                            \
+                (category),                                                              \
+                __FILE__,                                                                \
+                __LINE__,                                                                \
+                (formatStr) __VA_OPT__(,) __VA_ARGS__);                                  \
+        }                                                                                \
     } while (0)
-
-// ------------------------------------------------------------------------------------------------
-// Макрос для фатальных (panic) ошибок.
-// ------------------------------------------------------------------------------------------------
-//
-// Поведение реализаций panic/panicf_impl:
-//  - логирование на уровне Critical;
-//  - принудительный flush лог-файла;
-//  - понятный диалог/сообщение пользователю (на русском);
-//  - завершение работы процесса.
-//
-// Использование:
-//   LOG_PANIC(core::log::cat::Engine,
-//             "Unhandled exception: {}", e.what());
-// ------------------------------------------------------------------------------------------------
 
 #define LOG_PANIC(category, formatStr, ...)                                              \
     do {                                                                                 \

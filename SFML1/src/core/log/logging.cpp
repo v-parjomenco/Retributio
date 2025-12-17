@@ -4,6 +4,7 @@
 #include "core/log/log_defaults.h"
 #include "core/log/log_categories.h"
 
+#include <algorithm>
 #include <chrono>
 #include <ctime>
 #include <cstdlib>
@@ -13,6 +14,8 @@
 #include <iostream>
 #include <mutex>
 #include <sstream>
+#include <vector>
+#include <utility>
 
 #ifdef _WIN32
     #include <windows.h>
@@ -54,7 +57,7 @@ namespace {
         const auto now       = system_clock::now();
         const auto timeT     = system_clock::to_time_t(now);
 
-    std::tm localTime{};
+        std::tm localTime{};
     #ifdef _WIN32
         localtime_s(&localTime, &timeT);
     #elif defined(__unix__) || defined(__APPLE__)
@@ -72,7 +75,7 @@ namespace {
         return oss.str();
     }
 
-    #ifdef _WIN32
+#ifdef _WIN32
 
     std::wstring utf8ToWide(std::string_view text) {
         if (text.empty()) {
@@ -112,27 +115,23 @@ namespace {
     }
 
     void configureConsoleUtf8Once() {
-        static bool configured = false;
-        if (configured) {
-            return;
-        }
+        static std::once_flag once;
+        std::call_once(once, []() {
+            // Включаем UTF-8 и поддержку ANSI-цветов, если возможно.
+            SetConsoleOutputCP(CP_UTF8);
 
-        configured = true;
-
-        // Включаем UTF-8 и поддержку ANSI-цветов, если возможно.
-        SetConsoleOutputCP(CP_UTF8);
-
-        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-        if (hOut != INVALID_HANDLE_VALUE) {
-            DWORD mode = 0;
-            if (GetConsoleMode(hOut, &mode)) {
-                mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-                SetConsoleMode(hOut, mode);
+            HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+            if (hOut != INVALID_HANDLE_VALUE) {
+                DWORD mode = 0;
+                if (GetConsoleMode(hOut, &mode)) {
+                    mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+                    SetConsoleMode(hOut, mode);
+                }
             }
-        }
+        });
     }
 
-    #endif // _WIN32
+#endif // _WIN32
 
     void printToConsole(Level level, const std::string& message) {
     #ifdef _WIN32
@@ -141,7 +140,7 @@ namespace {
         HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
         if (hOut == INVALID_HANDLE_VALUE) {
             // Фоллбэк — обычный stdout без цветов.
-            std::cout << message << '\n' << std::flush; 
+            std::cout << message << '\n' << std::flush;
             return;
         }
 
@@ -164,7 +163,9 @@ namespace {
             attributes = FOREGROUND_RED | FOREGROUND_INTENSITY;
             break;
         case Level::Critical:
-            attributes = FOREGROUND_RED | FOREGROUND_INTENSITY | BACKGROUND_INTENSITY;
+            attributes =
+                (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY) |
+                (BACKGROUND_RED | BACKGROUND_INTENSITY);
             break;
         }
 
@@ -202,18 +203,20 @@ namespace {
             return;
         }
 
-        try {
-            fs::create_directories(fs::path(cfg.logDirectory));
-        } catch (...) {
+    {
+        std::error_code ec;
+        fs::create_directories(fs::path(cfg.logDirectory), ec);
+        if (ec) {
             // Если не удалось создать каталог — пишем только в консоль.
             state.config.fileEnabled = false;
             return;
         }
+    }
 
         const auto now   = std::chrono::system_clock::now();
         const auto timeT = std::chrono::system_clock::to_time_t(now);
 
-    std::tm tm{};
+        std::tm tm{};
     #ifdef _WIN32
         localtime_s(&tm, &timeT);
     #elif defined(__unix__) || defined(__APPLE__)
@@ -244,23 +247,48 @@ namespace {
         state.file.flush();
 
         // Ротация: удаляем самые старые файлы, если их больше maxFiles.
-        if (cfg.maxFiles > 0) {
-            std::vector<fs::directory_entry> entries;
-            for (const auto& entry : fs::directory_iterator(logDir)) {
-                if (entry.is_regular_file() && entry.path().extension() == ".log") {
-                    entries.push_back(entry);
-                }
+        if (cfg.maxFiles == 0) {
+            return;
+        }
+        struct LogFileInfo {
+            fs::path path;
+            fs::file_time_type time;
+        };
+
+        std::vector<LogFileInfo> files;
+        std::error_code itEc;
+        for (const auto& entry : fs::directory_iterator(logDir, itEc)) {
+            std::error_code stEc;
+            if (!entry.is_regular_file(stEc) || stEc) {
+                continue;
+            }
+            if (entry.path().extension() != ".log") {
+                continue;
             }
 
-            std::sort(entries.begin(), entries.end(),
-                      [](const fs::directory_entry& a, const fs::directory_entry& b) {
-                          return fs::last_write_time(a) > fs::last_write_time(b);
+            std::error_code tEc;
+            const auto t = entry.last_write_time(tEc);
+            fs::file_time_type ts = tEc ? fs::file_time_type::min() : t;
+            if (tEc && entry.path() == logPath) {
+                ts = fs::file_time_type::max();
+            }
+            files.push_back(LogFileInfo{
+                entry.path(),
+                ts
+            });
+        }
+
+        // Если итерация по директории не удалась — просто пропускаем ротацию (логгер работает дальше).
+        if (!itEc) {
+            std::sort(files.begin(), files.end(),
+                      [](const LogFileInfo& a, const LogFileInfo& b) {
+                          return a.time > b.time;
                       });
 
-            if (entries.size() > cfg.maxFiles) {
-                for (std::size_t i = cfg.maxFiles; i < entries.size(); ++i) {
-                    std::error_code ec;
-                    fs::remove(entries[i].path(), ec);
+            if (files.size() > cfg.maxFiles) {
+                for (std::size_t i = cfg.maxFiles; i < files.size(); ++i) {
+                    std::error_code rmEc;
+                    fs::remove(files[i].path, rmEc);
                 }
             }
         }
@@ -280,6 +308,11 @@ namespace {
 
         state.config = cfg;
         openLogFileLocked(state, cfg);
+
+        // Fast-path gate: после успешного применения конфига макросы могут отсекать
+        // форматирование без mutex.
+        g_minLevelAtomic.store(state.config.minLevel, std::memory_order_release);
+        g_fastGateReady.store(true, std::memory_order_release);
 
     #ifdef _WIN32
         if (state.config.consoleEnabled) {
@@ -302,7 +335,7 @@ namespace {
         initLocked(state, cfg);
     }
 
-    } // namespace
+} // namespace
 
     // --------------------------------------------------------------------------------------------
     // Публичный API
@@ -320,6 +353,10 @@ namespace {
 
         ensureInitialized(state);
         state.config.minLevel = level;
+
+        // Fast-path gate update.
+        g_minLevelAtomic.store(level, std::memory_order_release);
+        g_fastGateReady.store(true, std::memory_order_release);
     }
 
     void shutdown() {
@@ -336,18 +373,42 @@ namespace {
         }
 
         state.initialized = false;
+
+        // Возвращаем "консервативный режим": до следующей инициализации не делаем early-reject
+        // по atomic.
+        g_fastGateReady.store(false, std::memory_order_release);
     }
 
     void log(Level level,
              std::string_view category,
              std::string_view message,
              const char* file,
-             int line) {
+             int line) {        
+
+        // ----------------------------------------------------------------------------------------
+        // Fast-path reject БЕЗ mutex:
+        // если логгер уже инициализирован (gateReady=true), и уровень ниже порога —
+        // то нет смысла брать lock и заниматься форматированием строки лога.
+        //
+        // Важно: мы всё равно повторно проверим state.config.minLevel под mutex ниже,
+        // чтобы:
+        //  - корректно обработать гонку с setMinLevel();
+        //  - корректно работать в "консервативном режиме" (gateReady=false).
+        // ----------------------------------------------------------------------------------------
+        if (g_fastGateReady.load(std::memory_order_acquire)) {
+            const Level minLevel = g_minLevelAtomic.load(std::memory_order_relaxed);
+            if (level < minLevel) {
+                return;
+            }
+        }
+
         auto& state = getState();
         std::lock_guard<std::mutex> lock(state.mutex);
 
         ensureInitialized(state);
 
+        // Точная проверка под mutex: гарантирует, что сообщения не "пробьются" при гонке
+        // с setMinLevel().
         if (level < state.config.minLevel) {
             return;
         }
@@ -388,9 +449,9 @@ namespace {
     }
 
     [[noreturn]] void panic(std::string_view category,
-               std::string_view message,
-               const char* file,
-               int line) {
+                            std::string_view message,
+                            const char* file,
+                            int line) {
         // Пишем в лог как CRITICAL.
         log(Level::Critical, category, message, file, line);
 
@@ -403,6 +464,7 @@ namespace {
                 state.file.close();
             }
             state.initialized = false;
+            g_fastGateReady.store(false, std::memory_order_release);
         }
 
         // Собираем текст для пользователя (на русском).
@@ -429,7 +491,6 @@ namespace {
         std::cerr << "========================================\n\n";
     #endif
 
-        // Аккуратный выход: деструкторы статиков/atexit и т.п.
         std::exit(EXIT_FAILURE);
     }
 

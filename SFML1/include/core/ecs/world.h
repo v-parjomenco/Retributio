@@ -1,190 +1,271 @@
 // ================================================================================================
 // File: core/ecs/world.h
-// Purpose: ECS coordinator: entities, storages, systems
-// Used by: Game
-// Related headers: registry.h, system_manager.h, component_storage.h
+// Purpose: ECS coordinator facade over entt::registry
+// Used by: Game, all systems
+// Related headers: entity.h, system_manager.h, third_party/entt/entt_registry.hpp
 // ================================================================================================
 #pragma once
 
-#include <memory>
 #include <type_traits>
-#include <typeindex>
-#include <unordered_map>
+#include <utility>
 
 #include <SFML/Graphics.hpp>
 
-#include "core/ecs/component_storage.h"
-#include "core/ecs/registry.h"
+#include "third_party/entt/entt_registry.hpp"
+
+#include "core/ecs/entity.h"
 #include "core/ecs/system_manager.h"
 
 namespace core::ecs {
 
+    namespace detail {
+
+        /**
+         * @brief Вспомогательный трейт для проверки "чистого" типа компонента.
+         *
+         * В терминах EnTT компонент должен быть:
+         *  - без const;
+         *  - без volatile;
+         *  - без ссылок (&, &&).
+         *
+         * Мы не навязываем здесь POD/TriviallyCopyable (это отдельный уровень политики),
+         * а проверяем только "форму" типа, чтобы ошибка всплывала в нашем коде,
+         * а не где-то глубоко в EnTT/ STL (xmemory и т.п.).
+         */
+        template <typename T>
+        struct is_bare_component : std::bool_constant<
+                                      !std::is_const_v<T> &&
+                                      !std::is_volatile_v<T> &&
+                                      !std::is_reference_v<T>> {
+        };
+
+        template <typename T>
+        inline constexpr bool is_bare_component_v = is_bare_component<T>::value;
+
+    } // namespace detail
+
     /**
-     * @brief Главный координирующий класс ECS.
+     * @brief Главный координирующий класс ECS (EnTT backend).
      *
-     * Он:
-     *  - создаёт/удаляет сущности (через Registry)
-     *  - хранит ВСЕ компоненты (через type-erased map)
-     *  - обновляет ВСЕ системы
+     * Принципы дизайна:
+     *  - "Нулевая" обёртка над entt::registry (минимальный оверхед);
+     *  - все операции с компонентами инлайн и сводятся к прямым вызовам EnTT;
+     *  - интерфейс World максимально простой и дружественный к job-системе;
+     *  - системы используют view<>/group<> (нативные идиомы EnTT).
      */
     class World {
       public:
         World() = default;
         ~World() = default;
 
-        // Запрещаем копирование (из-за unique_ptr внутри)
         World(const World&) = delete;
         World& operator=(const World&) = delete;
-        // Разрешаем перемещение
-        // NOLINTNEXTLINE(performance-noexcept-move-constructor, bugprone-exception-escape)
+
+        // Движок допускает перемещение World (например, Game владеет им как полем).
         World(World&&) = default;
-        // NOLINTNEXTLINE(performance-noexcept-move-constructor, bugprone-exception-escape)
         World& operator=(World&&) = default;
 
-        // --------------------------- Сущности ---------------------------------------------------
+        // ------------------------------- Жизненный цикл сущности --------------------------------
+
+        /**
+         * @brief Создать новую сущность.
+         *
+         * Возвращает валидный дескриптор Entity, который затем можно использовать
+         * для добавления компонентов.
+         */
         [[nodiscard]] Entity createEntity() {
-            return mRegistry.createEntity();
+            return mRegistry.create();
         }
 
         /**
          * @brief Уничтожить сущность и все её компоненты.
-         *
-         * Важно:
-         *  - сначала вычищаем компоненты из всех хранилищ;
-         *  - затем удаляем сущность из Registry (dense/sparse структуры).
-         * Это гарантирует, что системы не будут продолжать работать с “висячими”
-         * компонентами уже несуществующей сущности.
          */
         void destroyEntity(Entity e) {
-            // Если сущность уже мертва — ничего не делаем
-            if (!mRegistry.isAlive(e)) {
-                return;
-            }
-            // Сначала удаляем компоненты этой сущности из всех хранилищ
-            for (auto& [type, storage] : mStorages) {
-                (void) type; // тип ключа здесь не используется — только само хранилище
-                if (storage) {
-                    storage->remove(e);
-                }
-            }
-            // Затем удаляем саму сущность из Registry
-            mRegistry.destroyEntity(e);
+            mRegistry.destroy(e);
         }
-
-        [[nodiscard]] bool isAlive(Entity e) const noexcept {
-            return mRegistry.isAlive(e);
-        }
-
-        // --------------------------- Компоненты -------------------------------------------------
 
         /**
-         * @brief Получить (создать при необходимости) хранилище компонента T.
+         * @brief Проверить, жива ли сущность (валиден ли дескриптор).
          */
-        template <typename T> ComponentStorage<T>& storage() {
-            // Получение хранилища для компонента T
-            const std::type_index key{typeid(T)}; // typeid(T) даёт тип во время выполнения
-                                                  // (TransformComponent, HealthComponent, и т.д.)
-                                                  // std::type_index - обёртка, вокруг typeid(T),
-                                                  // которая позволяет использовать тип typeid(T)
-                                                  // в unordered_map как ключ.
-            auto it = mStorages.find(key);
-            if (it != mStorages.end()) {
-                /**
-                 * static_cast преобразует IComponentStorage*, который возвращает it->second.get()
-                 * в ComponentStorage<T>*, чтобы компилятор разрешил вызывать методы set, get,
-                 * remove и т.д., которые определены только в ComponentStorage<T>, поэтому нам
-                 * нужно преобразовать тип обратно к нему.
-                 * 
-                 * (*) звездочка здесь - разыменование указателя, который возвращает static_cast,
-                 * поскольку нам нужно вернуть ComponentStorage<T>& storage(); не указатель,
-                 * а сам объект
-                 */
-                return *static_cast<ComponentStorage<T>*>(it->second.get());
-            }
-
-            // Создание при отсутствии хранилища для компонента T
-            auto storage = std::make_unique<ComponentStorage<T>>();
-            ComponentStorage<T>* ptr = storage.get();
-            /**
-             * Добавляет в mStorages новый элемент, где ключ — это тип компонента,
-             * представленный через std::type_index (обёртку вокруг typeid(T)),
-             * чтобы его можно было безопасно и корректно использовать в unordered_map
-             * в качестве ключа, а значение — передача владения только что созданным
-             * хранилищем storage.
-             */
-            mStorages.emplace(key, std::move(storage));
-            return *ptr;
+        [[nodiscard]] bool isAlive(Entity e) const noexcept {
+            return mRegistry.valid(e);
         }
 
-        // Добавить компонент сущности в хранилище по rvalue через std::move
-        template <typename T> T& addComponent(Entity e, T&& value) {
-            using PureT = std::remove_reference_t<T>; // удаляем ссылки
-            auto& s = storage<PureT>();
-            s.set(e, std::forward<T>(value));
-            return *s.get(e);
+        // --------------------------------- Доступ к компонентам ---------------------------------
+
+        /**
+         * @brief Добавить или заменить компонент у сущности.
+         *
+         * Единственный overload addComponent:
+         *  - lvalue → копирование;
+         *  - rvalue (std::move / временный объект) → перемещение;
+         *  - const& / volatile& → копирование в "голый" тип компонента (EnTT хранит T, не cvref).
+         *
+         * Важно:
+         *  - Внутренний тип компонента для EnTT — это всегда
+         *    std::remove_cv_t<std::remove_reference_t<T>>.
+         *  - Это позволяет писать удобный код на уровне вызова,
+         *    не задумываясь о cv/ref в конкретном месте.
+         */
+        template <typename T>
+        decltype(auto) addComponent(Entity e, T&& value) {
+            using ComponentType = std::remove_cv_t<std::remove_reference_t<T>>;
+
+            // Эта проверка держит контракт "хранимый тип компонента должен быть bare".
+            // (На практике remove_cv/remove_reference уже обеспечивает bare, но assert оставляем
+            // чтобы политика была явно зафиксирована в одном месте.)
+            static_assert(
+                detail::is_bare_component_v<ComponentType>,
+                "World::addComponent(): stored ECS component type must be non-const, non-volatile,"
+                " and non-reference"
+            );
+
+            return mRegistry.emplace_or_replace<ComponentType>(e, std::forward<T>(value));
         }
 
-        // Добавить компонент сущности в хранилище по const ref
-        template <typename T> T& addComponent(Entity e, const T& value) {
-            using PureT = std::remove_reference_t<T>; // удаляем ссылки
-            auto& s = storage<PureT>();               // s - переменная типа ComponentStorage<T>,
-            // здесь мы вызываем у неё метод storage(),описанный выше
-            s.set(e, value);
-            return *s.get(e);
+        /**
+         * @brief Получить указатель на изменяемый компонент (или nullptr, если компонента нет).
+         */
+        template <typename T>
+        [[nodiscard]] T* getComponent(Entity e) {
+            static_assert(
+                detail::is_bare_component_v<T>,
+                "World::getComponent<T>(): T must be a bare component type (no const/volatile/&). "
+                "Use getComponent<Foo>(), not getComponent<const Foo>() or getComponent<Foo&>()"
+            );
+            return mRegistry.try_get<T>(e);
         }
 
-        // Получить указатель на компонент, если компонент есть
-        template <typename T> [[nodiscard]] T* getComponent(Entity e) {
-            auto& s = storage<T>();
-            return s.get(e);
+        /**
+         * @brief Получить указатель на константный компонент (или nullptr, если компонента нет).
+         */
+        template <typename T>
+        [[nodiscard]] const T* getComponent(Entity e) const {
+            static_assert(
+                detail::is_bare_component_v<T>,
+                "World::getComponent<T>() const: T must be a bare component type "
+                "(no const/volatile/&). "
+                "Use getComponent<Foo>(), not getComponent<const Foo>() or getComponent<Foo&>()"
+            );
+            return mRegistry.try_get<T>(e);
         }
 
-        // Получить константный указатель на компонент (или nullptr, если компонента нет)
-        template <typename T> [[nodiscard]] const T* getComponent(Entity e) const {
-            auto& s = const_cast<World*>(this)->storage<T>();
-            return s.get(e);
+        /**
+         * @brief Удалить компонент у сущности (если он был).
+         */
+        template <typename T>
+        void removeComponent(Entity e) {
+            static_assert(
+                detail::is_bare_component_v<T>,
+                "World::removeComponent<T>(): T must be a bare component type"
+                "(no const/volatile/&). Use removeComponent<Foo>(), "
+                "not removeComponent<const Foo>() or removeComponent<Foo&>()"
+            );
+            mRegistry.remove<T>(e);
         }
 
-        // Вызывает erase в хранилище для этой сущности
-        template <typename T> void removeComponent(Entity e) {
-            auto& s = storage<T>();
-            s.remove(e);
+        // ---------------------------- Запросы систем через EnTT view ----------------------------
+
+        /**
+         * @brief EnTT view для итерации по сущностям с заданным набором компонентов.
+         *
+         * Критично:
+         *  - Components... должны быть "голыми" типами (TransformComponent, и т.п.);
+         *  - НЕ использовать const T, volatile T, T&, const T& в списке шаблонных параметров.
+         */
+        template <typename... Components>
+        [[nodiscard]] auto view() {
+            static_assert(
+                (detail::is_bare_component_v<Components> && ...),
+                "World::view<Components...>(): all component types must be bare "
+                "(no const/volatile/&). "
+                "Use view<Foo, Bar>(), not view<const Foo>() or view<Foo&>()"
+            );
+            return mRegistry.view<Components...>();
         }
 
-        // --------------------------- Системы ----------------------------------------------------
+        template <typename... Components>
+        [[nodiscard]] auto view() const {
+            static_assert(
+                (detail::is_bare_component_v<Components> && ...),
+                "World::view<Components...>() const: all component types must be bare "
+                "(no const/volatile/&). "
+                "Use view<Foo, Bar>(), not view<const Foo>() or view<Foo&>()"
+            );
+            return mRegistry.view<Components...>();
+        }
 
-        template <typename T, typename... Args> T& addSystem(Args&&... args) {
+        /**
+         * @brief EnTT group для "горячих" путей (рендер, физика и т.п.).
+         *
+         * Owned... — компоненты, которые принадлежат группе
+         *            (EnTT может их упорядочивать и хранить плотнее).
+         * Get...   — компоненты, которые лишь читаются вместе с Owned.
+         */
+        template <typename... Owned, typename... Get>
+        [[nodiscard]] auto group(entt::get_t<Get...> = {}) {
+            static_assert(
+                (detail::is_bare_component_v<Owned> && ...),
+                "World::group<Owned...>(...): Owned... must be bare component types "
+                "(no const/volatile/&)"
+            );
+            static_assert(
+                (detail::is_bare_component_v<Get> && ...),
+                "World::group<...>(entt::get<Get...>): Get... must be bare component types "
+                "(no const/volatile/&)"
+            );
+
+            return mRegistry.group<Owned...>(entt::get<Get...>);
+        }
+
+        // --------------------------------- Управление системами ---------------------------------
+
+        /**
+         * @brief Добавить систему в мир.
+         *
+         * Система создаётся внутри SystemManager и будет участвовать
+         * в update()/render() в порядке добавления.
+         */
+        template <typename T, typename... Args>
+        T& addSystem(Args&&... args) {
             return mSystems.addSystem<T>(std::forward<Args>(args)...);
         }
 
+        /**
+         * @brief Обновить все системы (логическая часть).
+         */
         void update(float dt) {
             mSystems.updateAll(*this, dt);
         }
 
+        /**
+         * @brief Отрисовать все системы, которые что-либо рисуют.
+         */
         void render(sf::RenderWindow& window) {
             mSystems.renderAll(*this, window);
         }
 
-        // Доступ к registry — если нужно низкоуровневое управление списком сущностей
-        [[nodiscard]] Registry& registry() noexcept {
+        // ------------------------------- Прямой доступ к registry -------------------------------
+
+        /**
+         * @brief Прямой доступ к entt::registry (escape hatch для сложных случаев).
+         *
+         * В обычном коде по возможности использовать методы World:
+         *  - createEntity / destroyEntity;
+         *  - addComponent / getComponent / removeComponent;
+         *  - view / group.
+         */
+        [[nodiscard]] entt::registry& registry() noexcept {
             return mRegistry;
         }
-        [[nodiscard]] const Registry& registry() const noexcept {
+
+        [[nodiscard]] const entt::registry& registry() const noexcept {
             return mRegistry;
         }
 
       private:
-        Registry mRegistry;
+        entt::registry mRegistry;
         SystemManager mSystems;
-
-        /**
-         * @brief Словарь всех компонентов
-         * - type_index позволяет искать по типу во время выполнения;
-         * - unique_ptr хранит указатель на базовый класс (IComponentStorage);
-         * - при этом каждый компонентный storage — уникален и типизирован отдельно.
-         * Благодаря этому World может хранить компоненты любого типа в одном контейнере
-         */
-        std::unordered_map<std::type_index, std::unique_ptr<IComponentStorage>> mStorages;
     };
 
 } // namespace core::ecs

@@ -375,6 +375,7 @@ namespace {
 
 int main(int argc, char* argv[])
 {
+
     // 1. Ставим terminate-handler как можно раньше, чтобы поймать любые ранние аварии.
     installTerminateHandler();
 

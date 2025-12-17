@@ -20,6 +20,7 @@ namespace core::ecs {
     class LockSystem;
     class InputSystem;
     class DebugOverlaySystem;
+    class RenderSystem;
 } // namespace core::ecs
 
 namespace game::skyguard {
@@ -60,6 +61,7 @@ namespace game::skyguard {
         core::ecs::LockSystem* mLockSystem{nullptr};           // кэшируем систему фиксации
         core::ecs::InputSystem* mInputSystem{nullptr};         // клавиатурный ввод
         core::ecs::DebugOverlaySystem* mDebugOverlay{nullptr}; // debug overlay (FPS и т.п.)
+        core::ecs::RenderSystem* mRenderSystem{nullptr};       // рендер (нужно для метрик)
     };
 
 } // namespace game::skyguard

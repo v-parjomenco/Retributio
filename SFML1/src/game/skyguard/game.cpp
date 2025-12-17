@@ -1,7 +1,16 @@
 #include "pch.h"
 
 #include "game/skyguard/game.h"
+
+#include <array>
 #include <cassert>
+#include <charconv>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
+#include <optional>
 
 #include "core/config/engine_settings.h"
 #include "core/config/loader/debug_overlay_loader.h"
@@ -32,6 +41,102 @@ namespace dbg = ::core::debug;
 // Специфические игровые конфиги/blueprints для SkyGuard (player.json, window и т.п.).
 namespace skycfg    = ::game::skyguard::config;
 
+namespace {
+
+#ifndef NDEBUG
+
+    [[nodiscard]] std::size_t readEnvSize(const char* name,
+                                          const std::size_t maxValue) noexcept {
+
+        const char* s = nullptr;
+
+    #ifdef _WIN32
+        std::array<char, 64> buf{};
+        std::size_t required = 0;
+
+        // getenv_s:
+        //  - required == 0 => переменная не задана
+        //  - required включает '\0'
+        if (::getenv_s(&required, buf.data(), buf.size(), name) != 0) {
+            return 0;
+        }
+        if (required == 0 || required > buf.size()) {
+            return 0;
+        }
+
+        s = buf.data();
+    #else
+        s = std::getenv(name);
+        if (s == nullptr || *s == '\0') {
+            return 0;
+        }
+    #endif // _WIN32
+
+        std::uint64_t value = 0;
+        const std::size_t len = std::strlen(s);
+        const auto [ptr, ec] = std::from_chars(s, s + len, value);
+        if (ec != std::errc{} || ptr != (s + len)) {
+            return 0;
+        }
+
+        if (value > static_cast<std::uint64_t>(maxValue)) {
+            return maxValue;
+        }
+
+        return static_cast<std::size_t>(value);
+    }
+
+    void spawnStressSprites(core::ecs::World& world,
+                            const std::size_t count,
+                            const core::resources::ids::TextureID textureId) {
+        if (count == 0) {
+            return;
+        }
+
+        // Квадратная сетка: удобно и детерминированно.
+        std::size_t rowLen =
+            static_cast<std::size_t>(std::sqrt(static_cast<double>(count)));
+        if (rowLen * rowLen < count) {
+            ++rowLen;
+        }
+
+        const sf::Vector2f start{10.f, 10.f};
+        const sf::Vector2f step{10.f, 10.f};
+
+        for (std::size_t i = 0; i < count; ++i) {
+            const core::ecs::Entity e = world.createEntity();
+            if (e == core::ecs::NullEntity) {
+                LOG_WARN(core::log::cat::Performance,
+                         "Stress scene: entity creation failed at i={} (spawned {}).",
+                         i, i);
+                break;
+            }
+
+            core::ecs::TransformComponent tr{};
+            tr.position = {
+                start.x + step.x * static_cast<float>(i % rowLen),
+                start.y + step.y * static_cast<float>(i / rowLen)
+            };
+
+            core::ecs::SpriteComponent sp{};
+            sp.textureId = textureId;
+
+            // Минимизируем fill-rate/GPU, чтобы стрессить именно CPU-пайплайн (sort+build+batch).
+            sp.textureRect = sf::IntRect(sf::Vector2i{0, 0}, sf::Vector2i{1, 1});
+            sp.baseScale = {8.f, 8.f};
+            sp.scale = sp.baseScale;
+            sp.origin = {0.f, 0.f};
+            sp.zOrder = 0.f;
+
+            world.addComponent(e, tr);
+            world.addComponent(e, sp);
+        }
+    }
+
+#endif // !NDEBUG
+
+} // namespace
+
 namespace game::skyguard {
 
     Game::Game() {
@@ -57,7 +162,7 @@ namespace game::skyguard {
 
         // Логируем итоговые настройки рендеринга один раз при запуске игры.
         LOG_INFO(core::log::cat::Gameplay,
-                 "[EngineSettings]\nVSync: {}, frameLimit: {}{}",
+                 "[EngineSettings] VSync: {}, frameLimit: {}{}",
                  (engineSettings.vsyncEnabled ? "enabled" : "disabled"),
                  engineSettings.frameLimit,
                  (engineSettings.vsyncEnabled
@@ -115,6 +220,17 @@ namespace game::skyguard {
 
         // Создаём сущность игрока
         mPlayerEntity = mWorld.createEntity();
+        //if (!isNull(mPlayerEntity)) {                 
+        //    LOG_INFO("Created entity {}", toUint(e));
+        //}
+
+        if (mPlayerEntity == core::ecs::NullEntity) {
+            LOG_ERROR(core::log::cat::Gameplay, "FAILED to create player entity!");
+            throw std::runtime_error("Player entity creation failed");
+        }
+
+        LOG_INFO(core::log::cat::Gameplay, "Created player entity: {}", 
+             core::ecs::toUint(mPlayerEntity));
 
         // Добавляем компонент с конфигурацией игрока из JSON (playerCfg) в ECS-мир.
         // PlayerInitSystem при первом апдейте создаст остальные компоненты
@@ -131,7 +247,7 @@ namespace game::skyguard {
         mWorld.addSystem<game::skyguard::ecs::PlayerInitSystem>(mResources, baseViewSize);
 
         mWorld.addSystem<core::ecs::MovementSystem>();
-        mWorld.addSystem<core::ecs::RenderSystem>();
+        mRenderSystem = &mWorld.addSystem<core::ecs::RenderSystem>(mResources);
         // Эти системы требуют прямого доступа (onResize, onKeyEvent),
         // поэтому сохраняем указатели.
         mScalingSystem  = &mWorld.addSystem<core::ecs::ScalingSystem>();
@@ -144,6 +260,7 @@ namespace game::skyguard {
             const sf::Font& font = mResources.getFont(core::resources::ids::FontID::Default).get();
 
             mDebugOverlay->bind(mTime, font);
+            mDebugOverlay->setRenderSystem(mRenderSystem);
 
             // Грузим конфиг для DebugOverlay.
             const auto overlayCfg =
@@ -157,6 +274,24 @@ namespace game::skyguard {
             //  - сборка разрешает overlay (Debug=true, Release=false) через SHOW_FPS_OVERLAY.
             mDebugOverlay->setEnabled(overlayCfg.enabled && dbg::SHOW_FPS_OVERLAY);
         }
+
+#ifndef NDEBUG
+        // ------------------------------------------------------------------------------------
+        // Stress scene (DEV-only): задаётся ENV, по умолчанию выключено.
+        //   SKYGUARD_STRESS_SPRITES=50000
+        // В Release этого кода не существует (не компилируется).
+        // ------------------------------------------------------------------------------------
+        constexpr std::size_t kMaxStressSprites = 1'000'000;
+        const std::size_t stressCount =
+            readEnvSize("SKYGUARD_STRESS_SPRITES", kMaxStressSprites);
+
+        if (stressCount > 0) {
+            LOG_INFO(core::log::cat::Performance,
+                     "Stress scene enabled: spawning {} sprites (ENV SKYGUARD_STRESS_SPRITES).",
+                     stressCount);
+            spawnStressSprites(mWorld, stressCount, core::resources::ids::TextureID::Player);
+        }
+#endif
     }
 
     /**
@@ -179,6 +314,9 @@ namespace game::skyguard {
 
         const sf::Time fixedTimeStep = timecfg::FIXED_TIME_STEP;
 
+        LOG_INFO(core::log::cat::Gameplay, "Game loop started");
+        int frameCount = 0;
+
         while (mWindow.isOpen()) {
             // Обновляем время кадра (raw dt, scaled dt, FPS/метрики).
             mTime.tick();
@@ -190,6 +328,11 @@ namespace game::skyguard {
             }
             // Отрисовываем текущее состояние мира.
             render();
+
+            if (++frameCount % 600 == 0) {  // раз в 600 кадров (частота зависит от FPS)
+                LOG_DEBUG(core::log::cat::Performance, "FPS: {:.1f} (frame {})",
+                          mTime.getSmoothedFps(), frameCount);
+            }
         }
     }
 

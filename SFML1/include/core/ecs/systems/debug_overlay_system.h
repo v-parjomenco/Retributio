@@ -21,6 +21,7 @@
 
 #pragma once
 #include <optional>
+#include <string>
 
 #include <SFML/Graphics.hpp>
 
@@ -40,12 +41,17 @@ namespace core {
 
 namespace core::ecs {
 
+    class RenderSystem;
+
     class DebugOverlaySystem final : public ISystem {
       public:
         DebugOverlaySystem() = default;
 
         // Связать с сервисом времени и шрифтом (полученным через ResourceManager)
         void bind(core::time::TimeService& timeService, const sf::Font& font);
+        void setRenderSystem(const RenderSystem* renderSystem) noexcept {
+            mRenderSystem = renderSystem;
+        }
 
         void setEnabled(bool enabled) noexcept {
             mEnabled = enabled;
@@ -68,7 +74,9 @@ namespace core::ecs {
 
       private:
         core::time::TimeService* mTime{nullptr}; // не владеем
+        const RenderSystem* mRenderSystem{nullptr}; // не владеем
         std::optional<sf::Text> mFpsText;
+        std::string mTextBuffer; // scratch buffer (no per-frame allocations)
         bool mEnabled{true};
     };
 

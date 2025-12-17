@@ -214,7 +214,9 @@
     <ClCompile Include="src\core\ui\lock_behavior.cpp" />
     <ClCompile Include="src\core\ui\scaling_behavior.cpp" />
     <ClCompile Include="src\core\utils\file_loader.cpp" />
-    <ClCompile Include="src\core\utils\json\json_utils.cpp" />
+    <ClCompile Include="src\core\utils\json\json_accessors.cpp" />
+    <ClCompile Include="src\core\utils\json\json_document.cpp" />
+    <ClCompile Include="src\core\utils\json\json_parsers.cpp" />
     <ClCompile Include="src\game\skyguard\config\loader\config_loader.cpp" />
     <ClCompile Include="src\game\skyguard\config\loader\window_config_loader.cpp" />
     <ClCompile Include="src\game\skyguard\game.cpp" />
@@ -250,10 +252,7 @@
     <ClInclude Include="include\core\ecs\components\sprite_component.h" />
     <ClInclude Include="include\core\ecs\components\transform_component.h" />
     <ClInclude Include="include\core\ecs\components\velocity_component.h" />
-    <ClInclude Include="include\core\ecs\component_storage.h" />
     <ClInclude Include="include\core\ecs\entity.h" />
-    <ClInclude Include="include\core\ecs\entity_manager.h" />
-    <ClInclude Include="include\core\ecs\registry.h" />
     <ClInclude Include="include\core\ecs\system.h" />
     <ClInclude Include="include\core\ecs\systems\debug_overlay_system.h" />
     <ClInclude Include="include\core\ecs\systems\input_system.h" />
@@ -287,7 +286,10 @@
     <ClInclude Include="include\core\ui\lock_behavior.h" />
     <ClInclude Include="include\core\ui\scaling_behavior.h" />
     <ClInclude Include="include\core\utils\file_loader.h" />
-    <ClInclude Include="include\core\utils\json\json_utils.h" />
+    <ClInclude Include="include\core\utils\json\json_accessors.h" />
+    <ClInclude Include="include\core\utils\json\json_common.h" />
+    <ClInclude Include="include\core\utils\json\json_document.h" />
+    <ClInclude Include="include\core\utils\json\json_parsers.h" />
     <ClInclude Include="include\core\utils\json\json_validator.h" />
     <ClInclude Include="include\game\skyguard\config\blueprints\player_blueprint.h" />
     <ClInclude Include="include\game\skyguard\config\config_keys.h" />
@@ -298,8 +300,10 @@
     <ClInclude Include="include\game\skyguard\ecs\systems\player_init_system.h" />
     <ClInclude Include="include\game\skyguard\game.h" />
     <ClInclude Include="include\pch.h" />
-    <ClInclude Include="include\third_party\json_fwd.hpp" />
-    <ClInclude Include="include\third_party\json_silent.hpp" />
+    <ClInclude Include="include\third_party\entt\entt_fwd.hpp" />
+    <ClInclude Include="include\third_party\entt\entt_registry.hpp" />
+    <ClInclude Include="include\third_party\json\json_fwd.hpp" />
+    <ClInclude Include="include\third_party\json\json_silent.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="assets\core\config\debug_overlay.json" />

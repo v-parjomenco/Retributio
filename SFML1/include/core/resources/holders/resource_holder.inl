@@ -35,7 +35,7 @@ namespace core::resources::holders {
         //  - при наличии аргументов — соответствующая перегрузка/шаблон ресурса.
         if (!resource->loadFromFile(filename, std::forward<Args>(args)...)) {
             throw std::runtime_error(
-                std::string("[ResourceHolder::load]\nНе удалось загрузить файл: ") + filename +
+                std::string("[ResourceHolder::load] Не удалось загрузить файл: ") + filename +
                 "\nID: " + core::resources::ids::idToString(id));
         }
 
@@ -55,7 +55,7 @@ namespace core::resources::holders {
     const Resource& ResourceHolder<Resource, Identifier>::get(const Identifier& id) const {
         auto found = mResourceMap.find(id);
         if (found == mResourceMap.end()) {
-            throw std::runtime_error(std::string("[ResourceHolder::get]\nРесурс не найден: ") +
+            throw std::runtime_error(std::string("[ResourceHolder::get] Ресурс не найден: ") +
                                      core::resources::ids::idToString(id));
         }
         return *found->second;

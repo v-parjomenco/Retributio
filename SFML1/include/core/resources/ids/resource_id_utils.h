@@ -19,7 +19,7 @@ namespace core::resources::ids {
     // resource_ids.h. Для std::string возвращает саму строку.
     // --------------------------------------------------------------------------------------------
     template <typename Identifier> inline std::string idToString(const Identifier&) {
-        return u8"Неизвестный ID";
+        return "Unknown ID";
     }
 
     // Специализации для ожидаемых типов ID (enum'ы)

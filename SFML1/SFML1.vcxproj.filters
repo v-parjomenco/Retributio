@@ -238,6 +238,12 @@
     <Filter Include="src\core\debug">
       <UniqueIdentifier>{b8f755f4-9e45-4234-a140-6ee661260b2a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\third_party\json">
+      <UniqueIdentifier>{862771aa-e4e5-4bbe-a46d-129428f5fb53}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\third_party\entt">
+      <UniqueIdentifier>{381451f7-1e7c-4cf2-8f4c-f70f74cc2c01}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -254,9 +260,6 @@
     </ClCompile>
     <ClCompile Include="src\core\resources\paths\resource_paths.cpp">
       <Filter>src\core\resources\paths</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\utils\json\json_utils.cpp">
-      <Filter>src\core\utils\json</Filter>
     </ClCompile>
     <ClCompile Include="src\core\time\time_service.cpp">
       <Filter>src\core\time</Filter>
@@ -306,24 +309,21 @@
     <ClCompile Include="src\core\log\log_level.cpp">
       <Filter>src\core\log</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\utils\json\json_parsers.cpp">
+      <Filter>src\core\utils\json</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\utils\json\json_accessors.cpp">
+      <Filter>src\core\utils\json</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\utils\json\json_document.cpp">
+      <Filter>src\core\utils\json</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\third_party\json_silent.hpp">
-      <Filter>include\third_party</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\resources\resource_manager.h">
       <Filter>include\core\resources</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\ecs\component_storage.h">
-      <Filter>include\core\ecs</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\ecs\entity.h">
-      <Filter>include\core\ecs</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\ecs\entity_manager.h">
-      <Filter>include\core\ecs</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\ecs\registry.h">
       <Filter>include\core\ecs</Filter>
     </ClInclude>
     <ClInclude Include="include\core\ecs\system.h">
@@ -397,9 +397,6 @@
     </ClInclude>
     <ClInclude Include="include\core\config\config_keys.h">
       <Filter>include\core\config</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\utils\json\json_utils.h">
-      <Filter>include\core\utils\json</Filter>
     </ClInclude>
     <ClInclude Include="include\core\utils\json\json_validator.h">
       <Filter>include\core\utils\json</Filter>
@@ -515,8 +512,29 @@
     <ClInclude Include="include\core\debug\debug_config.h">
       <Filter>include\core\debug</Filter>
     </ClInclude>
-    <ClInclude Include="include\third_party\json_fwd.hpp">
-      <Filter>include\third_party</Filter>
+    <ClInclude Include="include\third_party\json\json_fwd.hpp">
+      <Filter>include\third_party\json</Filter>
+    </ClInclude>
+    <ClInclude Include="include\third_party\json\json_silent.hpp">
+      <Filter>include\third_party\json</Filter>
+    </ClInclude>
+    <ClInclude Include="include\third_party\entt\entt_fwd.hpp">
+      <Filter>include\third_party\entt</Filter>
+    </ClInclude>
+    <ClInclude Include="include\third_party\entt\entt_registry.hpp">
+      <Filter>include\third_party\entt</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\utils\json\json_parsers.h">
+      <Filter>include\core\utils\json</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\utils\json\json_accessors.h">
+      <Filter>include\core\utils\json</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\utils\json\json_document.h">
+      <Filter>include\core\utils\json</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\utils\json\json_common.h">
+      <Filter>include\core\utils\json</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

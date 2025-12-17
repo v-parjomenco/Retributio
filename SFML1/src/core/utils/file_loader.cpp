@@ -31,7 +31,7 @@ namespace core::utils {
         // Если, например, путь неверный или прав нет — поток будет в "плохом" состоянии.
         if (!ifs) {
             LOG_DEBUG(core::log::cat::Engine,
-                "[FileLoader]\nНе удалось открыть файл: {}", path);
+                "[FileLoader] Не удалось открыть файл: {}", path);
             return std::nullopt;
         }
 
@@ -45,7 +45,7 @@ namespace core::utils {
         // Если позиция отрицательная — что-то пошло не так (например, ошибка потока).
         if (endPosition < 0) {
             LOG_DEBUG(core::log::cat::Engine,
-                      "[FileLoader]\nНе удалось определить размер файла: {}", path);
+                      "[FileLoader] Не удалось определить размер файла: {}", path);
             return std::nullopt;
         }
 
@@ -75,14 +75,14 @@ namespace core::utils {
             // Причины: файл укоротился, ошибка устройства и т.п.
             if (readCount != size) {
                 LOG_DEBUG(core::log::cat::Engine,
-                          "[FileLoader]\nПрочитано меньше байт, чем ожидалось: {}", path);
+                          "[FileLoader] Прочитано меньше байт, чем ожидалось: {}", path);
                 return std::nullopt;
             }
             // Дополнительная страховка: если поток в плохом состоянии
             // и это не просто "дошли до конца файла".
             if (!ifs && !ifs.eof()) {
                 LOG_DEBUG(core::log::cat::Engine,
-                    "[FileLoader]\nОшибка чтения файла: {}", path);
+                    "[FileLoader] Ошибка чтения файла: {}", path);
                 return std::nullopt;
             }
         }
@@ -116,7 +116,7 @@ namespace core::utils {
         // Если, например, путь неверный или прав нет — поток будет в "плохом" состоянии.
         if (!ifs) {
             LOG_DEBUG(core::log::cat::Engine,
-                "[FileLoader]\nНе удалось открыть бинарный файл: {}", path);
+                "[FileLoader] Не удалось открыть бинарный файл: {}", path);
             return std::nullopt;
         }
 
@@ -130,7 +130,7 @@ namespace core::utils {
         // Если позиция отрицательная — что-то пошло не так (например, ошибка потока).
         if (endPosition < 0) {
             LOG_DEBUG(core::log::cat::Engine,
-                      "[FileLoader]\nНе удалось определить размер бинарного файла: {}", path);
+                      "[FileLoader] Не удалось определить размер бинарного файла: {}", path);
             return std::nullopt;
         }
 
@@ -156,7 +156,7 @@ namespace core::utils {
             // Причины: файл укоротился, ошибка устройства и т.п.
             if (readCount != size) {
                 LOG_DEBUG(core::log::cat::Engine,
-                          "[FileLoader]\nПрочитано меньше байт, чем ожидалось (бинарный файл): {}",
+                          "[FileLoader] Прочитано меньше байт, чем ожидалось (бинарный файл): {}",
                           path);
                 return std::nullopt;
             }
@@ -164,7 +164,7 @@ namespace core::utils {
             // и это не просто "дошли до конца файла".
             if (!ifs && !ifs.eof()) {
                 LOG_DEBUG(core::log::cat::Engine,
-                          "[FileLoader]\nОшибка чтения бинарного файла: {}", path);
+                          "[FileLoader] Ошибка чтения бинарного файла: {}", path);
                 return std::nullopt;
             }
         }

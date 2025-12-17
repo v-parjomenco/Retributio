@@ -1,5 +1,5 @@
 // ================================================================================================
-// File: third_party/json_silent.hpp
+// File: third_party/json/json_silent.hpp
 // Purpose: Wrapper around <nlohmann/json.hpp> with warning suppression for third-party code.
 // Notes:
 //  - Used in implementation files and JSON helpers.

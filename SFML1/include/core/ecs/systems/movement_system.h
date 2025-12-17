@@ -9,16 +9,20 @@
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/components/velocity_component.h"
 #include "core/ecs/system.h"
-#include "core/ecs/world.h"
 
 namespace core::ecs {
 
     /** 
-    * @brief Система движения
-    * проходит по всем сущностям, у которых есть и Transform и Velocity,
-    * и выполняет: position += velocity * dt
+    * @brief Базовая система движения: position += velocity * dt.
+    * 
+    * Контракт:
+    * - работает только по сущностям, у которых есть TransformComponent + VelocityComponent;
+    * - выполняет интегрирование Эйлером: position += velocity * dt.
+    * 
+    * Примечание:
+    * - dt должен быть строго положительным; источник dt — TimeService/игровой цикл.
     */
-    class MovementSystem : public ISystem {
+    class MovementSystem final : public ISystem {
       public:
         MovementSystem() = default;
         ~MovementSystem() override = default;

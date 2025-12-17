@@ -1,7 +1,7 @@
 // ================================================================================================
 // File: core/utils/json/json_validator.h
 // Purpose: Lightweight schema-like validation helper for JSON configs.
-// Used by: json_utils::parseAndValidateCritical/NonCritical, config loaders, debug blueprints.
+// Used by: json_utils::parseAndValidateCritical/NonCritical, config loaders.
 // Notes:
 //  - Pure structural validation: no logging, no UI, no engine-level dependencies.
 //  - On violation throws std::runtime_error with human-readable description.
@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "third_party/json_silent.hpp"
+#include "third_party/json/json_silent.hpp"
 
 #ifdef _MSC_VER
 // C5045: "Spectre mitigation" шум при проходе по вектору правил.

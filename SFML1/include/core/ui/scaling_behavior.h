@@ -14,32 +14,45 @@ namespace core::ui {
 
     /**
      * @brief Тип политики масштабирования при изменении размера окна.
-     *
-     * None    - без дополнительного масштабирования;
-     * Uniform - равномерное масштабирование относительно базового размера окна.
-     *
-     * Строковые имена ("None", "Uniform") и маппинг string <-> enum живут
-     * в core::ui::ids::scalingFromString / core::ui::ids::toString.
      */
-    enum class ScalingBehaviorKind { None, Uniform };
+    enum class ScalingBehaviorKind {
+        None,   // без дополнительного масштабирования
+        Uniform // равномерное масштабирование
+    };
 
     /**
-     * @brief Реализация Uniform-скейлинга.
+     * @brief Реализация Uniform-скейлинга (СТАРАЯ ВЕРСИЯ для sf::Sprite).
      *
-     *  - baseViewSize задаётся при создании сущности (reference size),
-     *    обычно равен начальному размеру окна игры;
-     *  - lastUniform — последний применённый равномерный коэффициент масштабирования.
-     *
-     * Алгоритм:
-     *  - newUniform = min(currentView.x / baseViewSize.x,
-     *                     currentView.y / baseViewSize.y);
-     *  - ratio = newUniform / lastUniform;
-     *  - sprite.scale *= ratio;
-     *  - lastUniform = newUniform.
-     *
-     * Таким образом масштаб спрайта всегда равен baseScale * newUniform.
+     * DEPRECATED: Используется только старыми системами.
+     * Новые системы должны использовать computeUniformFactor().
      */
     void applyUniformScaling(sf::Sprite& sprite, const sf::View& view,
                              const sf::Vector2f& baseViewSize, float& lastUniform);
+
+    // ============================================================================================
+    // ID-BASED ECS HELPERS (Phase 3)
+    // ============================================================================================
+
+    /**
+     * @brief Вычисление uniform factor БЕЗ мутации sf::Sprite (data-driven).
+     *
+     * Старый подход (инкрементальный, накапливает ошибки):
+     *   applyUniformScaling(sprite, view, baseViewSize, lastUniform);
+     *
+     * Новый подход (детерминированный):
+     *   float uniformFactor = computeUniformFactor(view, baseViewSize);
+     *   spriteComp.scale = spriteComp.baseScale * uniformFactor;
+     */
+    inline float computeUniformFactor(const sf::View& view, const sf::Vector2f& baseViewSize) {
+        const sf::Vector2f safeBaseSize{std::max(baseViewSize.x, 1.f),
+                                        std::max(baseViewSize.y, 1.f)};
+
+        const sf::Vector2f currentViewSize = view.getSize();
+
+        const float scaleX = currentViewSize.x / safeBaseSize.x;
+        const float scaleY = currentViewSize.y / safeBaseSize.y;
+
+        return std::min(scaleX, scaleY);
+    }
 
 } // namespace core::ui

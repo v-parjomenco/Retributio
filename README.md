@@ -89,8 +89,12 @@ SFML1/
 ├─ include/
 │  ├─ core/                  # Engine headers (ECS, resources, time, UI, logging)
 │  ├─ game/skyguard/         # SkyGuard-specific headers
+   ├─ entt/			   		 # Fast and reliable ECS system
 │  ├─ nlohmann/			     # nlohmann-json (vendored)
-│  ├─ third_party/           # Thin wrappers over nlohmann-json (json_silent, json_fwd, LICENSE)
+│  ├─ third_party/           # Thin wrappers over nlohmann-json and EnTT (json_silent, json_fwd)
+│  │  ├─ entt/				 # Wrappers over entt   
+│  │  ├─ json/				 # Wrappers over <nlohmann/json>
+│  │  └─ licenses/ 			 # Third party licenses
 │  └─ pch.h                  # Precompiled header (shared across core/game)
 ├─ src/
 │  ├─ core/                  # Engine implementations
@@ -294,11 +298,12 @@ clang-format -i $(git ls-files *.h *.cpp)
 
 ---
 
-## 🪪 **License**
+## 🪪 **Licenses**
 
 - **Engine code:** License TBD (to be formalized)
-- **Third-party libraries:** nlohmann-json under MIT License — see [LICENSE.MIT](./SFML1/include/third_party/LICENSE.MIT)
-
+- **Third-party libraries:**
+	- nlohmann-json under MIT License — see [json_license.mit](./SFML1/include/third_party/licenses/json_license.mit)
+	- entt under MIT License — see [entt_license.mit](./SFML1/include/third_party/licenses/entt_license.mit)
 ---
 
 ## 🙏 **Credits**
