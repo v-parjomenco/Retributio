@@ -1,22 +1,20 @@
 // ================================================================================================
 // File: core/ecs/system_manager.h
-// Purpose: Owns and sequences systems (update/render)
-// Used by: World
-// Related headers: system.h
+// Purpose: Owns and orchestrates ECS systems.
+// Used by: core/ecs/world.h
 // ================================================================================================
 #pragma once
 
 #include <memory>
 #include <type_traits>
+#include <utility>
 #include <vector>
-
-#include <SFML/Graphics.hpp>
 
 #include "core/ecs/system.h"
 
 namespace core::ecs {
 
-    class World; // вперёд
+    class World;
 
     /**
      * @brief Простой менеджер систем.
@@ -31,7 +29,7 @@ namespace core::ecs {
         SystemManager() = default;
         ~SystemManager() = default;
 
-        // Запрещаем копирование (из-за unique_ptr внутри)
+        // SystemManager — владелец систем, и его копирование запрещено по архитектуре.
         SystemManager(const SystemManager&) = delete;
         SystemManager& operator=(const SystemManager&) = delete;
         // Разрешаем перемещение
@@ -42,11 +40,13 @@ namespace core::ecs {
          * @brief Добавить систему любого типа.
          * @return ссылка на созданную систему, чтобы можно было её дальше настраивать.
          */
-        template <typename T, typename... Args> T& addSystem(Args&&... args) {
+        template <typename T, typename... Args>
+        T& addSystem(Args&&... args) {
             static_assert(std::is_base_of_v<ISystem, T>, "T must derive from ISystem");
-            auto ptr = std::make_unique<T>(std::forward<Args>(args)...);
-            T& ref = *ptr;
-            mSystems.push_back(std::move(ptr));
+
+            auto sys = std::make_unique<T>(std::forward<Args>(args)...);
+            T& ref = *sys;
+            mSystems.push_back(std::move(sys));
             return ref;
         }
 

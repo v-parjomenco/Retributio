@@ -1,50 +1,43 @@
 // ================================================================================================
 // File: core/ecs/system.h
-// Purpose: Base interface for systems (update/render)
-// Used by: SystemManager, concrete systems
-// Related headers: system_manager.h, world.h
+// Purpose: Base interface for ECS systems.
+// Used by: core/ecs/system_manager.h, core/ecs/world.h, all concrete systems.
 // ================================================================================================
 #pragma once
 
-#include <SFML/Graphics.hpp>
+namespace sf {
+    class RenderWindow;
+} // namespace sf
 
 namespace core::ecs {
 
     class World; // предварительное объявление класса (forward declaration),
-    // чтобы компилятор знал, что такой класс есть, но ему не нужно знать, что у него внутри,
-    // поэтому мы не подключаем его, через include,
-    // чтобы избежать цепочку рекурсивных зависимостей между заголовками
+                 // чтобы не тянуть весь world.h сюда.
 
     /**
-     * @brief Базовый интерфейс для всех систем ECS.
+     * @brief Базовый интерфейс ECS-системы.
      *
-     * Система — это "кусок логики", который:
-     *  - не хранит данные
-     *  - работает поверх компонентов в World
-     *  - ничего не знает про конкретные сущности, только про их компоненты
+     * Cистемы:
+     *  - не хранят данные
+     *  - ничего не знают про конкретные сущности, только про их компоненты
+     *  - не владеют ресурсами: они должны быть переданы в конструктор извне (DI).
+     *
+     * Комментарии по контракту:
+     *  - update() вызывается каждый тик (или каждый кадр, зависит от Game).
+     *  - render() вызывается в рендер-фазе, после update().
      */
     class ISystem {
       public:
         virtual ~ISystem() = default;
 
-        /**
-         * @brief Логическое обновление (каждый кадр / с фиксированным шагом)
-         * @param world — ECS-мир, из которого можно забрать компоненты
-         * @param dt    — дельта-время в секундах
-         */
         virtual void update(World& world, float dt) {
-            // по умолчанию ничего не делаем
-            (void) world;
-            (void) dt;
+            (void)world;
+            (void)dt;
         }
 
-        /**
-         * @brief Отрисовка (не всем системам нужна, но удобно иметь)
-         */
         virtual void render(World& world, sf::RenderWindow& window) {
-            // по умолчанию ничего не делаем
-            (void) world;
-            (void) window;
+            (void)world;
+            (void)window;
         }
     };
 
