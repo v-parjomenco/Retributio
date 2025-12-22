@@ -21,25 +21,8 @@ namespace core::ui {
     };
 
     /**
-     * @brief Логика ScreenLock-политики (СТАРАЯ ВЕРСИЯ для sf::Sprite).
-     *
-     * DEPRECATED: Используется только старыми системами.
-     * Новые системы должны использовать computeScreenLockPosition().
-     */
-    void applyScreenLock(sf::Sprite& sprite, const sf::View& view, sf::Vector2f& previousViewSize,
-                         bool& initialized);
-
-    // ============================================================================================
-    // ID-BASED ECS HELPERS (Phase 3)
-    // ============================================================================================
-
-    /**
      * @brief Вычисление новой позиции для ScreenLock БЕЗ мутации sf::Sprite (data-driven).
      *
-     * Старый подход:
-     *   applyScreenLock(sprite, view, previousViewSize, initialized);
-     *
-     * Новый подход:
      *   sf::Vector2f newPos = computeScreenLockPosition(currentPos, prevViewSize, newViewSize);
      *   transformComp.position = newPos;
      */

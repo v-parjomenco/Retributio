@@ -20,7 +20,7 @@ namespace core::ecs {
      *  - baseViewSize — reference view size, под который верстался объект;
      *  - lastUniform — последний рассчитанный коэффициент uniform-скейла.
      *
-     * Логика масштабирования реализована в core::ui::applyUniformScaling и
+     * Логика масштабирования реализована в core::ui::computeUniformFactor() и
      * вызывается из ScalingSystem. Здесь только данные.
      */
     struct ScalingBehaviorComponent {
@@ -29,7 +29,7 @@ namespace core::ecs {
         // Reference view size, под который верстался объект (обычно стартовое окно игры).
         sf::Vector2f baseViewSize{0.f, 0.f};
 
-        // Последний применённый uniform-множитель (см. applyUniformScaling).
+        // Последний применённый uniform-множитель.
         float lastUniform{1.f};
     };
 

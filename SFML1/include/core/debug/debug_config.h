@@ -16,11 +16,11 @@ namespace core::debug {
     // Debug overlay (DebugOverlaySystem)
     // --------------------------------------------------------------------------------------------
 
-#ifdef _DEBUG
-    /// Показывать ли FPS overlay по умолчанию (в Debug обычно хотим видеть его сразу).
+#if defined(_DEBUG) || defined(SFML1_PROFILE)
+    /// Debug/Profile: overlay по умолчанию включён (инфраструктура разработчика/профилирования).
     inline constexpr bool SHOW_FPS_OVERLAY = true;
 #else
-    /// В Release overlay по умолчанию скрыт (может быть включён через debug-сборки/флаги).
+    /// Release: overlay по умолчанию выключен (может быть включён через debug-сборки/флаги).
     inline constexpr bool SHOW_FPS_OVERLAY = false;
 #endif
 

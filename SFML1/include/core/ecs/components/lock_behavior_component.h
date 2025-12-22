@@ -20,8 +20,8 @@ namespace core::ecs {
     *  - previousViewSize — размер view на предыдущем шаге (для ScreenLock);
     *  - initialized      — был ли уже инициализирован previousViewSize.
     *
-    * Логика политики реализована в core::ui::applyScreenLock и вызывается
-    * из LockSystem. Здесь только данные, без какой-либо логики.
+    * Логика политики реализована в LockSystem::onResize().
+    * Здесь только данные, без какой-либо логики.
     */
     struct LockBehaviorComponent {
         core::ui::LockBehaviorKind kind{core::ui::LockBehaviorKind::World};

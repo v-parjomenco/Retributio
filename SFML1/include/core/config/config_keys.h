@@ -6,8 +6,6 @@
 // ================================================================================================
 #pragma once
 
-#include <string>
-
 namespace core::config::keys {
 
     // --------------------------------------------------------------------------------------------
@@ -45,6 +43,8 @@ namespace core::config::keys {
     namespace DebugOverlay {
         inline constexpr const char* ENABLED = "enabled";
         inline constexpr const char* POSITION = "position";
+        inline constexpr const char* UPDATE_INTERVAL_MS = "updateIntervalMs";
+        inline constexpr const char* SMOOTHING_SHIFT = "smoothingShift";
         
         // Используем общие текстовые ключи, чтобы не дублировать литералы
         inline constexpr const char* CHARACTER_SIZE = Common::CHARACTER_SIZE;

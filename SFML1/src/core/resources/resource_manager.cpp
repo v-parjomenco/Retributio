@@ -1,8 +1,12 @@
 #include "pch.h"
 
 #include "core/resources/resource_manager.h"
+#include <array>
 #include <cassert>
+#include <charconv>
 #include <stdexcept>
+#include <system_error>
+#include <type_traits>
 
 #include "core/log/log_macros.h"
 
@@ -13,6 +17,27 @@ namespace core::resources {
         using core::resources::config::FontResourceConfig;
         using core::resources::config::SoundResourceConfig;
         using core::resources::config::TextureResourceConfig;
+
+#if defined(SFML1_PROFILE)
+        [[nodiscard]] std::string makeProfileStressTextureKey(ids::TextureID id) {
+            using U = std::underlying_type_t<ids::TextureID>;
+            const U raw = static_cast<U>(id);
+
+            // Короткий ключ под SSO (без heap в горячем пути): "psT<raw>"
+            std::array<char, 16> buf{};
+            char* out = buf.data();
+            *out++ = 'p';
+            *out++ = 's';
+            *out++ = 'T';
+
+            const auto [ptr, ec] = std::to_chars(out, buf.data() + buf.size(), raw);
+            if (ec != std::errc{}) {
+                return "psT0";
+            }
+
+            return std::string(buf.data(), ptr);
+        }
+#endif
 
         template <typename Cache, typename Key>
         const types::TextureResource&
@@ -114,13 +139,28 @@ namespace core::resources {
             const auto& textureConfig = paths::ResourcePaths::getTextureConfig(id);
             return ensureTextureLoadedWithConfig(mTextures, id, textureConfig);
         } catch (const std::exception& exception) {
+#if defined(SFML1_PROFILE)
+            // PROFILE stress mode: allow virtual TextureID values by duplicating one real texture.
+            // Important: do NOT mask TextureID::Unknown.
+            if (mProfileStressTexturesEnabled &&
+                id != ids::TextureID::Unknown &&
+                id != mProfileStressSourceTextureId) {
+
+                const auto& srcCfg =
+                    paths::ResourcePaths::getTextureConfig(mProfileStressSourceTextureId);
+
+                const std::string key = makeProfileStressTextureKey(id);
+                return ensureTextureLoadedWithConfig(mDynamicTextures, key, srcCfg);
+            }
+#endif
             // Если задан fallback и это не сам fallback-ID — пробуем вернуть его.
             if (mHasMissingTextureFallback && id != mMissingTextureID) {
+                using U = std::underlying_type_t<ids::TextureID>;
                 LOG_WARN(core::log::cat::Resources,
                          "[ResourceManager::getTexture(TextureID)] "
-                         "Не удалось получить текстуру для ID: {}. "
+                         "Не удалось получить текстуру для TextureID (Исходное значение:'{}'). "
                          "Используется fallback-текстура: {}. Детали: {}",
-                         ids::toString(id),
+                         static_cast<std::uint64_t>(static_cast<U>(id)),
                          ids::toString(mMissingTextureID),
                          exception.what());
 
@@ -396,5 +436,16 @@ namespace core::resources {
         mDynamicFonts.clear();
         mDynamicSounds.clear();
     }
+
+#if defined(SFML1_PROFILE)
+    void ResourceManager::enableProfileStressTextureDuplication(ids::TextureID sourceId) noexcept {
+        mProfileStressSourceTextureId = sourceId;
+        mProfileStressTexturesEnabled = true;
+    }
+
+    void ResourceManager::disableProfileStressTextureDuplication() noexcept {
+        mProfileStressTexturesEnabled = false;
+    }
+#endif
 
 } // namespace core::resources

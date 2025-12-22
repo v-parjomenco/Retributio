@@ -1,7 +1,9 @@
 #include "pch.h"
 
 #include "core/resources/paths/resource_paths.h"
+#include <cstdint>
 #include <stdexcept>
+#include <type_traits>
 
 #include "core/log/log_macros.h"
 #include "core/resources/ids/resource_id_utils.h"
@@ -190,9 +192,13 @@ namespace {
         if (it == map.end()) {
             // Последний рубеж, программная ошибка, которая должна либо ловиться
             // вызывающим кодом с логом, либо падать через глобальный обработчик
-            throw std::runtime_error(std::string("[ResourcePaths::get") + typeName +
-                                     "] Не найден ресурс для " + typeName + ": " +
-                                     std::string(core::resources::ids::toString(id)));
+            using U = std::underlying_type_t<EnumID>;
+            const auto raw = static_cast<std::uint64_t>(static_cast<U>(id));
+
+            throw std::runtime_error(
+                std::string("[ResourcePaths::get") + typeName +
+                "] Не найден ресурс для " + typeName + ": id=" + std::to_string(raw)
+            );
         }
         return it->second;
     }

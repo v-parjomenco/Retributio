@@ -9,7 +9,6 @@
 
 // TODO:
 //
-// режимы сборки : #ifdef _DEBUG можно использовать для дефолта SHOW_FPS_OVERLAY;
 // дополнительные метрики : ms / frame, dt, fixed tick, count draw calls(если есть),
 //  позиции сущности игрока;
 //
@@ -20,10 +19,12 @@
 //  и оставить DebugOverlay как подсистему или виджет.
 
 #pragma once
+#include <cstdint>
 #include <optional>
 #include <string>
 
 #include <SFML/Graphics.hpp>
+#include <SFML/System/Clock.hpp>
 
 #include "core/ecs/system.h"
 
@@ -35,6 +36,7 @@ namespace core {
     namespace config {
         namespace properties {
             struct TextProperties;
+            struct DebugOverlayRuntimeProperties;
         }
     } // namespace config
 } // namespace core
@@ -71,6 +73,8 @@ namespace core::ecs {
          * отображает их на sf::Text.
          */
         void applyTextProperties(const core::config::properties::TextProperties& props);
+        void applyRuntimeProperties(
+            const core::config::properties::DebugOverlayRuntimeProperties& props) noexcept;
 
       private:
         core::time::TimeService* mTime{nullptr}; // не владеем
@@ -78,6 +82,24 @@ namespace core::ecs {
         std::optional<sf::Text> mFpsText;
         std::string mTextBuffer; // scratch buffer (no per-frame allocations)
         bool mEnabled{true};
+
+        // Обновляем строку не каждый кадр, чтобы не было дрожи и лишней работы.
+        sf::Clock mRenderClock;
+        sf::Time  mAccumulatedTime{};
+        sf::Time  mUpdateInterval{}; // 0 => каждый кадр (no throttle)
+        std::uint8_t mSmoothingShift = 3;
+#if defined(SFML1_PROFILE)
+        // Сглаженные значения времени (EMA), чтобы цифры не "прыгали".
+        std::uint64_t mSmoothedCpuTotalUs = 0;
+        std::uint64_t mSmoothedCpuDrawUs  = 0;
+
+        // Сглаженный breakdown RenderSystem (raw/sm), только для Profile.
+        std::uint64_t mSmoothedRSGatherUs = 0;
+        std::uint64_t mSmoothedRSSortUs   = 0;
+        std::uint64_t mSmoothedRSBuildUs  = 0;
+        std::uint64_t mSmoothedRSDrawUs   = 0;
+#endif
+
     };
 
 } // namespace core::ecs

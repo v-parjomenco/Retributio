@@ -62,6 +62,12 @@ namespace core::config {
                  {Json::value_t::number_integer, Json::value_t::number_unsigned},
                  false},
                 {keys::DebugOverlay::COLOR, {Json::value_t::string, Json::value_t::object}, false},
+                {keys::DebugOverlay::UPDATE_INTERVAL_MS,
+                 {Json::value_t::number_integer, Json::value_t::number_unsigned},
+                 false},
+                {keys::DebugOverlay::SMOOTHING_SHIFT,
+                 {Json::value_t::number_integer, Json::value_t::number_unsigned},
+                 false},
             });
 
         // Если парсинг/валидация не удалась — остаёмся на дефолтных настройках.
@@ -181,6 +187,95 @@ namespace core::config {
                              keys::DebugOverlay::COLOR,
                              path,
                              json_utils::describe(res.issue));
+                }
+            }
+        }
+
+        // updateIntervalMs (0 = каждый кадр, иначе throttle)
+        {
+            const unsigned defaultMs = cfg.runtime.updateIntervalMs;
+            const auto msRes = json_utils::parseUnsignedWithIssue(
+                data,
+                keys::DebugOverlay::UPDATE_INTERVAL_MS,
+                defaultMs
+            );
+
+            unsigned ms = msRes.value;
+            // Мягкая защита от идиотских значений (не критично, но держим UX вменяемым).
+            if (ms > 10'000u) {
+                ms = 10'000u;
+            }
+            cfg.runtime.updateIntervalMs = ms;
+
+            using Kind = json_utils::UnsignedParseIssue::Kind;
+            if (msRes.issue.kind != Kind::None && msRes.issue.kind != Kind::MissingKey) {
+                if (msRes.issue.kind == Kind::Negative) {
+                    LOG_WARN(core::log::cat::Config,
+                             "[DebugOverlayLoader] Некорректное поле '{}': {} (rawSigned={}). "
+                             "Применён дефолт ({}).",
+                             keys::DebugOverlay::UPDATE_INTERVAL_MS,
+                             json_utils::describe(msRes.issue),
+                             msRes.rawSigned,
+                             defaultMs);
+                } else if (msRes.issue.kind == Kind::OutOfRange) {
+                    LOG_WARN(core::log::cat::Config,
+                             "[DebugOverlayLoader] Некорректное поле '{}': {} (rawUnsigned={}). "
+                             "Применён дефолт ({}).",
+                             keys::DebugOverlay::UPDATE_INTERVAL_MS,
+                             json_utils::describe(msRes.issue),
+                             msRes.rawUnsigned,
+                             defaultMs);
+                } else {
+                    LOG_WARN(core::log::cat::Config,
+                             "[DebugOverlayLoader] Некорректное поле '{}': {}. "
+                             "Применён дефолт ({}).",
+                             keys::DebugOverlay::UPDATE_INTERVAL_MS,
+                             json_utils::describe(msRes.issue),
+                             defaultMs);
+                }
+            }
+        }
+
+        // smoothingShift (0 = no smoothing, max clamp)
+        {
+            const unsigned defaultShift = cfg.runtime.smoothingShift;
+            const auto shRes = json_utils::parseUnsignedWithIssue(
+                data,
+                keys::DebugOverlay::SMOOTHING_SHIFT,
+                defaultShift
+            );
+
+            unsigned sh = shRes.value;
+            if (sh > 8u) {
+                sh = 8u;
+            }
+            cfg.runtime.smoothingShift = static_cast<std::uint8_t>(sh);
+
+            using Kind = json_utils::UnsignedParseIssue::Kind;
+            if (shRes.issue.kind != Kind::None && shRes.issue.kind != Kind::MissingKey) {
+                if (shRes.issue.kind == Kind::Negative) {
+                    LOG_WARN(core::log::cat::Config,
+                             "[DebugOverlayLoader] Некорректное поле '{}': {} (rawSigned={}). "
+                             "Применён дефолт ({}).",
+                             keys::DebugOverlay::SMOOTHING_SHIFT,
+                             json_utils::describe(shRes.issue),
+                             shRes.rawSigned,
+                             defaultShift);
+                } else if (shRes.issue.kind == Kind::OutOfRange) {
+                    LOG_WARN(core::log::cat::Config,
+                             "[DebugOverlayLoader] Некорректное поле '{}': {} (rawUnsigned={}). "
+                             "Применён дефолт ({}).",
+                             keys::DebugOverlay::SMOOTHING_SHIFT,
+                             json_utils::describe(shRes.issue),
+                             shRes.rawUnsigned,
+                             defaultShift);
+                } else {
+                    LOG_WARN(core::log::cat::Config,
+                             "[DebugOverlayLoader] Некорректное поле '{}': {}. "
+                             "Применён дефолт ({}).",
+                             keys::DebugOverlay::SMOOTHING_SHIFT,
+                             json_utils::describe(shRes.issue),
+                             defaultShift);
                 }
             }
         }

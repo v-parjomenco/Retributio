@@ -217,6 +217,19 @@ namespace core::resources {
          */
         void clearAll() noexcept;
 
+        #if defined(SFML1_PROFILE)
+        // ----------------------------------------------------------------------------------------
+        // Диагностика только для PROFILE-сборки:
+        //  - включает "виртуальные" текстуры для стресс-тестов, даже если resources.json содержит
+        //    только 1 текстуру;
+        //  - при включении неизвестные значения TextureID преобразуются в копии текстуры sourceId,
+        //    загруженные в mDynamicTextures под уникальными ключами.
+        //  - не компилируется в Debug/Release.
+        // ----------------------------------------------------------------------------------------
+        void enableProfileStressTextureDuplication(ids::TextureID sourceId) noexcept;
+        void disableProfileStressTextureDuplication() noexcept;
+        #endif
+
       private:
         // Хранилища для статических enum-ID (основной путь для движка).
         holders::ResourceHolder<types::TextureResource, ids::TextureID> mTextures;
@@ -237,6 +250,11 @@ namespace core::resources {
 
         bool mHasMissingSoundFallback = false;
         ids::SoundID mMissingSoundID{};
+
+        #if defined(SFML1_PROFILE)
+            bool mProfileStressTexturesEnabled = false;
+            ids::TextureID mProfileStressSourceTextureId{};
+        #endif
 
         // ----------------------------------------------------------------------------------------
         // TODO (будущие расширения ResourceManager для 4X / больших проектов):

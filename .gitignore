@@ -43,17 +43,21 @@
 
 # Builds (только корневые и билд-папки, НЕ исходники)
 /Debug/
+/Profile/
 /Release/
 /x64/
 /SFML1/Debug/
+/SFML1/Profile/
 /SFML1/Release/
 /SFML1/x64/
 /bin/
 /obj/
 /build/
 **/build/Debug/
+**/build/Profile/
 **/build/Release/
 **/cmake-build-*/Debug/
+**/cmake-build-*/Profile/
 **/cmake-build-*/Release/
 
 # IDE/Editor

@@ -45,13 +45,22 @@ namespace {
     struct BuildInfo {
         const char* version   = "0.1.0-dev";
         const char* buildDate = __DATE__ " " __TIME__;
-    #ifdef NDEBUG
+#if defined(SFML1_PROFILE)
+        const char* buildType = "Profile";
+#elif defined(NDEBUG)
         const char* buildType = "Release";
-    #else
+#else
         const char* buildType = "Debug";
-    #endif
+#endif
         const char* gitCommit = GIT_COMMIT_HASH;
     };
+
+#if defined(_DEBUG) && defined(NDEBUG)
+    #error "Invalid build: both _DEBUG and NDEBUG are defined."
+#endif
+#if defined(SFML1_PROFILE) && defined(_DEBUG)
+    #error "Invalid build: Profile must not define _DEBUG (use NDEBUG + SFML1_PROFILE)."
+#endif
 
     void logBuildInfo()
     {

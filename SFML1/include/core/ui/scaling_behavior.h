@@ -21,23 +21,8 @@ namespace core::ui {
     };
 
     /**
-     * @brief Реализация Uniform-скейлинга (СТАРАЯ ВЕРСИЯ для sf::Sprite).
-     *
-     * DEPRECATED: Используется только старыми системами.
-     * Новые системы должны использовать computeUniformFactor().
-     */
-    void applyUniformScaling(sf::Sprite& sprite, const sf::View& view,
-                             const sf::Vector2f& baseViewSize, float& lastUniform);
-
-    // ============================================================================================
-    // ID-BASED ECS HELPERS (Phase 3)
-    // ============================================================================================
-
-    /**
      * @brief Вычисление uniform factor БЕЗ мутации sf::Sprite (data-driven).
      *
-     * Старый подход (инкрементальный, накапливает ошибки):
-     *   applyUniformScaling(sprite, view, baseViewSize, lastUniform);
      *
      * Новый подход (детерминированный):
      *   float uniformFactor = computeUniformFactor(view, baseViewSize);

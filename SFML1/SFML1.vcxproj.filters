@@ -244,6 +244,12 @@
     <Filter Include="include\third_party\entt">
       <UniqueIdentifier>{381451f7-1e7c-4cf2-8f4c-f70f74cc2c01}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\game\skyguard\dev">
+      <UniqueIdentifier>{a8ccc805-74a0-47af-8cbc-81eeefdd81fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\game\skyguard\dev">
+      <UniqueIdentifier>{80e824ba-19a1-4b15-85e6-8815080fefb6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -275,12 +281,6 @@
     </ClCompile>
     <ClCompile Include="src\core\utils\file_loader.cpp">
       <Filter>src\core\utils</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\ui\lock_behavior.cpp">
-      <Filter>src\core\ui</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\ui\scaling_behavior.cpp">
-      <Filter>src\core\ui</Filter>
     </ClCompile>
     <ClCompile Include="src\core\config\loader\debug_overlay_loader.cpp">
       <Filter>src\core\config\loader</Filter>
@@ -317,6 +317,9 @@
     </ClCompile>
     <ClCompile Include="src\core\utils\json\json_document.cpp">
       <Filter>src\core\utils\json</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\skyguard\dev\stress_scene.cpp">
+      <Filter>src\game\skyguard\dev</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -535,6 +538,12 @@
     </ClInclude>
     <ClInclude Include="include\core\utils\json\json_common.h">
       <Filter>include\core\utils\json</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\dev\stress_scene.h">
+      <Filter>include\game\skyguard\dev</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config\properties\debug_overlay_runtime_properties.h">
+      <Filter>include\core\config\properties</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

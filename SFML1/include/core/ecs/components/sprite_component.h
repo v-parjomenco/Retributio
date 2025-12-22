@@ -19,7 +19,7 @@ namespace core::ecs {
      * АРХИТЕКТУРНОЕ РЕШЕНИЕ:
      *  - Компонент хранит ТОЛЬКО данные (no sf::Sprite, no methods)
      *  - RenderSystem разрешает TextureID → sf::Texture через ResourceManager
-     *  - Размер: ~44 байта vs 200+ для старого SpriteComponent
+     *  - Размер: ~44 байта
      *
      * ПОЛЯ (детерминированная модель):
      *  - textureId:   enum ID текстуры (4 байта)
@@ -41,15 +41,11 @@ namespace core::ecs {
      *  - RenderSystem использует origin при setOrigin(sprite)
      *
      * ПРЕИМУЩЕСТВА:
-     *  ✅ Компактность: ×4.5 экономия памяти (44 байта vs 200+)
-     *  ✅ Cache-friendly: плотная упаковка в EnTT storage
-     *  ✅ Data-driven: текстура по ID, легко менять/стримить
-     *  ✅ Детерминизм: scale = baseScale * uniform (no накопление ошибок)
-     *  ✅ Z-ordering: готовность к слоистому рендерингу
-     *
-     * МИГРАЦИЯ ОТ СТАРОГО SpriteComponent:
-     *  - ДО:  SpriteComponent { sf::Sprite sprite; }  (~200+ байт)
-     *  - ПОСЛЕ: SpriteComponent { TextureID + scales + origin + zOrder }  (~44 байта)
+     *  Компактность
+     *  Cache-friendly: плотная упаковка в EnTT storage
+     *  Data-driven: текстура по ID, легко менять/стримить
+     *  Детерминизм: scale = baseScale * uniform (no накопление ошибок)
+     *  Z-ordering: готовность к слоистому рендерингу
      */
     struct SpriteComponent {
         /// ID текстуры из enum (резолвится через ResourceManager)

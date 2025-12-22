@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <system_error>
 
+#include "core/config/properties/debug_overlay_runtime_properties.h"
 #include "core/config/properties/text_properties.h"
 #include "core/ecs/systems/render_system.h"
 #include "core/time/time_service.h"
@@ -24,18 +25,36 @@ namespace {
         }
     }
 
+#if defined(SFML1_PROFILE)
     void appendMs1DecimalFromUs(std::string& out, std::uint64_t us) {
         // Печатаем миллисекунды с 1 знаком после точки без float:
         // ms10 = (us / 100) == 0.1ms units (с округлением).
         const std::uint64_t ms10 = (us + 50) / 100;
 
         const std::uint64_t intPart = ms10 / 10;
-        const std::uint64_t frac    = ms10 % 10;
+        const std::uint64_t frac = ms10 % 10;
 
         appendU64(out, intPart);
         out.push_back('.');
         out.push_back(static_cast<char>('0' + static_cast<int>(frac)));
     }
+
+    [[nodiscard]] std::uint64_t emaPow2(std::uint64_t prev,
+                                        std::uint64_t sample,
+                                        const std::uint8_t shift) noexcept {
+        // EMA без float: alpha = 1 / (2^shift)
+        // shift==0 => без сглаживания.
+        if (shift == 0) {
+            return sample;
+        }
+        if (prev == 0) {
+            return sample;
+        }
+        const std::uint64_t denom = (1ull << shift);
+        const std::uint64_t half = denom / 2;
+        return (prev * (denom - 1) + sample + half) / denom;
+    }
+#endif
 
 } // namespace
 
@@ -46,7 +65,31 @@ namespace core::ecs {
         mFpsText.emplace(font);
 
         mTextBuffer.clear();
-        mTextBuffer.reserve(256);
+        mTextBuffer.reserve(512);
+
+        mRenderClock.restart();
+        mAccumulatedTime = mUpdateInterval; // чтобы первый render сразу обновил текст
+    }
+
+    void DebugOverlaySystem::applyRuntimeProperties(
+        const core::config::properties::DebugOverlayRuntimeProperties& props) noexcept {
+        // 0 ms => обновлять каждый кадр.
+        mUpdateInterval = (props.updateIntervalMs == 0)
+                              ? sf::Time::Zero
+                              : sf::milliseconds(static_cast<int>(props.updateIntervalMs));
+        mSmoothingShift = props.smoothingShift;
+        // При изменении режима сбрасываем сглаживание, чтобы не было "хвоста".
+#if defined(SFML1_PROFILE)
+        mSmoothedCpuTotalUs = 0;
+        mSmoothedCpuDrawUs = 0;
+        mSmoothedRSGatherUs = 0;
+        mSmoothedRSSortUs = 0;
+        mSmoothedRSBuildUs = 0;
+        mSmoothedRSDrawUs = 0;
+#endif
+        // И таймер тоже, чтобы изменение применилось сразу.
+        mRenderClock.restart();
+        mAccumulatedTime = mUpdateInterval;        
     }
 
     void DebugOverlaySystem::applyTextProperties(
@@ -71,6 +114,15 @@ namespace core::ecs {
         if (!mEnabled || !mFpsText) {
             return;
         }
+
+        // Ровно 1 раз за кадр, но строку обновляем реже (убираем дрожь).
+        const sf::Time dt = mRenderClock.restart();
+        mAccumulatedTime += dt;
+        if (mUpdateInterval != sf::Time::Zero && mAccumulatedTime < mUpdateInterval) {
+            window.draw(*mFpsText);
+            return;
+        }
+        mAccumulatedTime = sf::Time::Zero;
 
         mTextBuffer.clear();
 
@@ -97,20 +149,57 @@ namespace core::ecs {
             mTextBuffer.append("\nSprites: ");
             appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.spriteCount));
 
-            mTextBuffer.append("  Verts: ");
+            mTextBuffer.append("  Vertices: ");
             appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.vertexCount));
 
-            mTextBuffer.append("\nBatches: ");
+            mTextBuffer.append("\nDrawCalls: ");
             appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.batchDrawCalls));
 
-            mTextBuffer.append("  TexSw: ");
+            mTextBuffer.append("  TexSwitches: ");
             appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.textureSwitches));
 
-            mTextBuffer.append("\nRender: ");
-            appendMs1DecimalFromUs(mTextBuffer, stats.cpuTotalUs);
+            mTextBuffer.append("  UniqueTex*: ");
+            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.uniqueTexturePointers));
+
+            mTextBuffer.append("  TexCache: ");
+            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.textureCacheSize));
+
+            mTextBuffer.append("  SlowResolves: ");
+            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.resourceLookupsThisFrame));
+
+            mTextBuffer.append("\nCulling: ");
+            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.spriteCount));
+            mTextBuffer.push_back('/');
+            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.totalSpriteCount));
+            mTextBuffer.push_back('/');
+            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.culledSpriteCount));
+
+#if defined(SFML1_PROFILE)
+            // Сглаживаем времена, чтобы не прыгали от тика к тику.
+            mSmoothedCpuTotalUs = emaPow2(mSmoothedCpuTotalUs, stats.cpuTotalUs, mSmoothingShift);
+            mSmoothedCpuDrawUs  = emaPow2(mSmoothedCpuDrawUs,  stats.cpuDrawUs,  mSmoothingShift);
+
+            mTextBuffer.append("\nCPU: ");
+            appendMs1DecimalFromUs(mTextBuffer, mSmoothedCpuTotalUs);
             mTextBuffer.append(" ms  (draw ");
-            appendMs1DecimalFromUs(mTextBuffer, stats.cpuDrawUs);
+            appendMs1DecimalFromUs(mTextBuffer, mSmoothedCpuDrawUs);
             mTextBuffer.append(" ms)");
+
+            // RenderSystem breakdown: raw/sm (в миллисекундах, 1 знак, без float).
+            mSmoothedRSGatherUs = emaPow2(mSmoothedRSGatherUs, stats.cpuGatherUs, mSmoothingShift);
+            mSmoothedRSSortUs = emaPow2(mSmoothedRSSortUs, stats.cpuSortUs, mSmoothingShift);
+            mSmoothedRSBuildUs = emaPow2(mSmoothedRSBuildUs, stats.cpuBuildUs, mSmoothingShift);
+            mSmoothedRSDrawUs = emaPow2(mSmoothedRSDrawUs, stats.cpuDrawUs, mSmoothingShift);
+
+            mTextBuffer.append("\nRender(ms): gather ");
+            appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSGatherUs);
+            mTextBuffer.append(" | sort ");
+            appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSSortUs);
+            mTextBuffer.append(" | build ");
+            appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSBuildUs);
+            mTextBuffer.append(" | draw ");
+            appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSDrawUs);
+#endif
         }
 
         mFpsText->setString(mTextBuffer);
