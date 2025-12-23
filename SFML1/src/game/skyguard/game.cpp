@@ -260,6 +260,11 @@ namespace game::skyguard {
                 const sf::Vector2f newSize(static_cast<float>(resized->size.x),
                                            static_cast<float>(resized->size.y));
 
+                // При минимизации окно может сообщить 0x0. Не создаём/не применяем invalid view.
+                if (newSize.x <= 0.0f || newSize.y <= 0.0f) {
+                    continue;
+                }
+
                 const sf::View newView({newSize.x * 0.5f, newSize.y * 0.5f},
                                        {newSize.x, newSize.y});
 

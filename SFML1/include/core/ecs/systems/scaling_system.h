@@ -1,15 +1,16 @@
 // ================================================================================================
-// File: core/ecs/systems/scaling_system.h (DETERMINISTIC VERSION - идеальная)
+// File: core/ecs/systems/scaling_system.h (DETERMINISTIC VERSION)
 // Purpose: Apply per-entity scaling behavior on window/view resize (absolute-based)
 // Used by: Game resize handling, World/SystemManager
 // Related headers: scaling_behavior_component.h, sprite_component.h
 // ================================================================================================
 #pragma once
 
-#include <SFML/Graphics.hpp>
+#include <SFML/Graphics/View.hpp>
 
 #include "core/ecs/components/scaling_behavior_component.h"
 #include "core/ecs/components/sprite_component.h"
+#include "core/ecs/entity.h"
 #include "core/ecs/system.h"
 #include "core/ecs/world.h"
 #include "core/log/log_macros.h"

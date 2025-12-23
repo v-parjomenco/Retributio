@@ -6,7 +6,6 @@
 // ================================================================================================
 #pragma once
 
-#include <algorithm>
 #include <SFML/Graphics/View.hpp>
 #include <SFML/System/Vector2.hpp>
 
@@ -33,12 +32,21 @@ namespace core::ui {
 
         const sf::Vector2f currentViewSize = view.getSize();
 
-        // Не делим на 0, даже если окно пришло в “нулевой” размер.
-        const float safeBaseX = std::max(baseViewSize.x, 1.0f);
-        const float safeBaseY = std::max(baseViewSize.y, 1.0f);
+        constexpr float kMinViewComponent = 1e-3f;
 
-        const float scaleX = currentViewSize.x / safeBaseX;
-        const float scaleY = currentViewSize.y / safeBaseY;
+        // Если baseViewSize неизвестен/некорректен (включая NaN),
+        // корректный коэффициент вычислить нельзя -> возвращаем нейтральный множитель.
+        if (!(baseViewSize.x > kMinViewComponent) || !(baseViewSize.y > kMinViewComponent)) {
+            return 1.0f;
+        }
+
+        // Если текущий размер некорректен (включая NaN/0) -> тоже нейтральный множитель.
+        if (!(currentViewSize.x > kMinViewComponent) || !(currentViewSize.y > kMinViewComponent)) {
+            return 1.0f;
+        }
+
+        const float scaleX = currentViewSize.x / baseViewSize.x;
+        const float scaleY = currentViewSize.y / baseViewSize.y;
 
         return std::min(scaleX, scaleY);
     }

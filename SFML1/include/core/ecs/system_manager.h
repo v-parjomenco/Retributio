@@ -12,6 +12,10 @@
 
 #include "core/ecs/system.h"
 
+namespace sf {
+    class RenderWindow;
+}
+
 namespace core::ecs {
 
     class World;

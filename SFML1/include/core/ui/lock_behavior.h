@@ -6,8 +6,6 @@
 // ================================================================================================
 #pragma once
 
-#include <algorithm>
-#include <SFML/Graphics/View.hpp>
 #include <SFML/System/Vector2.hpp>
 
 namespace core::ui {
@@ -28,15 +26,26 @@ namespace core::ui {
      */
     [[nodiscard]] inline sf::Vector2f
     computeScreenLockPosition(const sf::Vector2f& currentPosition,
-                                                  const sf::Vector2f& previousViewSize,
-                                                  const sf::Vector2f& newViewSize) noexcept {
+                              const sf::Vector2f& previousViewSize,
+                              const sf::Vector2f& newViewSize) noexcept {
 
-        // Не делим на 0, даже если окно пришло в “нулевой” размер.
-        const float previousWidth = std::max(1.f, previousViewSize.x);
-        const float previousHeight = std::max(1.f, previousViewSize.y);
+        constexpr float kMinViewComponent = 1e-3f;
 
-        const sf::Vector2f relativePosition = {currentPosition.x / previousWidth,
-                                               currentPosition.y / previousHeight};
+        // Если previousViewSize неизвестен/некорректен (включая NaN),
+        // относительное положение не восстановить.
+        // В этом случае не двигаем позицию, чтобы избежать "телепорта" на первом resize.
+        if (!(previousViewSize.x > kMinViewComponent) ||
+            !(previousViewSize.y > kMinViewComponent)) {
+            return currentPosition;
+        }
+
+        // Если новый размер некорректен (включая NaN/0), тоже ничего не делаем.
+        if (!(newViewSize.x > kMinViewComponent) || !(newViewSize.y > kMinViewComponent)) {
+            return currentPosition;
+        }
+
+        const sf::Vector2f relativePosition = {currentPosition.x / previousViewSize.x,
+                                               currentPosition.y / previousViewSize.y};
 
         return {newViewSize.x * relativePosition.x, newViewSize.y * relativePosition.y};
     }
