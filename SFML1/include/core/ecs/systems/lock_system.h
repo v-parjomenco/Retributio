@@ -13,6 +13,7 @@
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/system.h"
 #include "core/ecs/world.h"
+#include "core/ui/lock_behavior.h"
 
 namespace core::ecs {
 
@@ -22,9 +23,9 @@ namespace core::ecs {
      * Поток данных (EnTT backend):
      *  - Game при событии resize вызывает onResize(...);
      *  - система проходит по сущностям с LockBehaviorComponent + SpriteComponent + TransformComponent;
-     *  - применяет core::ui::computeScreenLockPosition(...) или оставляет позицию в мировых координатах (World);
-     *  - синхронизирует TransformComponent с позициями спрайтов, чтобы RenderSystem
-     *    всегда рисовал актуальные world-space координаты.
+     *  - Screen: пересчитывает позицию через core::ui::computeScreenLockPosition(...),
+     *    сохраняя относительное положение в долях от предыдущего view.
+     *  - World: позицию не меняет.
      *
      * Важно:
      *  - onResize вызывается РЕДКО (при изменении размера окна), а не каждый кадр;
@@ -46,26 +47,15 @@ namespace core::ecs {
 
                 switch (lockComp.kind) {
                 case core::ui::LockBehaviorKind::Screen: {
-                    // КРИТИЧЕСКИЙ ФИКС: обрабатываем первую инициализацию, но НЕ пропускаем resize!
-                    if (!lockComp.initialized) {
-                        lockComp.initialized = true;
-                        // НЕ break! Продолжаем выполнять resize логику ниже
-                    }
 
-                    // Защита от деления на 0
-                    const float previousWidth = std::max(1.f, lockComp.previousViewSize.x);
-                    const float previousHeight = std::max(1.f, lockComp.previousViewSize.y);
-
-                    // Относительное положение (в долях от старого размера)
-                    const sf::Vector2f relativePosition = {transform.position.x / previousWidth,
-                                                           transform.position.y / previousHeight};
-
-                    // Новая позиция с сохранением пропорций
-                    transform.position = {newViewSize.x * relativePosition.x,
-                                          newViewSize.y * relativePosition.y};
+                transform.position = core::ui::computeScreenLockPosition(
+                    transform.position,
+                    lockComp.previousViewSize,
+                    newViewSize);
 
                     // Обновляем сохранённый размер для следующего resize
                     lockComp.previousViewSize = newViewSize;
+                    lockComp.initialized = true;
 
                     break;
                 }

@@ -52,16 +52,29 @@ namespace game::skyguard {
         sf::RenderWindow mWindow;
         core::resources::ResourceManager mResources;
 
-        core::time::TimeService mTime;   // сервис времени (вне ECS)
-        core::ecs::World mWorld;         // ECS-мир
-        core::ecs::Entity mPlayerEntity; // сущность игрока
+        core::time::TimeService mTime; // сервис времени (вне ECS)
+        core::ecs::World mWorld;       // ECS-мир
 
-        // Системы, к которым нужен прямой доступ
-        core::ecs::ScalingSystem* mScalingSystem{nullptr};     // кэшируем систему масштабирования
-        core::ecs::LockSystem* mLockSystem{nullptr};           // кэшируем систему фиксации
-        core::ecs::InputSystem* mInputSystem{nullptr};         // клавиатурный ввод
-        core::ecs::DebugOverlaySystem* mDebugOverlay{nullptr}; // debug overlay (FPS и т.п.)
-        core::ecs::RenderSystem* mRenderSystem{nullptr};       // рендер (нужно для метрик)
+        // Пока не используется:
+        //  после перевода на one-shot PlayerInitSystem игрок создаётся внутри системы.
+        // Если понадобится доступ к player entity (камера/фокус/мультиплеер),
+        //  добавим явный канал:
+        //  - либо возвращаем список созданных Entity из PlayerInitSystem,
+        //  - либо заводим отдельный runtime-компонент "PlayerTag"/"LocalPlayerIndex"
+        //  и ищем через view().
+        core::ecs::Entity mPlayerEntity{core::ecs::NullEntity};
+
+        // Системы, к которым нужен прямой доступ.
+        //
+        // ВАЖНО (про валидность адреса):
+        //  - Сейчас SystemManager хранит системы через std::unique_ptr -> объекты живут в куче.
+        //  - Реаллокации std::vector двигают unique_ptr, но НЕ двигают сами объекты систем.
+        //  - Поэтому эти raw pointers стабильны по адресу, пока живёт World/SystemManager.
+        core::ecs::ScalingSystem* mScalingSystem{nullptr};
+        core::ecs::LockSystem* mLockSystem{nullptr};
+        core::ecs::InputSystem* mInputSystem{nullptr};
+        core::ecs::DebugOverlaySystem* mDebugOverlay{nullptr};
+        core::ecs::RenderSystem* mRenderSystem{nullptr};
     };
 
 } // namespace game::skyguard

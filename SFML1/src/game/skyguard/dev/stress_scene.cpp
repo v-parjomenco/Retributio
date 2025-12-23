@@ -331,8 +331,8 @@ namespace {
             sp.origin = {0.f, 0.f};
             sp.zOrder = d.zOrder;
 
-            world.addComponent(e, tr);
-            world.addComponent(e, sp);
+            world.addComponent<core::ecs::TransformComponent>(e, tr);
+            world.addComponent<core::ecs::SpriteComponent>(e, sp);
         }
     }
 

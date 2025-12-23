@@ -6,7 +6,7 @@
 // ================================================================================================
 #pragma once
 
-#include <SFML/Graphics/Sprite.hpp>
+#include <algorithm>
 #include <SFML/Graphics/View.hpp>
 #include <SFML/System/Vector2.hpp>
 
@@ -26,9 +26,12 @@ namespace core::ui {
      *   sf::Vector2f newPos = computeScreenLockPosition(currentPos, prevViewSize, newViewSize);
      *   transformComp.position = newPos;
      */
-    inline sf::Vector2f computeScreenLockPosition(const sf::Vector2f& currentPosition,
+    [[nodiscard]] inline sf::Vector2f
+    computeScreenLockPosition(const sf::Vector2f& currentPosition,
                                                   const sf::Vector2f& previousViewSize,
-                                                  const sf::Vector2f& newViewSize) {
+                                                  const sf::Vector2f& newViewSize) noexcept {
+
+        // Не делим на 0, даже если окно пришло в “нулевой” размер.
         const float previousWidth = std::max(1.f, previousViewSize.x);
         const float previousHeight = std::max(1.f, previousViewSize.y);
 

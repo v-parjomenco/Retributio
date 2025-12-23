@@ -437,9 +437,6 @@
     <ClInclude Include="include\game\skyguard\config\blueprints\player_blueprint.h">
       <Filter>include\game\skyguard\config\blueprints</Filter>
     </ClInclude>
-    <ClInclude Include="include\game\skyguard\ecs\components\player_config_component.h">
-      <Filter>include\game\skyguard\ecs\components</Filter>
-    </ClInclude>
     <ClInclude Include="include\game\skyguard\ecs\systems\player_init_system.h">
       <Filter>include\game\skyguard\ecs\systems</Filter>
     </ClInclude>
@@ -544,6 +541,9 @@
     </ClInclude>
     <ClInclude Include="include\core\config\properties\debug_overlay_runtime_properties.h">
       <Filter>include\core\config\properties</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\config_paths.h">
+      <Filter>include\game\skyguard\config</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

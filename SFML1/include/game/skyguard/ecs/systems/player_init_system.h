@@ -1,15 +1,19 @@
 // ================================================================================================
-// File: game/skyguard/ecs/systems/player_init_system.h (FIXED - правильный lastUniform)
-// Purpose: One-shot system converting PlayerBlueprint → runtime ECS components (ID-based)
-// Used by: World (systems wiring in Game)
-// Related headers: player_config_component.h, sprite_component.h, resource_manager.h
+// File: game/skyguard/ecs/systems/player_init_system.h
+// Purpose: One-shot system converting PlayerBlueprint -> runtime ECS components (ID-based)
+// Used by: Game (systems wiring), World/SystemManager
+// Related headers: sprite_component.h, resource_manager.h, anchor_utils.h, scaling_behavior.h
 // ================================================================================================
 #pragma once
 
+#include <cstddef>
 #include <utility>
 #include <vector>
 
 #include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/Graphics/Texture.hpp>
+#include <SFML/Graphics/View.hpp>
+#include <SFML/System/Vector2.hpp>
 
 #include "core/ecs/components/keyboard_control_component.h"
 #include "core/ecs/components/lock_behavior_component.h"
@@ -20,18 +24,37 @@
 #include "core/ecs/components/velocity_component.h"
 #include "core/ecs/system.h"
 #include "core/ecs/world.h"
+#include "core/log/log_macros.h"
 #include "core/resources/resource_manager.h"
 #include "core/ui/anchor_utils.h"
-#include "core/ui/scaling_behavior.h" // ← для computeUniformFactor
+#include "core/ui/scaling_behavior.h"
 
-#include "game/skyguard/ecs/components/player_config_component.h"
+#include "game/skyguard/config/blueprints/player_blueprint.h"
 
 namespace game::skyguard::ecs {
 
     class PlayerInitSystem final : public core::ecs::ISystem {
       public:
-        explicit PlayerInitSystem(core::resources::ResourceManager& res, sf::Vector2f baseViewSize)
-            : mResources(res), mBaseViewSize(baseViewSize), mHasRun(false) {
+        PlayerInitSystem(core::resources::ResourceManager& resources,
+                         const sf::Vector2f baseViewSize,
+                         const sf::Vector2f initialViewSize,
+                         std::vector<game::skyguard::config::blueprints::PlayerBlueprint> players)
+            : mResources(resources)
+            , mBaseViewSize(baseViewSize)
+            , mInitialViewSize(initialViewSize)
+            , mPlayers(std::move(players))
+            , mHasRun(false) {
+
+            if (mBaseViewSize.x <= 0.f || mBaseViewSize.y <= 0.f) {
+                LOG_WARN(core::log::cat::Gameplay,
+                         "PlayerInitSystem: baseViewSize is non-positive ({}, {})",
+                         mBaseViewSize.x, mBaseViewSize.y);
+            }
+            if (mInitialViewSize.x <= 0.f || mInitialViewSize.y <= 0.f) {
+                LOG_WARN(core::log::cat::Gameplay,
+                         "PlayerInitSystem: initialViewSize is non-positive ({}, {})",
+                         mInitialViewSize.x, mInitialViewSize.y);
+            }
         }
 
         void update(core::ecs::World& world, float) override {
@@ -39,113 +62,114 @@ namespace game::skyguard::ecs {
                 return;
             }
 
-            auto view = world.view<PlayerConfigComponent>();
+            LOG_DEBUG(core::log::cat::Gameplay, "PlayerInitSystem: one-shot spawn starting");
 
-            LOG_DEBUG(core::log::cat::Gameplay,
-                      "PlayerInitSystem: one-shot initialization starting");
+            if (mPlayers.empty()) {
+                LOG_WARN(core::log::cat::Gameplay,
+                         "PlayerInitSystem: no player blueprints provided (nothing to spawn)");
+                mHasRun = true;
+                return;
+            }
 
-            std::vector<core::ecs::Entity> toRemove;
-            int processedCount = 0;
+            const sf::Vector2f safeInitialSize{
+                (mInitialViewSize.x > 0.f) ? mInitialViewSize.x : 1.f,
+                (mInitialViewSize.y > 0.f) ? mInitialViewSize.y : 1.f
+            };
+            const sf::View initialView(
+                sf::FloatRect({0.f, 0.f}, {safeInitialSize.x, safeInitialSize.y}));
 
-            for (auto [entity, cfgComp] : view.each()) {
-                ++processedCount;
+            int spawnedCount = 0;
 
-                LOG_TRACE(core::log::cat::Gameplay, "Initializing player entity {} (iteration {})",
-                          core::ecs::toUint(entity), processedCount);
+            for (std::size_t i = 0; i < mPlayers.size(); ++i) {
+                const auto& cfg = mPlayers[i];
 
-                const auto& cfg = cfgComp.config;
+                const core::ecs::Entity entity = world.createEntity();
+                ++spawnedCount;
 
-                // Получаем текстуру для вычисления размеров (для anchor'а)
+                LOG_TRACE(core::log::cat::Gameplay,
+                          "PlayerInitSystem: spawning entity {} (index {})",
+                          core::ecs::toUint(entity), i);
+
+                const float initialUniform =
+                    core::ui::computeUniformFactor(initialView, mBaseViewSize);
+
+                const sf::Vector2f effectiveScale{
+                    cfg.sprite.scale.x * initialUniform,
+                    cfg.sprite.scale.y * initialUniform
+                };
+
                 const auto& textureResource = mResources.getTexture(cfg.sprite.textureId);
                 const sf::Texture& texture = textureResource.get();
                 const sf::Vector2u textureSize = texture.getSize();
-
-                // Вычисляем anchor данные
-                sf::View defaultView(sf::FloatRect({0.f, 0.f}, {mBaseViewSize.x, mBaseViewSize.y}));
 
                 sf::Vector2f origin{0.f, 0.f};
                 sf::Vector2f anchoredPos = cfg.anchor.startPosition;
 
                 if (cfg.anchor.anchorType != core::ui::AnchorType::None) {
-                    auto [computedOrigin, computedPosition] = core::ui::anchors::computeAnchorData(
-                        textureSize, cfg.sprite.scale, cfg.anchor.anchorType, defaultView);
-
+                    auto [computedOrigin, computedPosition] =
+                        core::ui::anchors::computeAnchorData(textureSize,
+                                                             effectiveScale,
+                                                             cfg.anchor.anchorType,
+                                                             initialView);
                     origin = computedOrigin;
                     anchoredPos = computedPosition;
                 }
 
-                LOG_TRACE(core::log::cat::Gameplay,
-                          "Player sprite: origin=({}, {}), position=({}, {})", origin.x, origin.y,
-                          anchoredPos.x, anchoredPos.y);
-
-                // Создаём ID-based sprite component
                 core::ecs::SpriteComponent spriteComp{};
                 spriteComp.textureId = cfg.sprite.textureId;
                 spriteComp.textureRect = {};
-                spriteComp.baseScale = cfg.sprite.scale; // IMMUTABLE базовый масштаб
-                spriteComp.scale = cfg.sprite.scale;     // текущий (изначально = base)
+                spriteComp.baseScale = cfg.sprite.scale;
+                spriteComp.scale = effectiveScale;
                 spriteComp.origin = origin;
                 spriteComp.zOrder = 0.f;
-
-                // ============================================================================
-                // КРИТИЧЕСКИЙ ФИКС: правильная инициализация lastUniform
-                // ============================================================================
 
                 core::ecs::ScalingBehaviorComponent scalingComp{};
                 scalingComp.kind = cfg.anchor.scalingBehavior;
                 scalingComp.baseViewSize = mBaseViewSize;
+                scalingComp.lastUniform = initialUniform;
 
-                // ПРАВИЛЬНО: вычисляем ТЕКУЩИЙ uniform factor для начального окна
-                // Если окно стартовало с размером != baseViewSize, это учтётся!
-                scalingComp.lastUniform =
-                    core::ui::computeUniformFactor(defaultView, mBaseViewSize);
-
-                LOG_TRACE(core::log::cat::Gameplay,
-                          "ScalingBehavior: baseViewSize=({}, {}), lastUniform={}", mBaseViewSize.x,
-                          mBaseViewSize.y, scalingComp.lastUniform);
-
-                // Компонент фиксации
                 core::ecs::LockBehaviorComponent lockComp{};
                 lockComp.kind = cfg.anchor.lockBehavior;
-                lockComp.previousViewSize = mBaseViewSize;
-                lockComp.initialized = false;
+                lockComp.previousViewSize = safeInitialSize;
+                lockComp.initialized = true;
 
-                // Добавляем все компоненты
-                LOG_TRACE(core::log::cat::Gameplay, "Adding components to entity {}",
+                core::ecs::TransformComponent tr{};
+                tr.position = anchoredPos;
+
+                core::ecs::VelocityComponent vel{};
+                vel.linear = {0.f, 0.f};
+
+                world.addComponent<core::ecs::SpriteComponent>(entity, spriteComp);
+                world.addComponent<core::ecs::TransformComponent>(entity, tr);
+                world.addComponent<core::ecs::VelocityComponent>(entity, vel);
+                world.addComponent<core::ecs::ScalingBehaviorComponent>(entity, scalingComp);
+                world.addComponent<core::ecs::LockBehaviorComponent>(entity, lockComp);
+
+                world.addComponent<core::ecs::MovementStatsComponent>(
+                    entity,
+                    core::ecs::MovementStatsComponent{
+                        cfg.movement.maxSpeed,
+                        cfg.movement.acceleration,
+                        cfg.movement.friction
+                    });
+
+                world.addComponent<core::ecs::KeyboardControlComponent>(
+                    entity,
+                    core::ecs::KeyboardControlComponent{
+                        cfg.controls.up,
+                        cfg.controls.down,
+                        cfg.controls.left,
+                        cfg.controls.right
+                    });
+
+                LOG_DEBUG(core::log::cat::Gameplay,
+                          "PlayerInitSystem: player entity {} initialized",
                           core::ecs::toUint(entity));
-
-                world.addComponent(entity, std::move(spriteComp));
-                world.addComponent(entity, core::ecs::TransformComponent{anchoredPos});
-                world.addComponent(entity, core::ecs::VelocityComponent{{0.f, 0.f}});
-                world.addComponent(entity, std::move(scalingComp));
-                world.addComponent(entity, std::move(lockComp));
-
-                world.addComponent(entity, core::ecs::MovementStatsComponent{
-                                               cfg.movement.maxSpeed, cfg.movement.acceleration,
-                                               cfg.movement.friction});
-
-                world.addComponent(entity, core::ecs::KeyboardControlComponent{
-                                               cfg.controls.up, cfg.controls.down,
-                                               cfg.controls.left, cfg.controls.right});
-
-                LOG_DEBUG(core::log::cat::Gameplay,
-                         "Player entity {} fully initialized (ID-based sprite)",
-                         core::ecs::toUint(entity));
-
-                toRemove.push_back(entity);
             }
 
-            for (auto e : toRemove) {
-                world.removeComponent<PlayerConfigComponent>(e);
-            }
-
-            if (processedCount > 0) {
-                LOG_INFO(core::log::cat::Gameplay,
-                         "PlayerInitSystem: initialized {} player entities", processedCount);
-            } else {
-                LOG_DEBUG(core::log::cat::Gameplay,
-                          "PlayerInitSystem: no PlayerConfigComponent found (nothing to initialize).");
-            }
+            LOG_INFO(core::log::cat::Gameplay,
+                     "PlayerInitSystem: spawned {} player entities",
+                     spawnedCount);
 
             mHasRun = true;
         }
@@ -156,6 +180,10 @@ namespace game::skyguard::ecs {
       private:
         core::resources::ResourceManager& mResources;
         sf::Vector2f mBaseViewSize;
+        sf::Vector2f mInitialViewSize;
+
+        std::vector<game::skyguard::config::blueprints::PlayerBlueprint> mPlayers;
+
         bool mHasRun;
     };
 

@@ -25,7 +25,7 @@ namespace core::ecs {
      */
     struct VelocityComponent {
         sf::Vector2f linear{0.f, 0.f}; // мгновенная линейная скорость, пикс/с
-        float angular = 0.f;      // скорость вращения (°/с) - пока не используется
+        float angular = 0.f;           // скорость вращения (°/с) - пока не используется
     };
 
 } // namespace core::ecs

@@ -232,7 +232,10 @@ namespace core::ecs {
             const auto& tr = ecsView.get<TransformComponent>(entity);
 
             const bool dataFinite =
-                isFiniteVec2(tr.position) && isFiniteVec2(spr.origin) && isFiniteVec2(spr.scale);
+                isFiniteVec2(tr.position) &&
+                isFiniteVec2(spr.origin) &&
+                isFiniteVec2(spr.scale) &&
+                std::isfinite(spr.zOrder);
 
 #if !defined(NDEBUG)
             // Это engine-level инвариант: NaN/Inf сюда попадать не должны.

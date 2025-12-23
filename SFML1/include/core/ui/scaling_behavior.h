@@ -6,7 +6,7 @@
 // ================================================================================================
 #pragma once
 
-#include <SFML/Graphics/Sprite.hpp>
+#include <algorithm>
 #include <SFML/Graphics/View.hpp>
 #include <SFML/System/Vector2.hpp>
 
@@ -28,14 +28,17 @@ namespace core::ui {
      *   float uniformFactor = computeUniformFactor(view, baseViewSize);
      *   spriteComp.scale = spriteComp.baseScale * uniformFactor;
      */
-    inline float computeUniformFactor(const sf::View& view, const sf::Vector2f& baseViewSize) {
-        const sf::Vector2f safeBaseSize{std::max(baseViewSize.x, 1.f),
-                                        std::max(baseViewSize.y, 1.f)};
+    [[nodiscard]] inline float computeUniformFactor(const sf::View& view,
+                                                    const sf::Vector2f& baseViewSize) noexcept {
 
         const sf::Vector2f currentViewSize = view.getSize();
 
-        const float scaleX = currentViewSize.x / safeBaseSize.x;
-        const float scaleY = currentViewSize.y / safeBaseSize.y;
+        // Не делим на 0, даже если окно пришло в “нулевой” размер.
+        const float safeBaseX = std::max(baseViewSize.x, 1.0f);
+        const float safeBaseY = std::max(baseViewSize.y, 1.0f);
+
+        const float scaleX = currentViewSize.x / safeBaseX;
+        const float scaleY = currentViewSize.y / safeBaseY;
 
         return std::min(scaleX, scaleY);
     }

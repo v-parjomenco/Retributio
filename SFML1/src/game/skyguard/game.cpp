@@ -3,6 +3,7 @@
 #include "game/skyguard/game.h"
 
 #include <cassert>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 
@@ -20,10 +21,10 @@
 #include "core/resources/paths/resource_paths.h"
 #include "core/time/time_config.h"
 
+#include "game/skyguard/config/config_paths.h"
 #include "game/skyguard/config/loader/config_loader.h"
 #include "game/skyguard/config/loader/window_config_loader.h"
 #include "game/skyguard/config/window_config.h"
-#include "game/skyguard/ecs/components/player_config_component.h"
 #include "game/skyguard/ecs/systems/player_init_system.h"
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
@@ -31,13 +32,15 @@
 #endif
 
 // Движковые конфиги (vsync, frame limit и т.п.).
-namespace cfg       = ::core::config;
+namespace cfg = ::core::config;
 // Движковые настройки времени (fixed timestep и т.п.).
-namespace timecfg   = ::core::time;
+namespace timecfg = ::core::time;
 // Debug-флаги и хоткеи (overlay, hold on exit и т.п.).
 namespace dbg = ::core::debug;
 // Специфические игровые конфиги/blueprints для SkyGuard (player.json, window и т.п.).
-namespace skycfg    = ::game::skyguard::config;
+namespace skycfg = ::game::skyguard::config;
+// Централизованное хранилище путей к JSON-конфигам
+namespace skycfg_paths = ::game::skyguard::config::paths;
 
 namespace game::skyguard {
 
@@ -46,20 +49,34 @@ namespace game::skyguard {
         // Загружаем конфиг окна SkyGuard из JSON (skyguard_game.json)
         // ----------------------------------------------------------------------------------------
         const skycfg::WindowConfig windowCfg =
-            skycfg::loadWindowConfig("assets/game/skyguard/config/skyguard_game.json");
+            skycfg::loadWindowConfig(skycfg_paths::SKYGUARD_GAME);
 
         // Создаём окно с настройками из JSON.
         mWindow.create(sf::VideoMode({windowCfg.width, windowCfg.height}), windowCfg.title);
 
+        // Если окно не открылось — это фатально. (SFML обычно не кидает исключения здесь.)
+        if (!mWindow.isOpen()) {
+            LOG_ERROR(core::log::cat::Engine,
+                      "Failed to create main window ({}x{}).",
+                      windowCfg.width,
+                      windowCfg.height);
+            throw std::runtime_error("Failed to create main window");
+        }
+
         // ----------------------------------------------------------------------------------------
         // Загружаем движковые настройки рендеринга (EngineSettings)
         // ----------------------------------------------------------------------------------------
-        cfg::EngineSettings engineSettings =
-            cfg::loadEngineSettings("assets/core/config/engine_settings.json");
+        const cfg::EngineSettings engineSettings =
+            cfg::loadEngineSettings(skycfg_paths::ENGINE_SETTINGS);
 
+        // Политика применения:
+        //  - VSync ON  => frameLimit должен быть выключен (0), чтобы не было двойного ограничения.
+        //  - VSync OFF => применяем frameLimit из конфига.
         mWindow.setVerticalSyncEnabled(engineSettings.vsyncEnabled);
         if (!engineSettings.vsyncEnabled) {
             mWindow.setFramerateLimit(engineSettings.frameLimit);
+        } else {
+            mWindow.setFramerateLimit(0);
         }
 
         // Логируем итоговые настройки рендеринга один раз при запуске игры.
@@ -74,11 +91,10 @@ namespace game::skyguard {
         // ----------------------------------------------------------------------------------------
         // Инициализация ресурсного слоя (реестр ресурсов + fallback-ресурсы)
         // ----------------------------------------------------------------------------------------
-
-        // Важно: initResources() должен быть вызван до initWorld(),
-        // чтобы ResourceManager уже знал о fallback-ресурсах и реестр
-        // был загружен.
-
+        // Важно: initResources() должен быть вызван до initWorld(), чтобы:
+        //  - реестр ресурсов был загружен;
+        //  - fallback-ресурсы были настроены;
+        //  - системы/лоадеры могли безопасно резолвить ресурсы через ResourceManager.
         initResources();
 
         // ----------------------------------------------------------------------------------------
@@ -89,8 +105,9 @@ namespace game::skyguard {
 
     void Game::initResources() {
         // Загружаем реестр ресурсов из JSON.
-        core::resources::paths::ResourcePaths::loadFromJSON(
-            "assets/game/skyguard/config/resources.json");
+        // Это критичный конфиг: если он сломан — игра не имеет смысла продолжать.
+        core::resources::paths::ResourcePaths::loadFromJSON(skycfg_paths::RESOURCES);
+
         // Настраиваем fallback-ресурсы на уровне ResourceManager.
         //
         // Сейчас гарантированно есть только один игровой шрифт — FontID::Default.
@@ -98,7 +115,8 @@ namespace game::skyguard {
         mResources.setMissingFontFallback(core::resources::ids::FontID::Default);
 
         // Для текстур и звуков пока специально не выставляем fallback:
-        //  - у нас ещё нет отдельной текстуры-заглушки (фиолетовый квадрат) с собственным TextureID;
+        //  - у нас ещё нет отдельной текстуры-заглушки (фиолетовый квадрат)
+        //    с собственным TextureID;
         //  - звуки в текущем билде не используются.
         //
         // Как только появится отдельная fallback-текстура:
@@ -113,155 +131,144 @@ namespace game::skyguard {
         // mResources.setMissingSoundFallback(core::resources::ids::SoundID::SomeDefault);
     }
 
-    // initWorld() без try / catch — все исключения уходят наверх в main()
+    // initWorld() без try/catch — все исключения уходят наверх в main()
     void Game::initWorld() {
+        // Загружаем blueprint игрока (data-driven).
+        auto playerCfg = skycfg::ConfigLoader::loadPlayerConfig(skycfg_paths::PLAYER);
 
-        // Создаём blueprint игрока (data-driven, собранный из properties)
-        auto playerCfg =
-            skycfg::ConfigLoader::loadPlayerConfig("assets/game/skyguard/config/player.json");
-
-        // Создаём сущность игрока
-        mPlayerEntity = mWorld.createEntity();
-        //if (!isNull(mPlayerEntity)) {                 
-        //    LOG_INFO("Created entity {}", toUint(e));
-        //}
-
-        if (mPlayerEntity == core::ecs::NullEntity) {
-            LOG_ERROR(core::log::cat::Gameplay, "FAILED to create player entity!");
-            throw std::runtime_error("Player entity creation failed");
-        }
-
-        LOG_DEBUG(core::log::cat::Gameplay, "Created player entity: {}", 
-             core::ecs::toUint(mPlayerEntity));
-
-        // Добавляем компонент с конфигурацией игрока из JSON (playerCfg) в ECS-мир.
-        // PlayerInitSystem при первом апдейте создаст остальные компоненты
-        // (Sprite, Transform и т.д.).
-        mWorld.addComponent(mPlayerEntity,
-                            game::skyguard::ecs::PlayerConfigComponent{playerCfg});
-
-        // ------------------------------------------------------------------------------------
-        // Подключаем ECS-системы
-        // ------------------------------------------------------------------------------------
-        // Передаём в PlayerInitSystem базовый размер view из текущего окна,
-        // чтобы якоря и базовые размеры масштабирования были согласованы с реальным окном.
+        // Базовый размер (design/reference) и фактический стартовый размер окна сейчас совпадают.
+        // Если позже захочешь "design resolution" отдельно — прокинем baseViewSize из конфига.
         const sf::Vector2f baseViewSize = mWindow.getView().getSize();
-        mWorld.addSystem<game::skyguard::ecs::PlayerInitSystem>(mResources, baseViewSize);
+        const sf::Vector2f initialViewSize = baseViewSize;
 
+        std::vector<game::skyguard::config::blueprints::PlayerBlueprint> players;
+        players.emplace_back(std::move(playerCfg));
+
+        // ----------------------------------------------------------------------------------------
+        // Подключаем ECS-системы (порядок важен для update/render)
+        // ----------------------------------------------------------------------------------------
+
+        // PlayerInitSystem сам создаёт сущности на первом тике и больше не работает.
+        mWorld.addSystem<game::skyguard::ecs::PlayerInitSystem>(
+            mResources, baseViewSize, initialViewSize, std::move(players));
+
+        // ВАЖНО: Input должен обновляться ДО Movement, т.к. Input пишет VelocityComponent,
+        // а Movement читает VelocityComponent в этом же тике.
+        mInputSystem    = &mWorld.addSystem<core::ecs::InputSystem>();
         mWorld.addSystem<core::ecs::MovementSystem>();
-        mRenderSystem = &mWorld.addSystem<core::ecs::RenderSystem>(mResources);
+
         // Эти системы требуют прямого доступа (onResize, onKeyEvent),
         // поэтому сохраняем указатели.
+        mRenderSystem   = &mWorld.addSystem<core::ecs::RenderSystem>(mResources);
         mScalingSystem  = &mWorld.addSystem<core::ecs::ScalingSystem>();
         mLockSystem     = &mWorld.addSystem<core::ecs::LockSystem>();
-        mInputSystem    = &mWorld.addSystem<core::ecs::InputSystem>();
         mDebugOverlay   = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
 
         // Привязываем overlay к сервису времени и шрифту (через ResourceManager).
-        if (mDebugOverlay) {
+        // Важно: ресурсы резолвим один раз при старте, не в hot-path.
+        {
             const sf::Font& font = mResources.getFont(core::resources::ids::FontID::Default).get();
 
             mDebugOverlay->bind(mTime, font);
             mDebugOverlay->setRenderSystem(mRenderSystem);
 
-            // Грузим конфиг для DebugOverlay.
-            const auto overlayCfg =
-                cfg::loadDebugOverlayBlueprint("assets/core/config/debug_overlay.json");
+            // Грузим конфиг для DebugOverlay (dev/косметика, не должен валить игру).
+            const auto overlayCfg = cfg::loadDebugOverlayBlueprint(skycfg_paths::DEBUG_OVERLAY);
 
             // Применяем стиль.
             mDebugOverlay->applyTextProperties(overlayCfg.text);
             mDebugOverlay->applyRuntimeProperties(overlayCfg.runtime);
 
-            // Итоговое состояние: overlay включён, только если:
-            //  - конфиг debug_overlay.json его не отключил;
-            //  - сборка разрешает overlay (Debug=true, Release=false) через SHOW_FPS_OVERLAY.
+            // Политика дефолтного состояния overlay при старте:
+            //  - overlayCfg.enabled может ОТКЛЮЧИТЬ overlay по умолчанию;
+            //  - dbg::SHOW_FPS_OVERLAY — compile-time флаг (Debug/Profile: true, Release: false).
+            //
+            // ВАЖНО: при формуле ниже JSON не может "включить overlay в Release на старте",
+            // потому что compile-time флаг сильнее. Но хоткей F3 (dbg::HOTKEY_TOGGLE_OVERLAY)
+            // всё равно позволяет включить overlay в рантайме в любой сборке.
             mDebugOverlay->setEnabled(overlayCfg.enabled && dbg::SHOW_FPS_OVERLAY);
         }
+
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
-        // DEV/PROFILE-only (Release no-op): стресс-сцена через ENV.
+        // DEV/PROFILE-only: стресс-сцена через ENV.
         game::skyguard::dev::trySpawnStressSpritesFromEnv(
             mWorld, mResources, core::resources::ids::TextureID::Player);
 #endif
     }
 
-    /**
-     * @brief Главный игровой цикл SkyGuard.
-     *
-     * Структура кадра:
-     *  1) mTime.tick() — измеряем время кадра, обновляем FPS и накопление для fixed-step;
-     *  2) processEvents() — обрабатываем все события окна/ввода;
-     *  3) while (shouldUpdate(FIXED_TIME_STEP)) — выполняем 0..N фиксированных шагов логики;
-     *  4) render() — один кадр отрисовки текущего состояния мира.
-     *
-     * Логика времени:
-     *  - TimeService управляет тем, сколько раз за кадр будет вызван update();
-     *  - dt для мира — FIXED_TIME_STEP (compile-time константа движка);
-     *  - пауза и timeScale (когда будут использоваться) настраиваются через TimeService,
-     *    но сам цикл остаётся таким же.
-     */
     void Game::run() {
         assert(mWindow.isOpen()); // проверка, что окно открылось
 
         const sf::Time fixedTimeStep = timecfg::FIXED_TIME_STEP;
 
         LOG_INFO(core::log::cat::Gameplay, "Game loop started");
-        int frameCount = 0;
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        std::uint64_t frameCount = 0;
+#endif
 
         while (mWindow.isOpen()) {
             // Обновляем время кадра (raw dt, scaled dt, FPS/метрики).
             mTime.tick();
+
             // Обрабатываем события окна и ввода.
             processEvents();
+
             // Выполняем один или несколько фиксированных шагов логики.
             while (mTime.shouldUpdate(fixedTimeStep)) {
                 update(fixedTimeStep);
             }
+
             // Отрисовываем текущее состояние мира.
             render();
 
-            if (++frameCount % 600 == 0) {  // раз в 600 кадров (частота зависит от FPS)
-                LOG_DEBUG(core::log::cat::Performance, "FPS: {:.1f} (frame {})",
-                          mTime.getSmoothedFps(), frameCount);
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            // Rate-limited debug: не спамим логом.
+            if (++frameCount % 600ULL == 0ULL) {
+                LOG_DEBUG(core::log::cat::Performance,
+                          "FPS: {:.1f} (frame {})",
+                          mTime.getSmoothedFps(),
+                          frameCount);
             }
+#endif
         }
     }
 
     void Game::processEvents() {
-
         while (const std::optional<sf::Event> event = mWindow.pollEvent()) {
-
-            // Обработка закрытия окна
+            // Закрытие окна.
             if (event->is<sf::Event::Closed>()) {
                 mWindow.close();
             }
-
-            // Обработка нажатия и отпускания клавиш
+            // Нажатие клавиш.
             else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
-                if (mInputSystem) {
-                    mInputSystem->onKeyEvent(keyPressed->code, true);
-                }
-                if (mDebugOverlay && keyPressed->code == dbg::HOTKEY_TOGGLE_OVERLAY) {
+                mInputSystem->onKeyEvent(keyPressed->code, true);
+
+                // Debug overlay toggle: хоткей работает во всех сборках (Debug/Release/Profile).
+                // Политика: хоткей ВСЕГДА активен, независимо от дефолтного состояния overlay
+                // при старте.
+                if (keyPressed->code == dbg::HOTKEY_TOGGLE_OVERLAY) {
                     mDebugOverlay->setEnabled(!mDebugOverlay->isEnabled());
                 }
-            } else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) {
-                if (mInputSystem) {
-                    mInputSystem->onKeyEvent(keyReleased->code, false);
-                }
             }
-
-            // Обработка изменения размера окна
+            // Отпускание клавиш.
+            else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) {
+                mInputSystem->onKeyEvent(keyReleased->code, false);
+            }
+            // Изменение размера окна.
             else if (const auto* resized = event->getIf<sf::Event::Resized>()) {
-                sf::Vector2f newSize(static_cast<float>(resized->size.x),
-                                     static_cast<float>(resized->size.y));
-                sf::View newView({newSize.x / 2.f, newSize.y / 2.f}, {newSize.x, newSize.y});
+                const sf::Vector2f newSize(static_cast<float>(resized->size.x),
+                                           static_cast<float>(resized->size.y));
+
+                const sf::View newView({newSize.x * 0.5f, newSize.y * 0.5f},
+                                       {newSize.x, newSize.y});
+
                 // Обновляем View окна, чтобы другие поведения и отрисовка видели актуальный вид.
                 mWindow.setView(newView);
-                if (mScalingSystem) {
-                    mScalingSystem->onResize(mWorld, newView); // безопасный вызов (null-check)
-                }
-                if (mLockSystem) {
-                    mLockSystem->onResize(mWorld, newView); // безопасный вызов (null-check)
-                }
+
+                // Пересчёт UI/привязок.
+                mScalingSystem->onResize(mWorld, newView);
+                mLockSystem->onResize(mWorld, newView);
             }
         }
     }
@@ -270,8 +277,10 @@ namespace game::skyguard {
     // и был "разрулен" TimeService (через shouldUpdate). ECS-системы не знают о том,
     // сколько реального времени прошло между кадрами, они видят стабильный шаг логики.
     void Game::update(const sf::Time& dt) {
-        assert(dt.asSeconds() > 0);    // время обновления должно быть положительным
-        mWorld.update(dt.asSeconds()); // обновляем все ECS-системы
+        const float dtSeconds = dt.asSeconds();
+        assert(dtSeconds > 0.0f); // фиксированный шаг должен быть положительным
+
+        mWorld.update(dtSeconds); // обновляем все ECS-системы
     }
 
     void Game::render() {

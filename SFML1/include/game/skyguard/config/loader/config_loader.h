@@ -1,7 +1,7 @@
 // ================================================================================================
 // File: game/skyguard/config/loader/config_loader.h
 // Purpose: High-level player configuration loader (JSON -> Player)
-// Used by: Game, PlayerConfigComponent, PlayerInitSystem
+// Used by: Game, PlayerInitSystem
 // Related headers: game/skyguard/config/config_keys.h, core/utils/json/json_utils.h,
 //                  core/utils/json/json_validator.h, core/utils/file_loader.h,
 //                  game/skyguard/config/blueprints/player_blueprint.h

@@ -6,6 +6,7 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <system_error>
 
 #include "core/config/properties/debug_overlay_runtime_properties.h"
@@ -24,6 +25,11 @@ namespace {
             out.append("?");
         }
     }
+
+    constexpr std::uint64_t kMaxIntAsU64 =
+        static_cast<std::uint64_t>(std::numeric_limits<int>::max());
+    constexpr std::uint8_t kMaxEmaShift =
+static_cast<std::uint8_t>(std::numeric_limits<std::uint64_t>::digits - 1); // 63
 
 #if defined(SFML1_PROFILE)
     void appendMs1DecimalFromUs(std::string& out, std::uint64_t us) {
@@ -50,9 +56,23 @@ namespace {
         if (prev == 0) {
             return sample;
         }
-        const std::uint64_t denom = (1ull << shift);
-        const std::uint64_t half = denom / 2;
-        return (prev * (denom - 1) + sample + half) / denom;
+
+        const std::uint64_t denom = (1ull << shift);   // shift гарантированно < 64
+        const std::uint64_t mask  = (denom - 1);       // denom == 2^shift
+        const std::uint64_t half  = (denom >> 1);      // округление
+
+        const auto roundDivPow2 = [shift, mask, half](const std::uint64_t diff) noexcept {
+            const std::uint64_t q = (diff >> shift);
+            const std::uint64_t r = (diff & mask);
+            return q + ((r >= half) ? 1ull : 0ull);
+        };
+
+        if (sample >= prev) {
+            return prev + roundDivPow2(sample - prev);
+        }
+
+        const std::uint64_t delta = roundDivPow2(prev - sample);
+        return (prev > delta) ? (prev - delta) : 0;
     }
 #endif
 
@@ -74,10 +94,17 @@ namespace core::ecs {
     void DebugOverlaySystem::applyRuntimeProperties(
         const core::config::properties::DebugOverlayRuntimeProperties& props) noexcept {
         // 0 ms => обновлять каждый кадр.
-        mUpdateInterval = (props.updateIntervalMs == 0)
-                              ? sf::Time::Zero
-                              : sf::milliseconds(static_cast<int>(props.updateIntervalMs));
-        mSmoothingShift = props.smoothingShift;
+        if (props.updateIntervalMs == 0) {
+            mUpdateInterval = sf::Time::Zero;
+        } else {
+            const std::uint64_t raw = static_cast<std::uint64_t>(props.updateIntervalMs);
+            const int clampedMs = static_cast<int>((raw > kMaxIntAsU64) ? kMaxIntAsU64 : raw);
+            mUpdateInterval = sf::milliseconds(clampedMs);
+        }
+
+        // ВАЖНО: shift используется в (1ull << shift). shift>=64 => UB.
+        mSmoothingShift =
+            (props.smoothingShift > kMaxEmaShift) ? kMaxEmaShift : props.smoothingShift;
         // При изменении режима сбрасываем сглаживание, чтобы не было "хвоста".
 #if defined(SFML1_PROFILE)
         mSmoothedCpuTotalUs = 0;

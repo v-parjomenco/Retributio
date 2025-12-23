@@ -13,6 +13,7 @@
 #include "core/ecs/system.h"
 #include "core/ecs/world.h"
 #include "core/log/log_macros.h"
+#include "core/ui/scaling_behavior.h"
 
 namespace core::ecs {
 
@@ -33,27 +34,6 @@ namespace core::ecs {
      *  - sprite.baseScale IMMUTABLE (устанавливается один раз в PlayerInitSystem)
      *  - sprite.scale MUTABLE (пересчитывается каждый resize)
      *  - lastUniform нужен ТОЛЬКО для логов/метрик (можно убрать в Release)
-     *
-     * МАТЕМАТИЧЕСКОЕ ДОКАЗАТЕЛЬСТВО отсутствия ошибок:
-     *  Пусть baseScale = 0.12, baseViewSize = {1024, 768}
-     *
-     *  Resize 1: window = {672, 504} (65.8%)
-     *    uniform = min(672/1024, 504/768) = min(0.656, 0.656) = 0.656
-     *    scale = 0.12 * 0.656 = 0.0787
-     *
-     *  Resize 2: window = {1024, 768} (100%, обратно)
-     *    uniform = min(1024/1024, 768/768) = 1.0
-     *    scale = 0.12 * 1.0 = 0.12  ← ТОЧНО исходный!
-     *
-     *  Resize 3: window = {2048, 1536} (200%)
-     *    uniform = min(2048/1024, 1536/768) = 2.0
-     *    scale = 0.12 * 2.0 = 0.24
-     *
-     *  Resize 4: window = {1024, 768} (обратно)
-     *    uniform = 1.0
-     *    scale = 0.12 * 1.0 = 0.12  ← СНОВА точно исходный!
-     *
-     * Никакого накопления ошибок, только машинная точность float.
      */
     class ScalingSystem final : public ISystem {
       public:
@@ -65,19 +45,8 @@ namespace core::ecs {
 
                 switch (scaling.kind) {
                 case core::ui::ScalingBehaviorKind::Uniform: {
-                    // Защита от деления на 0
-                    const sf::Vector2f safeBaseSize{std::max(scaling.baseViewSize.x, 1.f),
-                                                    std::max(scaling.baseViewSize.y, 1.f)};
-
-                    // Текущий размер view
-                    const sf::Vector2f currentViewSize = newView.getSize();
-
-                    // Коэффициенты изменения по осям
-                    const float scaleX = currentViewSize.x / safeBaseSize.x;
-                    const float scaleY = currentViewSize.y / safeBaseSize.y;
-
-                    // Uniform factor (минимум из двух осей)
-                    const float newUniform = std::min(scaleX, scaleY);
+                    const float newUniform =
+                        core::ui::computeUniformFactor(newView, scaling.baseViewSize);
 
                     // DEBUG: логируем ДО изменения
                     LOG_TRACE(core::log::cat::ECS,

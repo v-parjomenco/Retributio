@@ -1,7 +1,7 @@
 // ================================================================================================
 // File: game/skyguard/config/blueprints/player_blueprint.h
 // Purpose: High-level player blueprint assembled from generic properties
-// Used by: ConfigLoader, PlayerConfigComponent, PlayerInitSystem
+// Used by: ConfigLoader, PlayerInitSystem
 // Related headers: core/config/properties/*.h
 // ================================================================================================
 #pragma once
