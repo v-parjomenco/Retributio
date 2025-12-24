@@ -75,8 +75,8 @@ namespace core::ecs {
      * @return uint32_t числовое представление (включает generation)
      */
     [[nodiscard]] constexpr std::uint32_t toUint(Entity entity) noexcept {
-        // entt::to_integral возвращает underlying type (может быть отрицательным или специальным)
-        // Для null entity возвращаем явно 0xFFFFFFFF чтобы было видно
+        // entt::to_integral возвращает числовое представление дескриптора (underlying value).
+        // Для null entity возвращаем явно 0xFFFFFFFF, чтобы в логах это не сливалось с обычными ID.
         if (entity == entt::null) {
             return 0xFFFFFFFF; // Явный маркер "null entity"
         }

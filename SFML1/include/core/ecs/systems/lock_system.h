@@ -1,4 +1,4 @@
-﻿// ================================================================================================
+// ================================================================================================
 // File: core/ecs/systems/lock_system.h
 // Purpose: Apply per-entity lock behavior on window/view resize (EnTT backend)
 // Used by: Game resize handling, World/SystemManager

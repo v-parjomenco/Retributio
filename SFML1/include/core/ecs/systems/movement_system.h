@@ -1,4 +1,4 @@
-﻿// ================================================================================================
+// ================================================================================================
 // File: core/ecs/systems/movement_system.h
 // Purpose: position += velocity * dt
 // Used by: Game update loop via World/SystemManager

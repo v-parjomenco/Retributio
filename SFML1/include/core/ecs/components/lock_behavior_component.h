@@ -1,4 +1,4 @@
-﻿// ================================================================================================
+// ================================================================================================
 // File: core/ecs/components/lock_behavior_component.h
 // Purpose: Per-entity state for lock behavior on window resize
 // Used by: LockSystem, PlayerInitSystem

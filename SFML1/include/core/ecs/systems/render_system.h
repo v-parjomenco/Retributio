@@ -40,7 +40,7 @@
                 // Число отсечённых culling-ом спрайтов-кандидатов (спрайты вне view + invalid).
                 std::size_t culledSpriteCount = 0;
 
-                // Число реально отрисованных спрайтовф (после culling).
+                // Число реально отрисованных спрайтов (после culling).
                 std::size_t spriteCount = 0;
                 std::size_t vertexCount = 0;
                 std::size_t batchDrawCalls = 0;

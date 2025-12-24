@@ -1,4 +1,4 @@
-﻿// ================================================================================================
+// ================================================================================================
 // File: core/ui/anchor_utils.h
 // Purpose: Anchor type definitions and utility functions
 // Used by: AnchorPolicy, AnchorProperties, PlayerInitSystem

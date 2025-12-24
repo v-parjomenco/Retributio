@@ -3,7 +3,8 @@
 // Role: Lightweight ECS system to render debug overlay (FPS etc.)
 // Notes:
 //  - Reads data from services (e.g., TimeService), renders via SFML
-//  - Data-driven friendly: font comes from ResourceManager; later add JSON config
+//  - Data-driven friendly: font is provided by caller (typically resolved via ResourceManager);
+//                          runtime layout comes from DebugOverlayBlueprint (JSON)
 //  - Can be toggled on/off at runtime
 // ================================================================================================
 
@@ -11,9 +12,6 @@
 //
 // дополнительные метрики : ms / frame, dt, fixed tick, count draw calls(если есть),
 //  позиции сущности игрока;
-//
-// конфигурирование(JSON) : добавить ещё пару метрик (ms/frame, dt, позиция игрока)
-//  и аккуратно свести их в один текстовый блок с выравниванием;
 //
 // позже: выделить Hud / UI Manager(управление всем UI, включая отладочный слой)
 //  и оставить DebugOverlay как подсистему или виджет.

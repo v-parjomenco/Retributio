@@ -1,4 +1,4 @@
-﻿// ================================================================================================
+// ================================================================================================
 // File: core/resources/paths/resource_paths.h
 // Purpose: Maps resource enum IDs to file system paths via JSON registry.
 // Used by: ResourceManager, higher-level loading code.
@@ -7,6 +7,9 @@
 //  - Backed by internal static maps (Meyer's singleton) for safe initialization.
 //  - Does NOT deal with hot-reload, mods, DLC, or virtual filesystems.
 //    Those are implemented at higher layers.
+//  - ResourcePaths must be treated as an internal detail of the resource layer;
+//    no code outside ResourceManager and the bootstrapping / composition root is allowed to access
+//    or depend on ResourcePaths directly.
 // ================================================================================================
 #pragma once
 
