@@ -39,8 +39,9 @@ namespace {
     }
 
     [[nodiscard]] Aabb2 makeViewAabb(const sf::View& view) noexcept {
-        // ВАЖНО: это AABB текущего view в world-space. Ротацию view не учитываем
-        // (в SkyGuard/4X это обычно не используется; если появится — нужен OBB/convex test).
+        // ПРИМЕЧАНИЕ: Culling работает только для неповернутого view (view.getRotation() == 0).
+        // При повороте view AABB в world-space больше не описывает видимую область корректно,
+        // понадобится более общий тест (OBB/матрица вида).
         const sf::Vector2f size = view.getSize();
         const sf::Vector2f center = view.getCenter();
         const sf::Vector2f topLeft{center.x - size.x * 0.5f, center.y - size.y * 0.5f};
@@ -60,11 +61,13 @@ namespace {
     }
 
     [[nodiscard]] bool hasExplicitRect(const sf::IntRect& r) noexcept {
-        // Политика: (0,0) => full texture. Иначе rect должен быть задан явно (оба != 0).
-        return (r.size.x != 0) && (r.size.y != 0);
+        // Политика: (0,0) => full texture. Rect должен быть явно положительным.
+        // Отражение с помощью отрицательного размера rect НЕ поддерживается;
+        // для зеркального отображения используйте отрицательный scale.
+        return (r.size.x > 0) && (r.size.y > 0);
     }
 
-void writeSpriteTriangles(sf::Vertex* out,
+    void writeSpriteTriangles(sf::Vertex* out,
                           const sf::Vector2f& position,
                           const sf::Vector2f& origin,
                           const sf::Vector2f& scale,
@@ -112,7 +115,7 @@ void writeSpriteTriangles(sf::Vertex* out,
                                                     const sf::Vector2f& origin,
                                                     const sf::Vector2f& scale,
                                                     const sf::IntRect& rect) noexcept {
-        // Должно соответствовать appendSpriteTriangles(): те же локальные точки и тот же порядок
+        // Должно соответствовать writeSpriteTriangles(): те же локальные точки и тот же порядок
         // transform (origin -> scale -> translate). Так culling совпадает с реальной геометрией.
         const float w = static_cast<float>(rect.size.x);
         const float h = static_cast<float>(rect.size.y);

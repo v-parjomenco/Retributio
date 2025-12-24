@@ -127,6 +127,18 @@ namespace game::skyguard::config {
                              defaultWidth);
                 }
             }
+
+            // Семантическая валидация (validate-on-write):
+            // 0x0 окно недопустимо для VideoMode/рендера, поэтому не принимаем ноль.
+            // Это НЕ hot path: выполняется один раз на загрузке конфига.
+            if (hasWidth && res.issue.kind == Kind::None && cfg.width == 0u) {
+                LOG_WARN(core::log::cat::Config,
+                         "[SkyGuard::WindowConfigLoader] Некорректное поле '{}': "
+                         "значение не может быть 0. Применён дефолт ({}).",
+                         gk::WINDOW_WIDTH,
+                         defaultWidth);
+                cfg.width = defaultWidth;
+            }
         }
 
         {
@@ -160,6 +172,16 @@ namespace game::skyguard::config {
                              gk::WINDOW_HEIGHT,
                              defaultHeight);
                 }
+            }
+
+            // Семантическая валидация (validate-on-write): высота 0 недопустима.
+            if (hasHeight && res.issue.kind == Kind::None && cfg.height == 0u) {
+                LOG_WARN(core::log::cat::Config,
+                         "[SkyGuard::WindowConfigLoader] Некорректное поле '{}': "
+                         "значение не может быть 0. Применён дефолт ({}).",
+                         gk::WINDOW_HEIGHT,
+                         defaultHeight);
+                cfg.height = defaultHeight;
             }
         }
 

@@ -40,6 +40,14 @@ namespace core::ecs {
       public:
         InputSystem() = default;
 
+        /// @brief Сбросить состояние всех клавиш.
+        ///
+        /// Нужно для сценариев потери фокуса (Alt-Tab, клик вне окна),
+        /// когда ОС может не прислать KeyReleased для уже нажатых клавиш.
+        void resetState() noexcept {
+            mKeyDown.fill(false);
+        }
+
         /// @brief Обновить состояние одной клавиши.
         void onKeyEvent(sf::Keyboard::Key code, bool pressed) noexcept {
             const auto index = tryKeyIndex(code);

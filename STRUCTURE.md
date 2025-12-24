@@ -2,88 +2,95 @@
 
 ## 📁 **Project Structure**
 
-High-level layout of the SFML1 / SkyGuard repository.  
+High-level layout of the SFML1 / SkyGuard repository.
 
 ```text
 .
 ├─ CREDITS.md
 ├─ README.md
-├─ STRUCTURE.md
 ├─ SFML1.sln
+├─ STRUCTURE.md
 ├─ docs/
-│  └─ architecture/           		# Architecture notes & diagrams
+│  └─ architecture/              # Architecture notes & diagrams
 ├─ tools/
-│  ├─ check_layering.ps1      		# Include layering checks
-│  └─ run-clang-tidy.ps1      		# clang-tidy helper
+│  ├─ check_layering.ps1         # Include layering checks
+│  └─ run-clang-tidy.ps1         # clang-tidy helper
 └─ SFML1/
+   ├─ SFML1.vcxproj
+   ├─ SFML1.vcxproj.filters
+   ├─ SFML1.vcxproj.user
+   ├─ main_skyguard.cpp          # Entry point, logging & safety-net wiring
    ├─ assets/
    │  ├─ core/
-   │  │  ├─ config/           		# Engine configs (engine_settings.json, debug_overlay.json)
-   │  │  └─ fonts/            		# Engine fonts
+   │  │  ├─ config/              # Engine configs (engine_settings.json, debug_overlay.json)
+   │  │  └─ fonts/               # Engine fonts
    │  └─ game/
    │     └─ skyguard/
-   │        ├─ config/        		# SkyGuard configs (player.json, skyguard_game.json, resources.json)
-   │        ├─ images/        		# SkyGuard textures & sprites
-   │        └─ sounds/        		# SkyGuard sounds (placeholder for future SFX)
+   │        ├─ config/           # SkyGuard configs (player.json, skyguard_game.json, resources.json)
+   │        ├─ images/           # SkyGuard textures & sprites
+   │        └─ sounds/           # SkyGuard sounds (placeholder / future SFX)
    ├─ include/
+   │  ├─ pch.h                   # Precompiled header
    │  ├─ core/
-   │  │  ├─ compiler/         		# warnings.h and platform glue (windows.h)
+   │  │  ├─ compiler/            # warnings.h and platform glue (windows.h)
    │  │  ├─ config/
-   │  │  │  ├─ blueprints/    		# Data models for configs (e.g. debug overlay)
-   │  │  │  ├─ loader/        		# Loaders that parse JSON into models
-   │  │  │  └─ properties/    		# Reusable property groups (sprite, movement, text, etc.)
-   │  │  ├─ debug/            		# Debug build flags & hotkeys
+   │  │  │  ├─ blueprints/       # Data models for configs (e.g. debug overlay)
+   │  │  │  ├─ loader/           # Loaders that parse JSON into models
+   │  │  │  └─ properties/       # Reusable property groups (sprite, movement, text, etc.)
+   │  │  ├─ debug/               # Debug build flags & config
    │  │  ├─ ecs/
-   │  │  │  ├─ components/    		# Engine-level ECS components
-   │  │  │  ├─ systems/       		# Engine-level ECS systems
-   │  │  │  └─ ...            		# World, SystemManager, registry glue
-   │  │  ├─ log/              		# Logging API, levels, categories, macros
+   │  │  │  ├─ components/       # Engine-level ECS components (POD)
+   │  │  │  ├─ systems/          # Engine-level ECS systems
+   │  │  │  ├─ entity.h
+   │  │  │  ├─ system.h
+   │  │  │  ├─ system_manager.h
+   │  │  │  └─ world.h
+   │  │  ├─ log/                 # Logging API, levels, categories, macros
    │  │  ├─ resources/
-   │  │  │  ├─ config/        		# Per-resource-type config structures
-   │  │  │  ├─ holders/       		# Generic ResourceHolder
-   │  │  │  ├─ ids/           		# Strong resource IDs and helpers
-   │  │  │  ├─ paths/         		# ResourcePaths registry facade
-   │  │  │  └─ types/         		# Thin wrappers over SFML resources
-   │  │  ├─ time/             		# TimeService and fixed timestep config
-   │  │  ├─ ui/
-   │  │  │  ├─ ids/           		# Enum/string helpers for UI identifiers
-   │  │  │  └─ ...            		# Anchor, lock and scaling behaviors
+   │  │  │  ├─ config/           # Per-resource-type config structures
+   │  │  │  ├─ holders/          # Generic ResourceHolder
+   │  │  │  ├─ ids/              # Strong resource IDs and helpers
+   │  │  │  ├─ paths/            # ResourcePaths registry (internal to resource layer)
+   │  │  │  └─ types/            # Thin wrappers over SFML resources
+   │  │  ├─ time/                # TimeService and fixed timestep config
+   │  │  ├─ ui/                  # Anchor, lock and scaling behaviors
    │  │  └─ utils/
-   │  │     ├─ file_loader.h  		# Low-level file I/O
-   │  │     └─ json/          		# JSON helpers & validation
-   │  ├─ entt/						# Fast and reliable ECS system
+   │  │     ├─ file_loader.h     # Low-level file I/O
+   │  │     └─ json/             # JSON parsing + validation helpers
+   │  │        ├─ json_common.h
+   │  │        ├─ json_validator.h
+   │  │        ├─ json_document.h # parseAndValidateCritical/NonCritical
+   │  │        ├─ json_accessors.h
+   │  │        └─ json_parsers.h
    │  ├─ game/
    │  │  └─ skyguard/
+   │  │     ├─ game.h            # SkyGuard Game façade (composition root)
    │  │     ├─ config/
-   │  │     │  ├─ blueprints/ 		# Player blueprint, etc.
-   │  │     │  ├─ loader/     		# SkyGuard config loaders
-   │  │     │  └─ window_config.h
+   │  │     │  ├─ config_keys.h
+   │  │     │  ├─ config_paths.h
+   │  │     │  ├─ window_config.h
+   │  │     │  ├─ blueprints/
+   │  │     │  └─ loader/
    │  │     ├─ ecs/
-   │  │     │  ├─ components/ 		# Game-specific ECS components
-   │  │     │  └─ systems/    		# Game-specific ECS systems
-   │  │     └─ game.h         		# SkyGuard Game facade (composition root)
-   │  ├─ pch.h                		# Precompiled header
-   │  ├─ nlohmann/			  		# nlohmann-json
-   │  └─ third_party/
-   │  	 ├─ entt/					# Wrappers over entt   
-   │  	 ├─ json/					# Wrappers over <nlohmann/json>
-   │     └─ licenses/ 		  		# Third party licenses
-   │        ├─ json_license.mit     # nlohmann/json license
-   │        └─ entt_license.mit     # entt license
+   │  │     │  ├─ components/    # Game-specific ECS components (currently empty placeholder)
+   │  │     │  └─ systems/       # Game-specific ECS systems
+   │  │     └─ dev/
+   │  │        └─ stress_scene.h
+   │  ├─ entt/                   # Vendored EnTT headers
+   │  ├─ nlohmann/               # Vendored nlohmann/json
+   │  └─ third_party/            # Thin wrappers + licenses
    ├─ src/
-   │  ├─ core/                		# Implementations mirroring include/core
-   │  │  ├─ compiler/
-   │  │  ├─ config/
-   │  │  ├─ debug/
-   │  │  ├─ ecs/
+   │  ├─ pch.cpp
+   │  ├─ core/                   # Implementations mirroring include/core
+   │  │  ├─ config/loader/
+   │  │  ├─ ecs/systems/
    │  │  ├─ log/
    │  │  ├─ resources/
    │  │  ├─ time/
    │  │  ├─ ui/
    │  │  └─ utils/
-   │  ├─ game/
-   │  │  └─ skyguard/         		# Implementations mirroring include/game/skyguard
-   │  └─ pch.cpp
-   ├─ logs/                   		# Runtime logs (per session)
-   └─ main_skyguard.cpp       		# Entry point, logging & safety-net wiring
+   │  │     └─ json/
+   │  └─ game/
+   │     └─ skyguard/            # Implementations mirroring include/game/skyguard
+   └─ logs/                      # Runtime logs (per session)
 ```

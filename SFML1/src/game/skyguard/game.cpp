@@ -255,6 +255,12 @@ namespace game::skyguard {
             else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) {
                 mInputSystem->onKeyEvent(keyReleased->code, false);
             }
+
+            // Потеря фокуса: сбрасываем ввод, чтобы не залипали клавиши при Alt-Tab/клике мимо окна.
+            else if (event->is<sf::Event::FocusLost>()) {
+                mInputSystem->resetState();
+            }
+
             // Изменение размера окна.
             else if (const auto* resized = event->getIf<sf::Event::Resized>()) {
                 const sf::Vector2f newSize(static_cast<float>(resized->size.x),
