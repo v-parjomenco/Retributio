@@ -1,78 +1,80 @@
 // ================================================================================================
-// File: core/ecs/systems/scaling_system.h (DETERMINISTIC VERSION)
-// Purpose: Apply per-entity scaling behavior on window/view resize (absolute-based)
+// File: core/ecs/systems/scaling_system.h
+// Purpose: Apply per-entity scaling behavior on window/view resize (deterministic, absolute-based)
 // Used by: Game resize handling, World/SystemManager
-// Related headers: scaling_behavior_component.h, sprite_component.h
+// Related headers: scaling_behavior_component.h, sprite_component.h, core/ui/scaling_behavior.h
 // ================================================================================================
 #pragma once
 
+#include <cassert>
+#include <cmath>
+
 #include <SFML/Graphics/View.hpp>
+#include <SFML/System/Vector2.hpp>
 
 #include "core/ecs/components/scaling_behavior_component.h"
 #include "core/ecs/components/sprite_component.h"
-#include "core/ecs/entity.h"
 #include "core/ecs/system.h"
 #include "core/ecs/world.h"
-#include "core/log/log_macros.h"
 #include "core/ui/scaling_behavior.h"
+
+namespace sf {
+    class RenderWindow;
+}
 
 namespace core::ecs {
 
     /**
-     * @brief Scaling system (ДЕТЕРМИНИРОВАННАЯ ВЕРСИЯ - без накопления ошибок).
+     * @brief Система масштабирования сущностей при resize.
      *
-     * КРИТИЧЕСКИЕ ПРЕИМУЩЕСТВА:
-     *  - Нет накопления float ошибок (всегда: scale = baseScale * uniform)
-     *  - Детерминизм: одинаковый размер окна → одинаковый scale
-     *  - Простота: один оператор присваивания
+     * Детерминированная формула:
+     *   scale = baseScale * uniformFactor
      *
-     * АЛГОРИТМ (Uniform scaling, детерминированный):
-     *  1. Вычисляем newUniform = min(newView.x / baseView.x, newView.y / baseView.y)
-     *  2. Присваиваем: sprite.scale = sprite.baseScale * newUniform
-     *  3. Сохраняем: lastUniform = newUniform (для дебага/метрик)
-     *
-     * ВАЖНО:
-     *  - sprite.baseScale IMMUTABLE (устанавливается один раз в PlayerInitSystem)
-     *  - sprite.scale MUTABLE (пересчитывается каждый resize)
-     *  - lastUniform нужен ТОЛЬКО для логов/метрик (можно убрать в Release)
+     * Принципиально: не накапливаем float-ошибки, т.к. каждый resize пересчитывает scale от baseScale.
+     * В Debug защищаем инвариант "в компоненты не пишем NaN/Inf" (проверка результата ДО записи).
      */
     class ScalingSystem final : public ISystem {
       public:
         void onResize(World& world, const sf::View& newView) {
             auto view = world.view<ScalingBehaviorComponent, SpriteComponent>();
 
+            // Loop-invariant: размер view одинаков для всех сущностей в рамках одного resize.
+            const sf::Vector2f currentViewSize = newView.getSize();
+
             for (auto [entity, scaling, sprite] : view.each()) {
-                (void) entity;
+                (void)entity;
 
                 switch (scaling.kind) {
                 case core::ui::ScalingBehaviorKind::Uniform: {
                     const float newUniform =
-                        core::ui::computeUniformFactor(newView, scaling.baseViewSize);
+                        core::ui::computeUniformFactor(currentViewSize, scaling.baseViewSize);
 
-                    // DEBUG: логируем ДО изменения
-                    LOG_TRACE(core::log::cat::ECS,
-                              "ScalingSystem: entity={}, BEFORE: scale=({:.3f}, {:.3f}), "
-                              "baseScale=({:.3f}, {:.3f}), uniform={:.3f}",
-                              core::ecs::toUint(entity), sprite.scale.x, sprite.scale.y,
-                              sprite.baseScale.x, sprite.baseScale.y, newUniform);
+                    // Транзакционное обновление: сначала считаем, затем (в Debug) валидируем, затем пишем.
+                    const sf::Vector2f newScale{
+                        sprite.baseScale.x * newUniform,
+                        sprite.baseScale.y * newUniform
+                    };
 
-                    // ДЕТЕРМИНИРОВАННОЕ ПРИСВАИВАНИЕ (всегда от baseScale!)
-                    sprite.scale.x = sprite.baseScale.x * newUniform;
-                    sprite.scale.y = sprite.baseScale.y * newUniform;
+#if !defined(NDEBUG)
+                    const bool scaleFinite = std::isfinite(newScale.x) && std::isfinite(newScale.y);
 
-                    // DEBUG: логируем ПОСЛЕ изменения
-                    LOG_TRACE(core::log::cat::ECS,
-                              "ScalingSystem: entity={}, AFTER: scale=({:.3f}, {:.3f})",
-                              core::ecs::toUint(entity), sprite.scale.x, sprite.scale.y);
+                    // Engine-level инвариант: NaN/Inf в scale недопустимы.
+                    // ВАЖНО: не пишем мусор даже если в IDE нажали "Continue" после assert.
+                    assert(scaleFinite &&
+                           "ScalingSystem: non-finite scale computed. "
+                           "Check computeUniformFactor() and baseScale initialization.");
 
-                    // Сохраняем для дебага/метрик (можно убрать в Release)
+                    if (!scaleFinite) {
+                        break;
+                    }
+#endif
+
+                    sprite.scale = newScale;
                     scaling.lastUniform = newUniform;
-
                     break;
                 }
 
                 case core::ui::ScalingBehaviorKind::None:
-                    // Ничего не делаем
                     break;
                 }
             }
@@ -80,6 +82,7 @@ namespace core::ecs {
 
         void update(World&, float) override {
         }
+
         void render(World&, sf::RenderWindow&) override {
         }
     };

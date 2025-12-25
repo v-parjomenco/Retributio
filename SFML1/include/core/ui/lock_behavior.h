@@ -19,10 +19,14 @@ namespace core::ui {
     };
 
     /**
-     * @brief Вычисление новой позиции для ScreenLock БЕЗ мутации sf::Sprite (data-driven).
+     * @brief Вычисление новой позиции для ScreenLock (data-driven).
      *
-     *   sf::Vector2f newPos = computeScreenLockPosition(currentPos, prevViewSize, newViewSize);
-     *   transformComp.position = newPos;
+     * Контракт:
+     *  - newViewSize уже проверен вызывающим кодом (LockSystem) и валиден (> 0.001).
+     *  - previousViewSize может быть неинициализирован/некорректен — тогда позицию не меняем.
+     *
+     * Политика:
+     *  - если previousViewSize некорректен (включая NaN/0) → возвращаем currentPosition.
      */
     [[nodiscard]] inline sf::Vector2f
     computeScreenLockPosition(const sf::Vector2f& currentPosition,
@@ -31,23 +35,21 @@ namespace core::ui {
 
         constexpr float kMinViewComponent = 1e-3f;
 
-        // Если previousViewSize неизвестен/некорректен (включая NaN),
-        // относительное положение не восстановить.
-        // В этом случае не двигаем позицию, чтобы избежать "телепорта" на первом resize.
-        if (!(previousViewSize.x > kMinViewComponent) ||
-            !(previousViewSize.y > kMinViewComponent)) {
+        // previousViewSize — состояние компонента; может быть неинициализировано.
+        // Используем !(val > min), чтобы захватить и малые значения, и NaN.
+        if (!(previousViewSize.x > kMinViewComponent) || !(previousViewSize.y > kMinViewComponent)) {
             return currentPosition;
         }
 
-        // Если новый размер некорректен (включая NaN/0), тоже ничего не делаем.
-        if (!(newViewSize.x > kMinViewComponent) || !(newViewSize.y > kMinViewComponent)) {
-            return currentPosition;
-        }
+        const sf::Vector2f relativePosition{
+            currentPosition.x / previousViewSize.x,
+            currentPosition.y / previousViewSize.y
+        };
 
-        const sf::Vector2f relativePosition = {currentPosition.x / previousViewSize.x,
-                                               currentPosition.y / previousViewSize.y};
-
-        return {newViewSize.x * relativePosition.x, newViewSize.y * relativePosition.y};
+        return {
+            newViewSize.x * relativePosition.x,
+            newViewSize.y * relativePosition.y
+        };
     }
 
 } // namespace core::ui

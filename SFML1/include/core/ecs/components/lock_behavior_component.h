@@ -28,9 +28,6 @@ namespace core::ecs {
 
         // Размер view, который использовался в прошлый раз для позиционирования.
         sf::Vector2f previousViewSize{0.f, 0.f};
-
-        // Флаг для отладки (использовался ли компонент).
-        bool initialized{false};
     };
 
 } // namespace core::ecs

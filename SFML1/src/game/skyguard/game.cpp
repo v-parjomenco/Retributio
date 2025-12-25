@@ -139,6 +139,13 @@ namespace game::skyguard {
         // Базовый размер (design/reference) и фактический стартовый размер окна сейчас совпадают.
         // Если позже захочешь "design resolution" отдельно — прокинем baseViewSize из конфига.
         const sf::Vector2f baseViewSize = mWindow.getView().getSize();
+
+        // Инвариант: после успешного create() view всегда валиден (ненулевой размер).
+        // Проверка нужна только для отлова багов в SFML или memory corruption.
+        assert((baseViewSize.x > 0.f) && (baseViewSize.y > 0.f) &&
+               "Game::initWorld: window view has invalid size after create(). "
+               "This indicates SFML bug or memory corruption.");
+
         const sf::Vector2f initialViewSize = baseViewSize;
 
         std::vector<game::skyguard::config::blueprints::PlayerBlueprint> players;

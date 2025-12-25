@@ -6,6 +6,8 @@
 // ================================================================================================
 #pragma once
 
+#include <algorithm>
+
 #include <SFML/Graphics/View.hpp>
 #include <SFML/System/Vector2.hpp>
 
@@ -16,39 +18,41 @@ namespace core::ui {
      */
     enum class ScalingBehaviorKind {
         None,   // без дополнительного масштабирования
-        Uniform // равномерное масштабирование
+        Uniform // равномерное масштабирование (сохранение пропорций по меньшей стороне)
     };
 
     /**
-     * @brief Вычисление uniform factor БЕЗ мутации sf::Sprite (data-driven).
+     * @brief Вычисление uniform factor по размерам.
      *
+     * Контракт:
+     *  - baseViewSize валиден и задаётся движком (проверяется на границе записи, не здесь).
+     *  - currentViewSize может быть 0/NaN при сворачивании/краевых состояниях окна — это штатно.
      *
-     * Новый подход (детерминированный):
-     *   float uniformFactor = computeUniformFactor(view, baseViewSize);
-     *   spriteComp.scale = spriteComp.baseScale * uniformFactor;
+     * Политика:
+     *  - если currentViewSize некорректен → возвращаем 1.0f (нейтральный множитель).
+     *  - без логов/assert'ов: функция leaf-level, без дублей валидации.
      */
-    [[nodiscard]] inline float computeUniformFactor(const sf::View& view,
+    [[nodiscard]] inline float computeUniformFactor(const sf::Vector2f& currentViewSize,
                                                     const sf::Vector2f& baseViewSize) noexcept {
-
-        const sf::Vector2f currentViewSize = view.getSize();
-
         constexpr float kMinViewComponent = 1e-3f;
 
-        // Если baseViewSize неизвестен/некорректен (включая NaN),
-        // корректный коэффициент вычислить нельзя -> возвращаем нейтральный множитель.
-        if (!(baseViewSize.x > kMinViewComponent) || !(baseViewSize.y > kMinViewComponent)) {
-            return 1.0f;
-        }
-
-        // Если текущий размер некорректен (включая NaN/0) -> тоже нейтральный множитель.
+        // currentViewSize — данные от OS: 0/NaN возможны (minimized). Не падаем.
+        // Используем !(val > min), чтобы захватить и малые значения, и NaN.
         if (!(currentViewSize.x > kMinViewComponent) || !(currentViewSize.y > kMinViewComponent)) {
             return 1.0f;
         }
 
         const float scaleX = currentViewSize.x / baseViewSize.x;
         const float scaleY = currentViewSize.y / baseViewSize.y;
-
         return std::min(scaleX, scaleY);
+    }
+
+    /**
+     * @brief Хелпер для вычисления фактора напрямую из sf::View.
+     */
+    [[nodiscard]] inline float computeUniformFactor(const sf::View& view,
+                                                    const sf::Vector2f& baseViewSize) noexcept {
+        return computeUniformFactor(view.getSize(), baseViewSize);
     }
 
 } // namespace core::ui

@@ -9,7 +9,8 @@
 // ================================================================================================
 #pragma once
 
-#include <SFML/Graphics.hpp>
+#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/System/Time.hpp>
 
 #include "core/ecs/world.h"
 #include "core/resources/resource_manager.h"

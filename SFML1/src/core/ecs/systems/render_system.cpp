@@ -28,9 +28,11 @@ namespace {
         float maxY = 0.f;
     };
 
-    [[nodiscard]] bool isFiniteVec2(const sf::Vector2f& v) noexcept {
-        return std::isfinite(v.x) && std::isfinite(v.y);
-    }
+#if !defined(NDEBUG)
+[[nodiscard]] bool isFiniteVec2(const sf::Vector2f& v) noexcept {
+    return std::isfinite(v.x) && std::isfinite(v.y);
+}
+#endif
 
     [[nodiscard]] bool intersectsInclusive(const Aabb2& a, const Aabb2& b) noexcept {
         // Инклюзивное пересечение (касание границ считаем видимым).
@@ -234,22 +236,20 @@ namespace core::ecs {
             const auto& spr = ecsView.get<SpriteComponent>(entity);
             const auto& tr = ecsView.get<TransformComponent>(entity);
 
+#if !defined(NDEBUG)
             const bool dataFinite =
                 isFiniteVec2(tr.position) &&
                 isFiniteVec2(spr.origin) &&
                 isFiniteVec2(spr.scale) &&
                 std::isfinite(spr.zOrder);
 
-#if !defined(NDEBUG)
             // Это engine-level инвариант: NaN/Inf сюда попадать не должны.
             assert(dataFinite && "RenderSystem: non-finite Transform/Sprite data detected.");
-#endif
             if (!dataFinite) {
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
                 ++culled;
-#endif
                 continue;
             }
+#endif
 
             const TextureCacheEntry* texEntry = nullptr;
             sf::IntRect rect{};
@@ -448,11 +448,7 @@ namespace core::ecs {
                 }
             }
 
-            const sf::IntRect rect =
-                (hasExplicitRect(spr.textureRect) &&
-                 (spr.textureRect.size.x > 0 && spr.textureRect.size.y > 0))
-                    ? spr.textureRect
-                    : fullRect;
+            const sf::IntRect rect = hasExplicitRect(spr.textureRect) ? spr.textureRect : fullRect;
 
             writeSpriteTriangles(mVertices.data() + vertexWrite,
                                  transform.position,

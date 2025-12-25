@@ -2,7 +2,14 @@
 
 #include "core/utils/json/json_document.h"
 
+#include <algorithm>
+#include <cassert>
+#include <cstddef>
+#include <stdexcept>
+#include <string>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "core/log/log_macros.h"
 #include "third_party/json/json_silent.hpp"
@@ -14,9 +21,6 @@
 
 namespace {
 
-    // Дубли ключей в JSON после парсинга уже не обнаружить:
-    // nlohmann::json хранит только "последнее значение".
-    // Поэтому ловим проблему НА ЭТАПЕ ПАРСИНГА через callback и считаем это ошибкой конфига.
     class DuplicateKeyError final : public std::runtime_error {
       public:
         explicit DuplicateKeyError(std::string key)
@@ -44,21 +48,26 @@ namespace {
             switch (event) {
             case Json::parse_event_t::object_start:
                 mObjectKeyStack.emplace_back();
+                mObjectKeyStack.back().beginObject();
                 break;
+
             case Json::parse_event_t::object_end:
+#if !defined(NDEBUG)
+                assert(!mObjectKeyStack.empty());
+#endif
                 mObjectKeyStack.pop_back();
                 break;
+
             case Json::parse_event_t::key: {
-                // nlohmann::json гарантирует, что parsed содержит string при событии key
                 const auto* keyPtr = parsed.get_ptr<const std::string*>();
-                
-                auto& keys = mObjectKeyStack.back();
-                const auto [it, inserted] = keys.emplace(*keyPtr);
-                if (!inserted) {
-                    throw DuplicateKeyError(*keyPtr);
-                }
+#if !defined(NDEBUG)
+                assert(keyPtr != nullptr);
+                assert(!mObjectKeyStack.empty());
+#endif
+                mObjectKeyStack.back().insertOrThrow(*keyPtr);
                 break;
             }
+
             default:
                 break;
             }
@@ -67,21 +76,84 @@ namespace {
         }
 
       private:
-        // Хранение через string_view: строки живут в parsed объекте nlohmann::json
-        // до завершения парсинга, поэтому копирование не требуется.
-        struct StringViewHash {
-            using is_transparent = void;
-            [[nodiscard]] size_t operator()(std::string_view sv) const noexcept {
-                return std::hash<std::string_view>{}(sv);
+        struct KeySet final {
+            // Переключаемся на hash после 32 ключей:
+            // - до этого линейный поиск выигрывает за счёт cache locality и отсутствия хешинга/нод
+            // - 32 * sizeof(std::string) ~ 1KB (порядка L1-friendly, зависит от STL)
+            static constexpr std::size_t kLinearLimit = 32;
+
+            std::vector<std::string> linear{};
+            std::unordered_set<std::string> hashed{};
+            bool useHash = false;
+
+            void beginObject() {
+                // Capacity намеренно сохраняем: если в JSON много похожих объектов,
+                // мы избегаем повторных аллокаций.
+                linear.clear();
+                if (linear.capacity() < 16) {
+                    linear.reserve(16);
+                }
+
+                if (useHash) {
+                    hashed.clear(); // bucket'ы сохраняются — это тоже "feature" для повторного использования
+                    useHash = false;
+                }
+            }
+
+            void insertOrThrow(const std::string& key) {
+                if (!useHash) {
+                    if (std::find(linear.begin(), linear.end(), key) != linear.end()) {
+                        throw DuplicateKeyError(key);
+                    }
+
+                    linear.push_back(key);
+
+                    if (linear.size() > kLinearLimit) {
+                        switchToHash();
+                    }
+
+                    return;
+                }
+
+                const auto [it, inserted] = hashed.emplace(key);
+                if (!inserted) {
+                    throw DuplicateKeyError(key);
+                }
+            }
+
+            void switchToHash() {
+                useHash = true;
+
+                // Резервируем с запасом: переключаемся при ~33 ключах, но большие объекты
+                // часто имеют 50–150 ключей. Цель — избежать rehash в процессе дальнейшего парсинга.
+                const std::size_t expected = std::max<std::size_t>(128, linear.size() * 4);
+                hashed.reserve(expected);
+
+                for (std::string& s : linear) {
+                    hashed.emplace(std::move(s));
+                }
+
+                // Обнуляем size, но сохраняем capacity как feature (повторное использование буфера).
+                // Деструкция moved-from строк корректна и обычно дешева (часто SSO).
+                linear.clear();
             }
         };
 
-        std::vector<std::unordered_set<std::string_view, StringViewHash, std::equal_to<>>> mObjectKeyStack{};
+        std::vector<KeySet> mObjectKeyStack{};
     };
 
-    [[nodiscard]] core::utils::json::json parseJsonStrict(const std::string& fileContent) {
+    [[nodiscard]] core::utils::json::json parseJsonWithPolicies(
+        const std::string& fileContent,
+        core::utils::json::DuplicateKeyPolicy dupPolicy) {
+
+        using Json = core::utils::json::json;
+
+        if (dupPolicy == core::utils::json::DuplicateKeyPolicy::Ignore) {
+            return Json::parse(fileContent);
+        }
+
         DuplicateKeyDetector detector{};
-        return core::utils::json::json::parse(fileContent, detector);
+        return Json::parse(fileContent, detector);
     }
 
 } // namespace
@@ -90,8 +162,9 @@ namespace core::utils::json {
 
     json parseAndValidateCritical(const std::string& fileContent,
                                   std::string_view path,
-                                  const char* moduleTag,
-                                  const std::vector<JsonValidator::KeyRule>& rules) {
+                                  std::string_view moduleTag,
+                                  std::span<const JsonValidator::KeyRule> rules,
+                                  JsonParseOptions options) {
         json data;
 
         // ----------------------------------------------------------------------------------------
@@ -99,29 +172,23 @@ namespace core::utils::json {
         // ----------------------------------------------------------------------------------------
 
         try {
-            data = ::parseJsonStrict(fileContent);
+            data = ::parseJsonWithPolicies(fileContent, options.duplicateKeys);
         } catch (const std::bad_alloc&) {
-            // Нехватка памяти — это не "валидируемая" ошибка конфига.
-            // Пусть пробрасывается наверх: caller может попытаться аккуратно завершиться.
+            // Нехватка памяти — не "валидируемая" ошибка конфига.
             throw;
         } catch (const DuplicateKeyError& e) {
-            // Дубликат ключа — ошибка конфига: иначе поведение зависит от порядка полей,
-            // а валидатор структуры уже не сможет это обнаружить.
             LOG_PANIC(core::log::cat::Config,
                       "[{}] JSON содержит дублирующийся ключ '{}' в файле '{}'",
                       moduleTag,
                       e.key(),
                       path);
         } catch (const json::exception& e) {
-            // JSON-специфичная ошибка парсинга (syntax error, parse error at line X, etc.).
             LOG_PANIC(core::log::cat::Config,
                       "[{}] Не удалось разобрать JSON в файле '{}': {}",
                       moduleTag,
                       path,
                       e.what());
         } catch (...) {
-            // Неизвестная ошибка (не std::exception). В production это не должно происходить:
-            // потенциально проблема в кастомном allocator/UB или внутренний баг библиотеки.
             LOG_PANIC(core::log::cat::Config,
                       "[{}] Неизвестная ошибка при разборе JSON в файле '{}'",
                       moduleTag,
@@ -129,36 +196,34 @@ namespace core::utils::json {
         }
 
         // ----------------------------------------------------------------------------------------
-        // Этап 2: Валидация структуры
+        // Этап 2: Валидация структуры (опционально)
         // ----------------------------------------------------------------------------------------
 
-        try {
-            JsonValidator::validate(data, rules);
-        } catch (const std::exception& e) {
-            // Ошибка "схемной" валидации: missing key, wrong type, etc.
-            // JsonValidator::validate бросает std::runtime_error, а не json::exception.
-            LOG_PANIC(core::log::cat::Config,
-                      "[{}] Неверная структура JSON в файле '{}': {}",
-                      moduleTag,
-                      path,
-                      e.what());
-        } catch (...) {
-            // Страховка: не даём "не-std" исключениям утечь наружу в критическом пути.
-            LOG_PANIC(core::log::cat::Config,
-                      "[{}] Неизвестная ошибка при валидации структуры JSON в файле '{}'",
-                      moduleTag,
-                      path);
+        if (options.schema == SchemaPolicy::Validate) {
+            try {
+                JsonValidator::validate(data, rules);
+            } catch (const std::exception& e) {
+                LOG_PANIC(core::log::cat::Config,
+                          "[{}] Неверная структура JSON в файле '{}': {}",
+                          moduleTag,
+                          path,
+                          e.what());
+            } catch (...) {
+                LOG_PANIC(core::log::cat::Config,
+                          "[{}] Неизвестная ошибка при валидации структуры JSON в файле '{}'",
+                          moduleTag,
+                          path);
+            }
         }
 
         return data;
     }
 
-    std::optional<json> parseAndValidateNonCritical(
-        const std::string& fileContent,
-        std::string_view path,
-        const char* moduleTag,
-        const std::vector<JsonValidator::KeyRule>& rules) {
-
+    std::optional<json> parseAndValidateNonCritical(const std::string& fileContent,
+                                                    std::string_view path,
+                                                    std::string_view moduleTag,
+                                                    std::span<const JsonValidator::KeyRule> rules,
+                                                    JsonParseOptions options) {
         json data;
 
         // ----------------------------------------------------------------------------------------
@@ -166,7 +231,7 @@ namespace core::utils::json {
         // ----------------------------------------------------------------------------------------
 
         try {
-            data = ::parseJsonStrict(fileContent);
+            data = ::parseJsonWithPolicies(fileContent, options.duplicateKeys);
         } catch (const std::bad_alloc&) {
             throw;
         } catch (const DuplicateKeyError& e) {
@@ -192,25 +257,26 @@ namespace core::utils::json {
         }
 
         // ----------------------------------------------------------------------------------------
-        // Этап 2: Валидация структуры
+        // Этап 2: Валидация структуры (опционально)
         // ----------------------------------------------------------------------------------------
 
-        try {
-            JsonValidator::validate(data, rules);
-        } catch (const std::exception& e) {
-            LOG_DEBUG(core::log::cat::Config,
-                      "[{}] Неверная структура JSON в файле '{}': {}",
-                      moduleTag,
-                      path,
-                      e.what());
-            return std::nullopt;
-        } catch (...) {
-            // Для NonCritical это принципиально: даже "не-std" исключение не должно валить игру.
-            LOG_DEBUG(core::log::cat::Config,
-                      "[{}] Неизвестная ошибка при валидации структуры JSON в файле '{}'",
-                      moduleTag,
-                      path);
-            return std::nullopt;
+        if (options.schema == SchemaPolicy::Validate) {
+            try {
+                JsonValidator::validate(data, rules);
+            } catch (const std::exception& e) {
+                LOG_DEBUG(core::log::cat::Config,
+                          "[{}] Неверная структура JSON в файле '{}': {}",
+                          moduleTag,
+                          path,
+                          e.what());
+                return std::nullopt;
+            } catch (...) {
+                LOG_DEBUG(core::log::cat::Config,
+                          "[{}] Неизвестная ошибка при валидации структуры JSON в файле '{}'",
+                          moduleTag,
+                          path);
+                return std::nullopt;
+            }
         }
 
         return data;

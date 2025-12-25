@@ -5,7 +5,8 @@
 // ================================================================================================
 #pragma once
 
-#include <SFML/Graphics.hpp>
+#include <SFML/Graphics/Sprite.hpp>
+#include <SFML/Graphics/View.hpp>
 
 #include "core/ui/anchor_utils.h"
 

@@ -10,9 +10,6 @@
 
 #include <string>
 
-#include <SFML/Audio.hpp>
-#include <SFML/Graphics.hpp>
-
 #include "core/resources/holders/resource_holder.h"
 #include "core/resources/ids/resource_ids.h"
 #include "core/resources/paths/resource_paths.h"

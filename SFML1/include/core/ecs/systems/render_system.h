@@ -11,7 +11,10 @@
     #include <utility>
     #include <vector>
 
-    #include <SFML/Graphics.hpp>
+    #include <SFML/Graphics/Rect.hpp>
+    #include <SFML/Graphics/RenderWindow.hpp>
+    #include <SFML/Graphics/Texture.hpp>
+    #include <SFML/Graphics/Vertex.hpp>
 
     #include "core/ecs/entity.h"
     #include "core/ecs/system.h"

@@ -45,16 +45,6 @@ namespace game::skyguard::ecs {
             , mPlayers(std::move(players))
             , mHasRun(false) {
 
-            if (mBaseViewSize.x <= 0.f || mBaseViewSize.y <= 0.f) {
-                LOG_WARN(core::log::cat::Gameplay,
-                         "PlayerInitSystem: baseViewSize is non-positive ({}, {})",
-                         mBaseViewSize.x, mBaseViewSize.y);
-            }
-            if (mInitialViewSize.x <= 0.f || mInitialViewSize.y <= 0.f) {
-                LOG_WARN(core::log::cat::Gameplay,
-                         "PlayerInitSystem: initialViewSize is non-positive ({}, {})",
-                         mInitialViewSize.x, mInitialViewSize.y);
-            }
         }
 
         void update(core::ecs::World& world, float) override {
@@ -78,20 +68,23 @@ namespace game::skyguard::ecs {
             const sf::View initialView(
                 sf::FloatRect({0.f, 0.f}, {safeInitialSize.x, safeInitialSize.y}));
 
-            int spawnedCount = 0;
+            // Loop-invariant: одинаковый для всех сущностей при первичной инициализации.
+            const float initialUniform =
+                core::ui::computeUniformFactor(safeInitialSize, mBaseViewSize);
+
+            // Сейчас спавним ровно по числу blueprint'ов.
+            const std::size_t spawnedCount = mPlayers.size();
 
             for (std::size_t i = 0; i < mPlayers.size(); ++i) {
                 const auto& cfg = mPlayers[i];
 
                 const core::ecs::Entity entity = world.createEntity();
-                ++spawnedCount;
 
+#if !defined(NDEBUG) && defined(SFML1_VERBOSE_PLAYER_SPAWN_LOGS)
                 LOG_TRACE(core::log::cat::Gameplay,
                           "PlayerInitSystem: spawning entity {} (index {})",
                           core::ecs::toUint(entity), i);
-
-                const float initialUniform =
-                    core::ui::computeUniformFactor(initialView, mBaseViewSize);
+#endif
 
                 const sf::Vector2f effectiveScale{
                     cfg.sprite.scale.x * initialUniform,
@@ -131,7 +124,6 @@ namespace game::skyguard::ecs {
                 core::ecs::LockBehaviorComponent lockComp{};
                 lockComp.kind = cfg.anchor.lockBehavior;
                 lockComp.previousViewSize = safeInitialSize;
-                lockComp.initialized = true;
 
                 core::ecs::TransformComponent tr{};
                 tr.position = anchoredPos;
@@ -162,9 +154,11 @@ namespace game::skyguard::ecs {
                         cfg.controls.right
                     });
 
+#if !defined(NDEBUG) && defined(SFML1_VERBOSE_PLAYER_SPAWN_LOGS)
                 LOG_DEBUG(core::log::cat::Gameplay,
-                          "PlayerInitSystem: player entity {} initialized",
-                          core::ecs::toUint(entity));
+                      "PlayerInitSystem: player entity {} initialized",
+                      core::ecs::toUint(entity));
+#endif
             }
 
             LOG_INFO(core::log::cat::Gameplay,

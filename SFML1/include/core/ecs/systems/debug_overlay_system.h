@@ -21,8 +21,11 @@
 #include <optional>
 #include <string>
 
-#include <SFML/Graphics.hpp>
+#include <SFML/Graphics/Font.hpp>
+#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/Graphics/Text.hpp>
 #include <SFML/System/Clock.hpp>
+#include <SFML/System/Time.hpp>
 
 #include "core/ecs/system.h"
 

@@ -8,6 +8,7 @@
 // ================================================================================================
 #pragma once
 
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -43,17 +44,16 @@ namespace core::utils::json {
         /**
          * @brief Проверяет, что JSON содержит все обязательные ключи и правильные типы.
          * @param data  JSON-объект (конфиг)
-         * @param rules Список правил для ключей.
+         * @param rules Список правил (std::span позволяет передавать vector/array без копирования).
          * @throws std::runtime_error при нарушении хотя бы одного правила.
          */
-        static void validate(const json& data, const std::vector<KeyRule>& rules) {
+        static void validate(const json& data, std::span<const KeyRule> rules) {
             for (const auto& rule : rules) {
                 const auto it = data.find(rule.name);
                 if (it == data.end()) {
                     if (rule.required) {
-                        throw std::runtime_error(
-                            "\nConfig validation error: missing key '" + rule.name + "'"
-                        );
+                        throw std::runtime_error("\nConfig validation error: missing key '" +
+                                                 rule.name + "'");
                     }
                     continue;
                 }
@@ -79,11 +79,9 @@ namespace core::utils::json {
                         }
                     }
 
-                    throw std::runtime_error(
-                        "\nConfig validation error: key '" + rule.name +
-                        "' has wrong type (" + typeName(type) +
-                        "), expected " + expected
-                    );
+                    throw std::runtime_error("\nConfig validation error: key '" + rule.name +
+                                             "' has wrong type (" + typeName(type) +
+                                             "), expected " + expected);
                 }
             }
         }
