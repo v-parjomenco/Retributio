@@ -1,208 +1,151 @@
 #include "pch.h"
-
 #include "core/utils/file_loader.h"
-#include <filesystem> // для std::filesystem::exists
-#include <fstream>    // для std::ifstream
+
+#include <filesystem>
+#include <fstream>
+#include <optional>
+#include <string_view>
+#include <vector>
 
 #include "core/log/log_macros.h"
 
 namespace core::utils {
 
-    // ----------------------------------------------------------------------------------------
-    // loadTextFile
-    //
-    // Читает целиком текстовый файл в std::string.
-    // Возвращает:
-    //   - std::nullopt, если файл нельзя открыть или произошла ошибка чтения
-    //   - строку (возможно пустую), если всё прошло успешно
-    //
-    // ВАЖНО:
-    //   - здесь мы НЕ интерпретируем содержимое (JSON/INI и т.п.),
-    //     только безопасно и предсказуемо читаем байты.
-    // ----------------------------------------------------------------------------------------
-    std::optional<std::string> FileLoader::loadTextFile(const std::string& path) {
-        // Открываем файл:
-        //  - std::ios::in      — режим чтения
-        //  - std::ios::binary  — читать байты "как есть", без \r\n → \n
-        //    (это безопаснее и предсказуемее, особенно на Windows)
-        std::ifstream ifs(path, std::ios::in | std::ios::binary);
+    namespace {
+        
+        // ----------------------------------------------------------------------------------------
+        // Безопасное получение размера файла через stream seeking
+        // ----------------------------------------------------------------------------------------
+        [[nodiscard]] std::optional<std::size_t> getStreamSize(
+            std::ifstream& ifs,
+            [[maybe_unused]] const std::string& path,
+            [[maybe_unused]] std::string_view what) {
+            ifs.seekg(0, std::ios::end);
+            if (!ifs) {
+                LOG_DEBUG(core::log::cat::Engine,
+                          "[FileLoader] Не удалось перейти в конец {}: {}",
+                          what, path);
+                return std::nullopt;
+            }
 
-        // Проверяем, открылся ли файл вообще.
-        // Если, например, путь неверный или прав нет — поток будет в "плохом" состоянии.
-        if (!ifs) {
-            LOG_DEBUG(core::log::cat::Engine,
-                "[FileLoader] Не удалось открыть файл: {}", path);
-            return std::nullopt;
+            const std::streampos endPosition = ifs.tellg();
+            if (endPosition < 0) {
+                LOG_DEBUG(core::log::cat::Engine,
+                          "[FileLoader] Не удалось определить размер {}: {}",
+                          what, path);
+                return std::nullopt;
+            }
+
+            return static_cast<std::size_t>(endPosition);
         }
 
-        // Узнаём размер файла:
-        // Перемещаем "курсор" чтения в конец файла.
-        ifs.seekg(0, std::ios::end);
-        // tellg() возвращает текущую позицию (в байтах от начала).
-        // Это и есть размер файла.
-        const std::streampos endPosition = ifs.tellg();
-
-        // Если позиция отрицательная — что-то пошло не так (например, ошибка потока).
-        if (endPosition < 0) {
-            LOG_DEBUG(core::log::cat::Engine,
-                      "[FileLoader] Не удалось определить размер файла: {}", path);
-            return std::nullopt;
+        // ----------------------------------------------------------------------------------------
+        // Безопасный возврат в начало файла
+        // ----------------------------------------------------------------------------------------
+        [[nodiscard]] bool seekToBegin(std::ifstream& ifs,
+                                       [[maybe_unused]] const std::string& path,
+                                       [[maybe_unused]] std::string_view what) {
+            ifs.seekg(0, std::ios::beg);
+            if (!ifs) {
+                LOG_DEBUG(core::log::cat::Engine,
+                          "[FileLoader] Не удалось перейти в начало {}: {}",
+                          what, path);
+                return false;
+            }
+            return true;
         }
 
-        // Переводим позицию в size_t (размер для контейнеров).
-        const auto size = static_cast<std::size_t>(endPosition);
+        // ----------------------------------------------------------------------------------------
+        // Чтение точного количества байт в буфер
+        // ----------------------------------------------------------------------------------------
+        [[nodiscard]] bool readExact(std::ifstream& ifs,
+                                     void* dst,
+                                     std::size_t size,
+                                     [[maybe_unused]] const std::string& path,
+                                     [[maybe_unused]] std::string_view what) {
+            if (size == 0) {
+                return true;
+            }
 
-        // Возвращаемся в начало файла, чтобы читать с нуля.
-        ifs.seekg(0, std::ios::beg);
+            ifs.read(static_cast<char*>(dst), static_cast<std::streamsize>(size));
 
-        // Готовим строку под данные.
-        // resize(size) сразу задаёт длину строки и выделяет нужную память.
-        // Если size == 0, то получим просто пустую строку — это валидная ситуация.
-        std::string content;
-        content.resize(size);
-
-        // Если файл не пустой — читаем данные.
-        if (size > 0) {
-            // std::string::data() в C++17 возвращает указатель на непрерывный буфер,
-            // по которому можно писать. Мы читаем ровно size байт в этот буфер.
-            ifs.read(content.data(), static_cast<std::streamsize>(size));
-
-            // После чтения проверяем состояние потока:
-
-            // Количество реально прочитанных байт
             const auto readCount = static_cast<std::size_t>(ifs.gcount());
-            // Если прочитали меньше, чем планировали — считаем это ошибкой.
-            // Причины: файл укоротился, ошибка устройства и т.п.
             if (readCount != size) {
                 LOG_DEBUG(core::log::cat::Engine,
-                          "[FileLoader] Прочитано меньше байт, чем ожидалось: {}", path);
-                return std::nullopt;
+                          "[FileLoader] Прочитано меньше байт, чем ожидалось ({}): {}",
+                          what, path);
+                return false;
             }
-            // Дополнительная страховка: если поток в плохом состоянии
-            // и это не просто "дошли до конца файла".
-            if (!ifs && !ifs.eof()) {
+
+            if (ifs.bad()) {
                 LOG_DEBUG(core::log::cat::Engine,
-                    "[FileLoader] Ошибка чтения файла: {}", path);
-                return std::nullopt;
+                          "[FileLoader] Ошибка чтения ({}): {}",
+                          what, path);
+                return false;
             }
+
+            return true;
         }
 
-        // Если мы дошли сюда — файл успешно прочитан.
-        // Даже если он пустой, вернём пустую строку (это не ошибка I/O).
+    } // namespace
+
+    std::optional<std::string> FileLoader::loadTextFile(const std::string& path) {
+        std::ifstream ifs(path, std::ios::in | std::ios::binary);
+        if (!ifs) {
+            LOG_DEBUG(core::log::cat::Engine, "[FileLoader] Не удалось открыть файл: {}", path);
+            return std::nullopt;
+        }
+
+        const auto sizeOpt = getStreamSize(ifs, path, "файла");
+        if (!sizeOpt) {
+            return std::nullopt;
+        }
+
+        if (!seekToBegin(ifs, path, "файла")) {
+            return std::nullopt;
+        }
+
+        std::string content;
+        content.resize(*sizeOpt);
+
+        if (!readExact(ifs, content.data(), *sizeOpt, path, "файл")) {
+            return std::nullopt;
+        }
+
         return content;
     }
 
-    // ----------------------------------------------------------------------------------------
-    // loadBinaryFile
-    //
-    // Читает бинарный файл (текстуры, звуки, произвольные данные)
-    // в std::vector<std::uint8_t>.
-    //
-    // Возвращает:
-    //   - std::nullopt при ошибке открытия/чтения
-    //   - вектор байт (возможно пустой) при успехе
-    //
-    // Здесь так же:
-    //   - нет интерпретации данных, только "сырые" байты.
-    // ----------------------------------------------------------------------------------------
     std::optional<std::vector<std::uint8_t>> FileLoader::loadBinaryFile(const std::string& path) {
-        // Открываем файл в бинарном режиме:
-        //  - std::ios::in      — режим чтения
-        //  - std::ios::binary  — читать байты "как есть", без \r\n → \n
-        //    (это безопаснее и предсказуемее, особенно на Windows)
         std::ifstream ifs(path, std::ios::in | std::ios::binary);
-
-        // Проверяем, открылся ли файл вообще.
-        // Если, например, путь неверный или прав нет — поток будет в "плохом" состоянии.
         if (!ifs) {
-            LOG_DEBUG(core::log::cat::Engine,
-                "[FileLoader] Не удалось открыть бинарный файл: {}", path);
+            LOG_DEBUG(core::log::cat::Engine, "[FileLoader] Не удалось открыть бинарный файл: {}", path);
             return std::nullopt;
         }
 
-        // Узнаём размер файла:
-        // Перемещаем "курсор" чтения в конец файла.
-        ifs.seekg(0, std::ios::end);
-        // tellg() возвращает текущую позицию (в байтах от начала).
-        // Это и есть размер файла.
-        const std::streampos endPosition = ifs.tellg();
-
-        // Если позиция отрицательная — что-то пошло не так (например, ошибка потока).
-        if (endPosition < 0) {
-            LOG_DEBUG(core::log::cat::Engine,
-                      "[FileLoader] Не удалось определить размер бинарного файла: {}", path);
+        const auto sizeOpt = getStreamSize(ifs, path, "бинарного файла");
+        if (!sizeOpt) {
             return std::nullopt;
         }
 
-        // Переводим позицию в size_t (размер для контейнеров).
-        const auto size = static_cast<std::size_t>(endPosition);
-
-        // Возвращаемся в начало файла, чтобы читать с нуля.
-        ifs.seekg(0, std::ios::beg);
-
-        // Готовим буфер нужного размера.
-        // Пустой файл → вектор размера 0, это допустимо с точки зрения I/O.
-        std::vector<std::uint8_t> data(size);
-
-        if (size > 0) {
-            // Читаем все байты одним вызовом read.
-            ifs.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(size));
-
-            // После чтения проверяем состояние потока:
-
-            // Количество реально прочитанных байт
-            const auto readCount = static_cast<std::size_t>(ifs.gcount());
-            // Если прочитали меньше, чем планировали — считаем это ошибкой.
-            // Причины: файл укоротился, ошибка устройства и т.п.
-            if (readCount != size) {
-                LOG_DEBUG(core::log::cat::Engine,
-                          "[FileLoader] Прочитано меньше байт, чем ожидалось (бинарный файл): {}",
-                          path);
-                return std::nullopt;
-            }
-            // Дополнительная страховка: если поток в плохом состоянии
-            // и это не просто "дошли до конца файла".
-            if (!ifs && !ifs.eof()) {
-                LOG_DEBUG(core::log::cat::Engine,
-                          "[FileLoader] Ошибка чтения бинарного файла: {}", path);
-                return std::nullopt;
-            }
+        if (!seekToBegin(ifs, path, "бинарного файла")) {
+            return std::nullopt;
         }
+
+        std::vector<std::uint8_t> data(*sizeOpt);
+        if (!readExact(ifs, data.data(), *sizeOpt, path, "бинарный файл")) {
+            return std::nullopt;
+        }
+
         return data;
-    }  
+    }
 
-    // ----------------------------------------------------------------------------------------
-    // fileExists
-    //
-    // Отвечает на вопрос:
-    //   "Есть ли что-то по этому пути на файловой системе?"
-    //
-    // ВАЖНО:
-    //   - Мы не проверяем права доступа.
-    //   - Если при доступе к файловой системе произошла ошибка (ec),
-    //     мы считаем, что файла "как бы нет", и просто возвращаем false.
-    // ----------------------------------------------------------------------------------------
     bool FileLoader::fileExists(const std::string& path) {
         std::error_code ec;
         const bool exists = std::filesystem::exists(path, ec);
-        // Если произошла ошибка (например, нет прав или путь битый),
-        // ec будет установлен. В этом случае не паникуем, а просто
-        // считаем, что файл "не существует" для наших целей.
         return !ec && exists;
     }
 
-    // ----------------------------------------------------------------------------------------
-    // isReadable
-    //
-    // Проверяет, можем ли мы ОТКРЫТЬ файл для чтения.
-    //
-    // Отличие от fileExists:
-    //   - fileExists говорит: "что-то по пути есть"
-    //   - isReadable говорит: "мы можем это открыть и читать"
-    // ----------------------------------------------------------------------------------------
     bool FileLoader::isReadable(const std::string& path) {
-        // Пробуем открыть файл. Если не получилось — значит не читается
-        // (нет прав, битый путь, каталог вместо файла и т.п.).
         std::ifstream ifs(path, std::ios::in | std::ios::binary);
         return static_cast<bool>(ifs);
     }
