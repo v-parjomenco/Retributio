@@ -6,6 +6,8 @@
 // ================================================================================================
 #pragma once
 
+#include <cstdint>
+
 #include <SFML/Graphics/Color.hpp>
 #include <SFML/System/Vector2.hpp>
 
@@ -28,7 +30,7 @@ namespace core::config::properties {
         // DebugOverlaySystem можно будет рисовать в отдельном screen-space view.
         sf::Vector2f position{10.f, 10.f};
 
-        unsigned int characterSize = 35; // размер шрифта
+        std::uint32_t characterSize = 35; // размер шрифта
         sf::Color color{255, 0, 0, 255}; // цвет текста по умолчанию (красный)
     };
 

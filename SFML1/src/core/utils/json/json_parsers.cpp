@@ -6,8 +6,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
-#include <limits>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -26,31 +24,6 @@ namespace {
     static constexpr std::uint8_t kInvalidIndex = 255;
 
     [[nodiscard]] bool tryGetU8FromNumber(const json& v, std::uint8_t& out) noexcept;
-
-    [[nodiscard]] bool equalsKeyNoAlloc(const std::string& s, std::string_view key) noexcept {
-        if (s.size() != key.size()) {
-            return false;
-        }
-        if (key.empty()) {
-            return true;
-        }
-        return std::memcmp(s.data(), key.data(), key.size()) == 0;
-    }
-
-    [[nodiscard]] const json* findObjectMemberNoAlloc(const json& obj,
-                                                      std::string_view key) noexcept {
-        if (!obj.is_object()) {
-            return nullptr;
-        }
-
-        for (auto it = obj.begin(); it != obj.end(); ++it) {
-            if (equalsKeyNoAlloc(it.key(), key)) {
-                return &(*it);
-            }
-        }
-
-        return nullptr;
-    }
 
     // Запрещаем вызов helper-а с временным json (rvalue), т.к. ColorParseResult::rawText
     // хранит string_view на строку внутри json, и при уничтожении временного json станет dangling.
@@ -143,7 +116,7 @@ namespace {
 
             auto parseChannel = [&](const char* field, Issue::Channel ch,
                                     std::uint8_t& dst) -> bool {
-                const json* v = findObjectMemberNoAlloc(value, field);
+                const json* v = core::utils::json::detail::findObjectMemberNoAlloc(value, field);
                 if (v == nullptr) {
                     return true; // поля нет -> оставляем fallback
                 }
@@ -308,7 +281,7 @@ namespace {
             float x = defaultValue.x;
             float y = defaultValue.y;
 
-            if (const json* xV = findObjectMemberNoAlloc(value, "x")) {
+            if (const json* xV = core::utils::json::detail::findObjectMemberNoAlloc(value, "x")) {
                 if (!xV->is_number()) {
                     r.issue.kind = Vec2ParseIssue::Kind::ObjectFieldNotNumber;
                     r.issue.axis = Vec2ParseIssue::Axis::X;
@@ -326,7 +299,7 @@ namespace {
                 x = fx;
             }
 
-            if (const json* yV = findObjectMemberNoAlloc(value, "y")) {
+            if (const json* yV = core::utils::json::detail::findObjectMemberNoAlloc(value, "y")) {
                 if (!yV->is_number()) {
                     r.issue.kind = Vec2ParseIssue::Kind::ObjectFieldNotNumber;
                     r.issue.axis = Vec2ParseIssue::Axis::Y;
@@ -349,56 +322,6 @@ namespace {
         }
 
         r.issue.kind = Vec2ParseIssue::Kind::WrongTopType;
-        return r;
-    }
-
-    [[nodiscard]] core::utils::json::UnsignedParseResult
-    parseUnsignedFromValueWithIssue(const json& v, unsigned defaultValue) noexcept {
-        using core::utils::json::UnsignedParseIssue;
-        using core::utils::json::UnsignedParseResult;
-
-        UnsignedParseResult r{};
-        r.value = defaultValue;
-
-        const auto maxU = std::numeric_limits<unsigned>::max();
-
-        if (const auto* pu = v.get_ptr<const json::number_unsigned_t*>()) {
-            const auto uRaw = *pu;
-            const auto u = static_cast<std::uint64_t>(uRaw);
-            r.rawUnsigned = u;
-
-            if (u > static_cast<std::uint64_t>(maxU)) {
-                r.issue.kind = UnsignedParseIssue::Kind::OutOfRange;
-                return r;
-            }
-
-            r.value = static_cast<unsigned>(u);
-            return r;
-        }
-
-        if (const auto* ps = v.get_ptr<const json::number_integer_t*>()) {
-            const auto sRaw = *ps;
-            const auto s = static_cast<std::int64_t>(sRaw);
-            r.rawSigned = s;
-
-            if (s < 0) {
-                r.issue.kind = UnsignedParseIssue::Kind::Negative;
-                return r;
-            }
-
-            const auto u = static_cast<std::uint64_t>(s);
-            r.rawUnsigned = u;
-
-            if (u > static_cast<std::uint64_t>(maxU)) {
-                r.issue.kind = UnsignedParseIssue::Kind::OutOfRange;
-                return r;
-            }
-
-            r.value = static_cast<unsigned>(u);
-            return r;
-        }
-
-        r.issue.kind = UnsignedParseIssue::Kind::WrongType;
         return r;
     }
 
@@ -441,7 +364,7 @@ namespace core::utils::json::detail {
                                                                  std::string_view key) noexcept {
         StringViewParseResult r{};
 
-        const json* v = ::findObjectMemberNoAlloc(data, key);
+        const json* v = findObjectMemberNoAlloc(data, key);
         if (v == nullptr) {
             r.issue.kind = StringViewParseIssue::Kind::MissingKey;
             return r;
@@ -549,6 +472,8 @@ namespace core::utils::json {
                                              : "элемент массива [1] не число";
         case Kind::ObjectFieldNotNumber:
             switch (issue.axis) {
+            case Vec2ParseIssue::Axis::None:
+                return "поле объекта не число";
             case Vec2ParseIssue::Axis::X:
                 return "поле объекта 'x' не число";
             case Vec2ParseIssue::Axis::Y:
@@ -558,6 +483,8 @@ namespace core::utils::json {
             }
         case Kind::NumberNotFiniteOrOutOfRange:
             switch (issue.axis) {
+            case Vec2ParseIssue::Axis::None:
+                break;
             case Vec2ParseIssue::Axis::X:
                 return "значение 'x' не конечное или вне диапазона float";
             case Vec2ParseIssue::Axis::Y:
@@ -578,7 +505,7 @@ namespace core::utils::json {
 
     Vec2ParseResult parseVec2fWithIssue(const json& data, std::string_view key,
                                         const sf::Vector2f& defaultValue) noexcept {
-        const json* v = ::findObjectMemberNoAlloc(data, key);
+        const json* v = detail::findObjectMemberNoAlloc(data, key);
         if (v == nullptr) {
             Vec2ParseResult r{};
             r.value = defaultValue;
@@ -649,6 +576,8 @@ namespace core::utils::json {
             return "неверный формат строки цвета";
         case Kind::InvalidHex:
             switch (issue.channel) {
+            case Ch::None:
+                return "неверные hex-цифры";
             case Ch::R:
                 return "неверные hex-цифры канала R";
             case Ch::G:
@@ -662,6 +591,8 @@ namespace core::utils::json {
             }
         case Kind::ObjectFieldNotNumber:
             switch (issue.channel) {
+            case Ch::None:
+                return "поле объекта не число";
             case Ch::R:
                 return "поле 'r' не число";
             case Ch::G:
@@ -675,6 +606,8 @@ namespace core::utils::json {
             }
         case Kind::ObjectFieldOutOfRange:
             switch (issue.channel) {
+            case Ch::None:
+                return "поле объекта вне диапазона 0..255";
             case Ch::R:
                 return "поле 'r' вне диапазона 0..255";
             case Ch::G:
@@ -696,7 +629,7 @@ namespace core::utils::json {
         ColorParseResult r{};
         r.value = defaultValue;
 
-        const json* v = ::findObjectMemberNoAlloc(data, key);
+        const json* v = detail::findObjectMemberNoAlloc(data, key);
         if (v == nullptr) {
             r.issue.kind = ColorParseIssue::Kind::MissingKey;
             return r;
@@ -718,7 +651,7 @@ namespace core::utils::json {
         case Kind::Negative:
             return "значение отрицательное";
         case Kind::OutOfRange:
-            return "значение вне диапазона unsigned";
+            return "значение вне диапазона целевого типа";
         default:
             return "неизвестная ошибка";
         }
@@ -726,20 +659,12 @@ namespace core::utils::json {
 
     UnsignedParseResult parseUnsignedWithIssue(const json& data, std::string_view key,
                                                unsigned defaultValue) noexcept {
-        const json* v = ::findObjectMemberNoAlloc(data, key);
-        if (v == nullptr) {
-            UnsignedParseResult r{};
-            r.value = defaultValue;
-            r.issue.kind = UnsignedParseIssue::Kind::MissingKey;
-            return r;
-        }
-
-        return ::parseUnsignedFromValueWithIssue(*v, defaultValue);
+        return parseUIntWithIssue<unsigned>(data, key, defaultValue);
     }
 
     FloatParseResult parseFloatWithIssue(const json& data, std::string_view key,
                                          float defaultValue) noexcept {
-        const json* v = ::findObjectMemberNoAlloc(data, key);
+        const json* v = detail::findObjectMemberNoAlloc(data, key);
         if (v == nullptr) {
             FloatParseResult r{};
             r.value = defaultValue;
@@ -752,7 +677,7 @@ namespace core::utils::json {
 
     FloatParseResult parseFloatWithIssue(const json& data, std::string_view key, float defaultValue,
                                          float minValue, float maxValue) noexcept {
-        const json* v = ::findObjectMemberNoAlloc(data, key);
+        const json* v = detail::findObjectMemberNoAlloc(data, key);
         if (v == nullptr) {
             FloatParseResult r{};
             r.value = defaultValue;

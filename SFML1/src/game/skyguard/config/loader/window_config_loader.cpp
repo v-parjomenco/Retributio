@@ -67,6 +67,18 @@ namespace game::skyguard::config {
 
         const Json& data = *dataOpt;
 
+        // ВАЖНО: формат window config — объект с ключами верхнего уровня.
+        // Гибкость формата (number/array/object) допускается для значений отдельных полей,
+        // но корень должен быть объектом, иначе ключи windowWidth/windowHeight/windowTitle
+        // не имеют смысла.
+        if (!data.is_object()) {
+            LOG_WARN(core::log::cat::Config,
+                     "[SkyGuard::WindowConfigLoader] Корневой JSON в '{}' должен быть object. "
+                     "Используются значения по умолчанию (width={}, height={}, title='{}').",
+                     path, cfg.width, cfg.height, cfg.title);
+            return cfg;
+        }
+
         // ----------------------------------------------------------------------------------------
         // Заполнение WindowConfig из JSON (fallback на значения по умолчанию)
         // ----------------------------------------------------------------------------------------
@@ -88,9 +100,11 @@ namespace game::skyguard::config {
         }
 
         {
-            const unsigned defaultWidth = cfg.width;
+            const std::uint32_t defaultWidth = cfg.width;
             const auto res =
-                json_utils::parseUnsignedWithIssue(data, gk::WINDOW_WIDTH, defaultWidth);
+                json_utils::parseUIntWithIssue<std::uint32_t>(data,
+                                                             gk::WINDOW_WIDTH,
+                                                             defaultWidth);
 
             cfg.width = res.value;
 
@@ -134,9 +148,11 @@ namespace game::skyguard::config {
         }
 
         {
-            const unsigned defaultHeight = cfg.height;
+            const std::uint32_t defaultHeight = cfg.height;
             const auto res =
-                json_utils::parseUnsignedWithIssue(data, gk::WINDOW_HEIGHT, defaultHeight);
+                json_utils::parseUIntWithIssue<std::uint32_t>(data,
+                                                             gk::WINDOW_HEIGHT,
+                                                             defaultHeight);
 
             cfg.height = res.value;
 

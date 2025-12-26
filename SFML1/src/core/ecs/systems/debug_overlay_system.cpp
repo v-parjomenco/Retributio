@@ -125,7 +125,7 @@ namespace core::ecs {
             return;
         }
         mFpsText->setPosition(props.position);
-        mFpsText->setCharacterSize(props.characterSize);
+        mFpsText->setCharacterSize(static_cast<unsigned int>(props.characterSize));
         mFpsText->setFillColor(props.color);
     }
 

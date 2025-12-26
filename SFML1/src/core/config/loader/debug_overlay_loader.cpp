@@ -67,6 +67,13 @@ namespace core::config {
         }
 
         const Json& data = *dataOpt;
+        if (!data.is_object()) {
+            LOG_WARN(core::log::cat::Config,
+                     "[DebugOverlayLoader] Корневой JSON в '{}' должен быть object. "
+                     "Используется конфигурация debug overlay по умолчанию.",
+                     path);
+            return cfg;
+        }
 
         // ----------------------------------------------------------------------------------------
         // Заполнение полей на основе JSON-данных, считанных с помощью json_utils:
@@ -116,11 +123,11 @@ namespace core::config {
             }
         }
 
-        // characterSize (unsigned int, если значения нет —> остаётся значение по умолчанию)
+        // characterSize (uint32_t, если значения нет —> остаётся значение по умолчанию)
         {
-            const unsigned defaultSize = cfg.text.characterSize;
+            const std::uint32_t defaultSize = cfg.text.characterSize;
 
-            const auto sizeRes = json_utils::parseUnsignedWithIssue(
+            const auto sizeRes = json_utils::parseUIntWithIssue<std::uint32_t>(
                 data,
                 keys::DebugOverlay::CHARACTER_SIZE,
                 defaultSize
@@ -193,16 +200,23 @@ namespace core::config {
 
         // updateIntervalMs (0 = каждый кадр, иначе throttle)
         {
-            const unsigned defaultMs = cfg.runtime.updateIntervalMs;
-            const auto msRes = json_utils::parseUnsignedWithIssue(
+            const std::uint32_t defaultMs = cfg.runtime.updateIntervalMs;
+            const auto msRes = json_utils::parseUIntWithIssue<std::uint32_t>(
                 data,
                 keys::DebugOverlay::UPDATE_INTERVAL_MS,
                 defaultMs
             );
 
-            unsigned ms = msRes.value;
+            std::uint32_t ms = msRes.value;
             // Мягкая защита от идиотских значений (не критично, но держим UX вменяемым).
             if (ms > 10'000u) {
+                if (msRes.issue.kind == json_utils::UnsignedParseIssue::Kind::None) {
+                    LOG_WARN(core::log::cat::Config,
+                             "[DebugOverlayLoader] Поле '{}' в '{}' обрезано: {} -> 10000.",
+                             keys::DebugOverlay::UPDATE_INTERVAL_MS,
+                             path,
+                             ms);
+                }
                 ms = 10'000u;
             }
             cfg.runtime.updateIntervalMs = ms;
@@ -238,18 +252,25 @@ namespace core::config {
 
         // smoothingShift (0 = no smoothing, max clamp)
         {
-            const unsigned defaultShift = cfg.runtime.smoothingShift;
-            const auto shRes = json_utils::parseUnsignedWithIssue(
+            const std::uint8_t defaultShift = cfg.runtime.smoothingShift;
+            const auto shRes = json_utils::parseUIntWithIssue<std::uint8_t>(
                 data,
                 keys::DebugOverlay::SMOOTHING_SHIFT,
                 defaultShift
             );
 
-            unsigned sh = shRes.value;
+            std::uint8_t sh = shRes.value;
             if (sh > 8u) {
+                if (shRes.issue.kind == json_utils::UnsignedParseIssue::Kind::None) {
+                    LOG_WARN(core::log::cat::Config,
+                             "[DebugOverlayLoader] Поле '{}' в '{}' обрезано: {} -> 8.",
+                             keys::DebugOverlay::SMOOTHING_SHIFT,
+                             path,
+                             static_cast<unsigned>(sh));
+                }
                 sh = 8u;
             }
-            cfg.runtime.smoothingShift = static_cast<std::uint8_t>(sh);
+            cfg.runtime.smoothingShift = sh;
 
             using Kind = json_utils::UnsignedParseIssue::Kind;
             if (shRes.issue.kind != Kind::None && shRes.issue.kind != Kind::MissingKey) {

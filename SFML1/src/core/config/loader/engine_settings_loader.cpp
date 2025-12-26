@@ -67,6 +67,17 @@ namespace core::config {
 
         const Json& data = *dataOpt;
 
+        // ВАЖНО: формат файла настроек — объект с ключами верхнего уровня.
+        // Гибкость (number/array/object/string) относится к значениям конкретных полей,
+        // а не к типу корня конфигурации.
+        if (!data.is_object()) {
+            LOG_WARN(core::log::cat::Config,
+                     "[EngineSettingsLoader] Корневой JSON в '{}' должен быть object. "
+                     "Используются значения по умолчанию (vsyncEnabled={}, frameLimit={}).",
+                     path, cfg.vsyncEnabled, cfg.frameLimit);
+            return cfg;
+        }
+
         // ----------------------------------------------------------------------------------------
         // Заполнение полей из JSON с fallback на EngineSettings по умолчанию.
         // ----------------------------------------------------------------------------------------
@@ -104,10 +115,12 @@ namespace core::config {
         // frameLimit: ловим отрицательные и out-of-range значения,
         // даже если тип формально number_integer.
         {
-            const unsigned defaultLimit = cfg.frameLimit;
+            const std::uint32_t defaultLimit = cfg.frameLimit;
 
             const auto res =
-                json_utils::parseUnsignedWithIssue(data, eng_keys::FRAME_LIMIT, defaultLimit);
+                json_utils::parseUIntWithIssue<std::uint32_t>(data,
+                                                             eng_keys::FRAME_LIMIT,
+                                                             defaultLimit);
 
             cfg.frameLimit = res.value;
 

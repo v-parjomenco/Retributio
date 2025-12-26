@@ -47,15 +47,18 @@ namespace {
         bool operator()(int /*depth*/, Json::parse_event_t event, Json& parsed) {
             switch (event) {
             case Json::parse_event_t::object_start:
-                mObjectKeyStack.emplace_back();
-                mObjectKeyStack.back().beginObject();
+                if (mDepth == mObjectKeyStack.size()) {
+                    mObjectKeyStack.emplace_back();
+                }
+                mObjectKeyStack[mDepth].beginObject();
+                ++mDepth;
                 break;
 
             case Json::parse_event_t::object_end:
 #if !defined(NDEBUG)
-                assert(!mObjectKeyStack.empty());
+                assert(mDepth > 0);
 #endif
-                mObjectKeyStack.pop_back();
+                --mDepth;
                 break;
 
             case Json::parse_event_t::key: {
@@ -64,7 +67,7 @@ namespace {
                 assert(keyPtr != nullptr);
                 assert(!mObjectKeyStack.empty());
 #endif
-                mObjectKeyStack.back().insertOrThrow(*keyPtr);
+                mObjectKeyStack[mDepth - 1].insertOrThrow(*keyPtr);
                 break;
             }
 
@@ -86,18 +89,19 @@ namespace {
             std::unordered_set<std::string> hashed{};
             bool useHash = false;
 
+            KeySet() {
+                // Резервируем один раз на всю жизнь KeySet (реюз по глубине).
+                linear.reserve(16);
+            }
+
             void beginObject() {
                 // Capacity намеренно сохраняем: если в JSON много похожих объектов,
                 // мы избегаем повторных аллокаций.
                 linear.clear();
-                if (linear.capacity() < 16) {
-                    linear.reserve(16);
-                }
-
-                if (useHash) {
-                    hashed.clear(); // bucket'ы сохраняются — это тоже "feature" для повторного использования
-                    useHash = false;
-                }
+                // Без ветвлений: состояние объекта всегда сбрасываем одинаково.
+                // clear() сохраняет bucket'ы, это и есть desired reuse.
+                hashed.clear();
+                useHash = false;
             }
 
             void insertOrThrow(const std::string& key) {
@@ -140,6 +144,7 @@ namespace {
         };
 
         std::vector<KeySet> mObjectKeyStack{};
+        std::size_t mDepth = 0;
     };
 
     [[nodiscard]] core::utils::json::json parseJsonWithPolicies(

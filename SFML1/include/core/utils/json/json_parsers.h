@@ -9,14 +9,22 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
+#include <limits>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <type_traits>
 
 #include <SFML/Graphics/Color.hpp>
 #include <SFML/System/Vector2.hpp>
 #include <SFML/Window/Keyboard.hpp>
 
 #include "core/utils/json/json_common.h"
+
+// ВАЖНО: здесь есть inline/template код, использующий методы и nested-типы nlohmann::json.
+// json_common.h обычно даёт только forward-decl, поэтому подключаем полное определение.
+#include "third_party/json/json_silent.hpp"
 
 namespace core::utils::json {
 
@@ -39,6 +47,38 @@ namespace core::utils::json {
     [[nodiscard]] std::string_view describe(const EnumParseIssue& issue) noexcept;
 
     namespace detail {
+
+        // ----------------------------------------------------------------------------------------
+        // No-alloc поиск по ключу в object:
+        //  - nlohmann::json::find(key) обычно требует std::string (потенциально аллокации)
+        //  - здесь сравниваем string_view с ключами объекта без выделений памяти
+        // ----------------------------------------------------------------------------------------
+
+        [[nodiscard]] inline bool equalsKeyNoAlloc(const std::string& s,
+                                                   std::string_view key) noexcept {
+            if (s.size() != key.size()) {
+                return false;
+            }
+            if (key.empty()) {
+                return true;
+            }
+            return std::memcmp(s.data(), key.data(), key.size()) == 0;
+        }
+
+        [[nodiscard]] inline const json* findObjectMemberNoAlloc(const json& obj,
+                                                                 std::string_view key) noexcept {
+            if (!obj.is_object()) {
+                return nullptr;
+            }
+
+            for (auto it = obj.begin(); it != obj.end(); ++it) {
+                if (equalsKeyNoAlloc(it.key(), key)) {
+                    return &(*it);
+                }
+            }
+
+            return nullptr;
+        }
 
         struct StringViewParseIssue {
             enum class Kind : std::uint8_t { None, MissingKey, WrongType };
@@ -210,12 +250,21 @@ namespace core::utils::json {
         Kind kind{Kind::None};
     };
 
-    struct UnsignedParseResult {
-        unsigned value{0u};
+    template <typename TUInt>
+    struct UIntParseResult {
+        TUInt value{};
         UnsignedParseIssue issue{};
         std::int64_t rawSigned{0};
         std::uint64_t rawUnsigned{0};
     };
+
+    template <typename TUInt>
+    [[nodiscard]] UIntParseResult<TUInt> parseUIntWithIssue(
+        const json& data,
+        std::string_view key,
+        TUInt defaultValue) noexcept;
+
+    using UnsignedParseResult = UIntParseResult<unsigned>;
 
     [[nodiscard]] UnsignedParseResult parseUnsignedWithIssue(
         const json& data,
@@ -223,6 +272,73 @@ namespace core::utils::json {
         unsigned defaultValue) noexcept;
 
     [[nodiscard]] std::string_view describe(const UnsignedParseIssue& issue) noexcept;
+
+    // --------------------------------------------------------------------------------------------
+    // Inline реализация parseUIntWithIssue<TUInt>
+    // --------------------------------------------------------------------------------------------
+
+    template <typename TUInt>
+    [[nodiscard]] inline UIntParseResult<TUInt> parseUIntWithIssue(
+        const json& data,
+        std::string_view key,
+        TUInt defaultValue) noexcept
+    {
+        static_assert(std::is_unsigned_v<TUInt>,
+                      "parseUIntWithIssue<TUInt> requires an unsigned integer type.");
+
+        using Kind = UnsignedParseIssue::Kind;
+        using IntT = json::number_integer_t;
+        using UIntT = json::number_unsigned_t;
+
+        UIntParseResult<TUInt> r{};
+        r.value = defaultValue;
+
+        const json* v = detail::findObjectMemberNoAlloc(data, key);
+        if (v == nullptr) {
+            r.issue.kind = Kind::MissingKey;
+            return r;
+        }
+
+        constexpr std::uint64_t kMaxU64 =
+            static_cast<std::uint64_t>(std::numeric_limits<TUInt>::max());
+
+        if (const auto* pu = v->get_ptr<const UIntT*>()) {
+            const std::uint64_t u = static_cast<std::uint64_t>(*pu);
+            r.rawUnsigned = u;
+
+            if (u > kMaxU64) {
+                r.issue.kind = Kind::OutOfRange;
+                return r;
+            }
+
+            r.value = static_cast<TUInt>(u);
+            return r;
+        }
+
+        if (const auto* ps = v->get_ptr<const IntT*>()) {
+            const std::int64_t s = static_cast<std::int64_t>(*ps);
+            r.rawSigned = s;
+
+            if (s < 0) {
+                r.issue.kind = Kind::Negative;
+                return r;
+            }
+
+            const std::uint64_t u = static_cast<std::uint64_t>(s);
+            r.rawUnsigned = u;
+
+            if (u > kMaxU64) {
+                r.issue.kind = Kind::OutOfRange;
+                return r;
+            }
+
+            r.value = static_cast<TUInt>(u);
+            return r;
+        }
+
+        r.issue.kind = Kind::WrongType;
+        return r;
+    }
 
     // --------------------------------------------------------------------------------------------
     // Диагностический парсер float (без логов, без исключений наружу)
