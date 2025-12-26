@@ -2,8 +2,11 @@
 // File: game/skyguard/config/loader/config_loader.h
 // Purpose: High-level player configuration loader (JSON -> Player)
 // Used by: Game, PlayerInitSystem
-// Related headers: game/skyguard/config/config_keys.h, core/utils/json/json_utils.h,
-//                  core/utils/json/json_validator.h, core/utils/file_loader.h,
+// Related headers: game/skyguard/config/config_keys.h,
+//                  core/utils/file_loader.h,
+//                  core/utils/json/json_accessors.h, core/utils/json/json_document.h,
+//                  core/utils/json/json_parsers.h,
+//                  core/resources/ids/resource_id_utils.h, core/ui/ids/ui_id_utils.h,
 //                  game/skyguard/config/blueprints/player_blueprint.h
 // ================================================================================================
 #pragma once
@@ -15,34 +18,30 @@
 namespace game::skyguard::config {
 
     /**
-     * @brief Высокоуровневый загрузчик, преобразующий JSON-файл в PlayerBlueprint.
+     * @brief Высокоуровневый загрузчик player-конфига (JSON -> PlayerBlueprint).
      *
-     * Обязанности:
-     *  - Использует FileLoader, чтобы прочесть JSON-файл как текст.
-     *  - Строит дерево Json из текста с помощью json::parse от nlohmann.
-     *  - С помощью JsonValidator валидирует структуру JSON-файла (parseAndValidateCritical).
-     *  - Превращает поля JSON-файла в набор properties::* и собирает PlayerBlueprint.
+     * Контракт:
+     *  - читает файл как текст (FileLoader);
+     *  - парсит JSON в критическом режиме (ошибка -> LOG_PANIC);
+     *  - запрещает дубли ключей (authoring safety);
+     *  - извлекает значения через парсеры *WithIssue (единая точка проверки типов/форматов).
      *
-     * НЕ:
-     *  - занимается низкоуровневой загрузкой ресурсов (диском/Texture/Font),
-     *  - знает что-либо о рендеринге, ECS и прочем.
+     * Этот класс НЕ:
+     *  - загружает ресурсы (текстуры/шрифты/звуки);
+     *  - знает что-либо о рендеринге, ECS и прочем runtime.
      */
     class ConfigLoader {
       public:
         /**
-     * @brief Загружает JSON из файла и парсит данные в PlayerBlueprint.
-     *
-     * Поведение:
-     *  - Если файл не может быть прочитан:
-     *      -> лог в core::log (Config/WARN) + возврат значения PlayerBlueprint по умолчанию.
-     *  - Если информация в JSON невалидна или искажена:
-     *      -> parseAndValidateCritical логирует через core::log и инициирует фатальное
-     *         завершение (panic).
-     *  - Если структура JSON неверна:
-     *      -> parseAndValidateCritical логирует через core::log и инициирует фатальное
-     *         завершение (panic).
-     */
-        static blueprints::PlayerBlueprint loadPlayerConfig(const std::string& path);
+         * @brief Загружает и разбирает player-конфиг.
+         *
+         * Ошибки:
+         *  - I/O (файл не читается) -> LOG_PANIC (обязательный контент).
+         *  - синтаксис JSON / дубли ключей -> LOG_PANIC.
+         *  - некорректные обязательные поля (тип/формат/диапазон/семантика) -> LOG_PANIC.
+         *  - некорректные опциональные поля -> LOG_WARN и остаются значения по умолчанию.
+         */
+        [[nodiscard]] static blueprints::PlayerBlueprint loadPlayerConfig(const std::string& path);
     };
 
 } // namespace game::skyguard::config

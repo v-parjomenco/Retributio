@@ -1,8 +1,16 @@
 // ================================================================================================
 // File: core/config/loader/debug_overlay_loader.h
-// Purpose: Loader function for DebugOverlayBlueprint from JSON
-// Used by: Game
-// Related headers: core/config/blueprints/debug_overlay_blueprint.h
+// Purpose: Load DebugOverlayBlueprint from JSON (non-critical, defaults on any failure).
+// Used by: Debug overlay system / game bootstrap.
+// Related headers:
+//  - core/config/blueprints/debug_overlay_blueprint.h
+//  - core/utils/file_loader.h
+//  - core/utils/json/json_document.h
+//  - core/utils/json/json_parsers.h
+//  - core/config/config_keys.h
+// Notes:
+//  - If the file can't be read or JSON is invalid, the loader returns defaults and emits one WARN.
+//  - Per-field issues are handled by *WithIssue parsers; missing keys keep defaults.
 // ================================================================================================
 #pragma once
 

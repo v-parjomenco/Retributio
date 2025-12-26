@@ -1,9 +1,16 @@
 // ================================================================================================
 // File: core/config/loader/engine_settings_loader.h
-// Purpose: Loader for EngineSettings from JSON file (engine_settings.json).
-// Used by: Game bootstrap / main, renderer initialization.
-// Related headers: core/config/engine_settings.h, core/utils/json/json_utils.h,
-//                  core/utils/file_loader.h
+// Purpose: Load EngineSettings from JSON (safe defaults; tuning only).
+// Used by: Game bootstrap / window + renderer initialization.
+// Related headers:
+//  - core/config/engine_settings.h
+//  - core/utils/file_loader.h
+//  - core/utils/json/json_document.h
+//  - core/utils/json/json_parsers.h
+//  - core/config/config_keys.h
+// Notes:
+//  - File missing/unreadable or invalid JSON -> returns defaults and emits one WARN.
+//  - Individual fields are parsed with *WithIssue; missing keys keep defaults.
 // ================================================================================================
 #pragma once
 

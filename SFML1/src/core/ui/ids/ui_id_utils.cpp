@@ -2,8 +2,6 @@
 
 #include "core/ui/ids/ui_id_utils.h"
 
-#include "core/log/log_macros.h"
-
 namespace core::ui::ids {
 
     // --------------------------------------------------------------------------------------------
@@ -57,12 +55,10 @@ namespace core::ui::ids {
     }
 
     // --------------------------------------------------------------------------------------------
-    // string_view -> enum
+    // string_view -> enum (TRY, no logs)
     // --------------------------------------------------------------------------------------------
 
-    [[nodiscard]] AnchorType anchorFromString(std::string_view name,
-                                              AnchorType       defaultType) noexcept {
-
+    std::optional<AnchorType> tryParseAnchor(std::string_view name) noexcept {
         if (name == "TopLeft") {
             return AnchorType::TopLeft;
         }
@@ -94,19 +90,10 @@ namespace core::ui::ids {
             return AnchorType::None;
         }
 
-        // Неизвестное значение — лог + откат на defaultType.
-        LOG_WARN(core::log::cat::UI,
-                 "[Anchor] Неизвестное значение anchor: {}. "
-                 "Применено значение по умолчанию ({}).",
-                 name,
-                 toString(defaultType));
-
-        return defaultType;
+        return std::nullopt;
     }
 
-    [[nodiscard]] ScalingBehaviorKind scalingFromString(std::string_view   name,
-                                                        ScalingBehaviorKind defaultKind) noexcept {
-
+    std::optional<ScalingBehaviorKind> tryParseScaling(std::string_view name) noexcept {
         if (name == "Uniform") {
             return ScalingBehaviorKind::Uniform;
         }
@@ -114,18 +101,10 @@ namespace core::ui::ids {
             return ScalingBehaviorKind::None;
         }
 
-        LOG_WARN(core::log::cat::UI,
-                 "[ScalingBehavior] Неизвестное значение resize_scaling: {}. "
-                 "Применено значение по умолчанию ({}).",
-                 name,
-                 toString(defaultKind));
-
-        return defaultKind;
+        return std::nullopt;
     }
 
-    [[nodiscard]] LockBehaviorKind lockFromString(std::string_view name,
-                                                  LockBehaviorKind defaultKind) noexcept {
-
+    std::optional<LockBehaviorKind> tryParseLock(std::string_view name) noexcept {
         if (name == "ScreenLock") {
             return LockBehaviorKind::Screen;
         }
@@ -133,12 +112,32 @@ namespace core::ui::ids {
             return LockBehaviorKind::World;
         }
 
-        LOG_WARN(core::log::cat::UI,
-                 "[LockBehavior] Неизвестное значение lock_behavior: {}. "
-                 "Применено значение по умолчанию ({}).",
-                 name,
-                 toString(defaultKind));
+        return std::nullopt;
+    }
 
+    // --------------------------------------------------------------------------------------------
+    // string_view -> enum (SOFT fallback, no logs)
+    // --------------------------------------------------------------------------------------------
+
+    AnchorType anchorFromString(std::string_view name, AnchorType defaultType) noexcept {
+        if (auto v = tryParseAnchor(name)) {
+            return *v;
+        }
+        return defaultType;
+    }
+
+    ScalingBehaviorKind scalingFromString(std::string_view name,
+                                          ScalingBehaviorKind defaultKind) noexcept {
+        if (auto v = tryParseScaling(name)) {
+            return *v;
+        }
+        return defaultKind;
+    }
+
+    LockBehaviorKind lockFromString(std::string_view name, LockBehaviorKind defaultKind) noexcept {
+        if (auto v = tryParseLock(name)) {
+            return *v;
+        }
         return defaultKind;
     }
 

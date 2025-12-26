@@ -4,15 +4,17 @@
 //          (textures, fonts, sounds) on top of ResourceHolder + ResourcePaths.
 // Used by: Game, ECS systems (PlayerInitSystem, DebugOverlaySystem, UI, etc.)
 // Related headers: texture_resource.h, font_resource.h, soundbuffer_resource.h, resource_holder.h,
-//                  resource_ids.h, resource_paths.h
+//                  resource_ids.h
+// Notes:   
+//  - Must be called once at boot
 // ================================================================================================
 #pragma once
 
 #include <string>
+#include <string_view>
 
 #include "core/resources/holders/resource_holder.h"
 #include "core/resources/ids/resource_ids.h"
-#include "core/resources/paths/resource_paths.h"
 #include "core/resources/types/font_resource.h"
 #include "core/resources/types/soundbuffer_resource.h"
 #include "core/resources/types/texture_resource.h"
@@ -25,8 +27,8 @@ namespace core::resources {
      * Обязанности:
      *  - Предоставляет простой API для запроса ресурсов по enum-ID
      *    (TextureID / FontID / SoundID).
-     *  - Использует ResourcePaths, чтобы сопоставить enum-ID с реальным путём на диске
-     *    и конфигурацией (smooth/repeated/mipmap).
+     *  - Использует ResourcePaths (внутренняя деталь ресурсного слоя), чтобы сопоставить enum-ID
+     *    с реальным путём на диске и конфигурацией (smooth/repeated/mipmap).
      *  - Кэширует загруженные ресурсы и гарантирует, что каждый файл грузится с диска
      *    не более одного раза.
      *
@@ -36,12 +38,12 @@ namespace core::resources {
      *  3) Явные пути к файлам       (getTextureByPath)             — низкоуровневый escape hatch.
      *
      * Ядро движка (геймплей, ECS-системы и т.п.) должно по максимуму использовать
-     * вариант №1 — enum-ID + ResourcePaths. Остальные методы — вспомогательные.
+     * вариант №1 — enum-ID. Остальные методы — вспомогательные.
      *
      * Для динамических строковых текстур используется единая политика отображения
      * (например, smooth=true по умолчанию). Если нужен полный контроль над smooth/repeated/mipmap,
      * ресурс должен быть описан в resources.json и запрашиваться по Enum-ID.
-     * 
+     *
      * На уровне 4X/больших стратегий поверх этого слоя могут добавляться:
      *  - стриминговые менеджеры (подкачка чанков);
      *  - LRU-кэши, разгружающие редко используемые ресурсы.
@@ -51,6 +53,24 @@ namespace core::resources {
       public:
         ResourceManager() = default;
         ~ResourceManager() = default;
+
+        // ----------------------------------------------------------------------------------------
+        // Bootstrapping (реестр ресурсов)
+        // ----------------------------------------------------------------------------------------
+
+        /**
+         * @brief Загрузить реестр ресурсов (resources.json).
+         *
+         * Важно:
+         *  - это операция инициализации, должна вызываться при старте до первого getTexture/
+         *    getFont/getSound;
+         *  - ошибки считаются критическими (реестр ресурсов — фундаментальный конфиг).
+         *
+         * Примечание:
+         *  - метод намеренно живёт во façade ResourceManager, чтобы game-слой не зависел
+         *    от внутренних деталей ресурсного слоя (ResourcePaths).
+         */
+        void loadRegistryFromJson(std::string_view filename);
 
         // ----------------------------------------------------------------------------------------
         // Текстуры
@@ -228,6 +248,10 @@ namespace core::resources {
         #endif
 
       private:
+        // Реестр ресурсов (resources.json) должен быть загружен ровно один раз на старте.
+        // Для hot-reload в будущем будет отдельный явный API, а не повторный вызов init.
+        bool mRegistryLoaded = false;
+
         // Хранилища для статических enum-ID (основной путь для движка).
         holders::ResourceHolder<types::TextureResource, ids::TextureID> mTextures;
         holders::ResourceHolder<types::FontResource, ids::FontID> mFonts;

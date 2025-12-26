@@ -11,8 +11,9 @@
 
 #include <SFML/System/Vector2.hpp>
 
-#include "core/utils/json/json_common.h"
 #include "third_party/json/json_silent.hpp"
+
+#include "core/utils/json/json_common.h"
 
 namespace core::utils::json {
 
@@ -23,7 +24,7 @@ namespace core::utils::json {
      * Если ключ отсутствует или чтение/конвертация не удалась — возвращаем defaultValue.
      */
     template <typename T>
-    T parseValue(const json& data, std::string_view key, const T& defaultValue) {
+    [[nodiscard]] T parseValue(const json& data, std::string_view key, const T& defaultValue) {
         const auto it = data.find(key);
         if (it == data.end()) {
             return defaultValue;
@@ -41,40 +42,32 @@ namespace core::utils::json {
     // --------------------------------------------------------------------------------------------
 
     template <>
-    float parseValue<float>(const json& data,
-                            std::string_view key,
-                            const float& defaultValue);
+    [[nodiscard]] float parseValue<float>(const json& data, std::string_view key,
+                                          const float& defaultValue);
 
     template <>
-    std::string parseValue<std::string>(const json& data,
-                                        std::string_view key,
-                                        const std::string& defaultValue);
+    [[nodiscard]] std::string parseValue<std::string>(const json& data, std::string_view key,
+                                                      const std::string& defaultValue);
 
     template <>
-    sf::Vector2f parseValue<sf::Vector2f>(const json& data,
-                                          std::string_view key,
-                                          const sf::Vector2f& defaultValue);
+    [[nodiscard]] sf::Vector2f parseValue<sf::Vector2f>(const json& data, std::string_view key,
+                                                        const sf::Vector2f& defaultValue);
 
     template <>
-    bool parseValue<bool>(const json& data,
-                          std::string_view key,
-                          const bool& defaultValue);
+    [[nodiscard]] bool parseValue<bool>(const json& data, std::string_view key,
+                                        const bool& defaultValue);
 
     template <>
-    unsigned parseValue<unsigned>(const json& data,
-                                  std::string_view key,
-                                  const unsigned& defaultValue);
+    [[nodiscard]] unsigned parseValue<unsigned>(const json& data, std::string_view key,
+                                                const unsigned& defaultValue);
 
     // --------------------------------------------------------------------------------------------
-    // Enum parser
+    // Enum parser (мягкий, для некритичных конфигов)
     // --------------------------------------------------------------------------------------------
 
     template <typename Enum, typename Mapper, typename ErrorHandler>
-    Enum parseEnum(const json& data,
-                   const char* key,
-                   Enum defaultValue,
-                   Mapper mapper,
-                   ErrorHandler onInvalidValue) {
+    [[nodiscard]] Enum parseEnum(const json& data, const char* key, Enum defaultValue,
+                                 Mapper mapper, ErrorHandler onInvalidValue) {
         const auto it = data.find(key);
         if (it == data.end()) {
             return defaultValue;
@@ -95,24 +88,26 @@ namespace core::utils::json {
         return defaultValue;
     }
 
+    template <typename Enum, typename Mapper, typename ErrorHandler>
+    [[nodiscard]] Enum parseEnum(const json&&, const char*, Enum, Mapper, ErrorHandler) = delete;
+
     template <typename Enum, typename Mapper>
-    Enum parseEnum(const json& data, const char* key, Enum defaultValue, Mapper mapper) {
-        return parseEnum(
-            data,
-            key,
-            defaultValue,
-            mapper,
-            [](std::string_view) {
-                // silent fallback
-            });
+    [[nodiscard]] Enum parseEnum(const json& data, const char* key, Enum defaultValue,
+                                 Mapper mapper) {
+        return parseEnum(data, key, defaultValue, mapper, [](std::string_view) {
+            // silent fallback
+        });
     }
+
+    template <typename Enum, typename Mapper>
+    [[nodiscard]] Enum parseEnum(const json&&, const char*, Enum, Mapper) = delete;
 
     // --------------------------------------------------------------------------------------------
     // Optional
     // --------------------------------------------------------------------------------------------
 
     template <typename T>
-    std::optional<T> getOptional(const json& data, const char* key) {
+    [[nodiscard]] std::optional<T> getOptional(const json& data, const char* key) {
         const auto it = data.find(key);
         if (it == data.end()) {
             return std::nullopt;
@@ -127,13 +122,12 @@ namespace core::utils::json {
 
     // Запрещаем вызовы с временным json: это потенциально приводит к dangling view
     // (и в целом не имеет смысла в нашей архитектуре загрузчиков).
-    template <typename T> std::optional<T>
-    getOptional(const json&&, const char*) = delete;
-    // (удалённая template-перегрузка выше покрывает и string_view)
+    template <typename T>
+    [[nodiscard]] std::optional<T> getOptional(const json&&, const char*) = delete;
 
     template <>
-    inline std::optional<std::string_view> getOptional<std::string_view>(const json& data,
-                                                                         const char* key) {
+    [[nodiscard]] inline std::optional<std::string_view>
+    getOptional<std::string_view>(const json& data, const char* key) {
         const auto it = data.find(key);
         if (it == data.end()) {
             return std::nullopt;

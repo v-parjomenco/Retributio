@@ -18,7 +18,6 @@
 #include "core/ecs/systems/render_system.h"
 #include "core/ecs/systems/scaling_system.h"
 #include "core/log/log_macros.h"
-#include "core/resources/paths/resource_paths.h"
 #include "core/time/time_config.h"
 
 #include "game/skyguard/config/config_paths.h"
@@ -106,7 +105,7 @@ namespace game::skyguard {
     void Game::initResources() {
         // Загружаем реестр ресурсов из JSON.
         // Это критичный конфиг: если он сломан — игра не имеет смысла продолжать.
-        core::resources::paths::ResourcePaths::loadFromJSON(skycfg_paths::RESOURCES);
+        mResources.loadRegistryFromJson(skycfg_paths::RESOURCES);
 
         // Настраиваем fallback-ресурсы на уровне ResourceManager.
         //

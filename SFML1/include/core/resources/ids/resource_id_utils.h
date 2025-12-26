@@ -45,7 +45,7 @@ namespace core::resources::ids {
     // fromString(...) — парсинг строковых ID из JSON (resources.json), т.е. string -> enum
     // Возвращают std::optional<Enum>: nullopt, если имя не распознано.
     // --------------------------------------------------------------------------------------------
-    inline std::optional<TextureID> textureFromString(std::string_view name) {
+    inline std::optional<TextureID> textureFromString(std::string_view name) noexcept {
         if (name == "Player") {
             return TextureID::Player;
         }
@@ -53,7 +53,7 @@ namespace core::resources::ids {
         return std::nullopt;
     }
 
-    inline std::optional<FontID> fontFromString(std::string_view name) {
+    inline std::optional<FontID> fontFromString(std::string_view name) noexcept {
         if (name == "Default") {
             return FontID::Default;
         }
@@ -61,7 +61,7 @@ namespace core::resources::ids {
         return std::nullopt;
     }
 
-    inline std::optional<SoundID> soundFromString(std::string_view name) {
+    inline std::optional<SoundID> soundFromString(std::string_view name) noexcept {
         // Сейчас в resources.json звуков может не быть — возвращаем пусто.
         // Когда будем добавлять звуки, нужно расширишь этот switch-эквивалент.
         (void) name;

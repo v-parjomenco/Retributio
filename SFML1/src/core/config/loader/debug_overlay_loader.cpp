@@ -5,7 +5,6 @@
 #include "core/config/config_keys.h"
 #include "core/log/log_macros.h"
 #include "core/utils/file_loader.h"
-#include "core/utils/json/json_accessors.h"
 #include "core/utils/json/json_document.h"
 #include "core/utils/json/json_parsers.h"
 
@@ -50,30 +49,17 @@ namespace core::config {
         *  - пишется сообщение уровня DEBUG (если включено),
         *  - возвращаем std::nullopt.
         */
-        auto dataOpt = json_utils::parseAndValidateNonCritical(
-            fileContent, path, "DebugOverlayLoader",
-            {
-                {keys::DebugOverlay::ENABLED, {Json::value_t::boolean}, false},
-                {keys::DebugOverlay::POSITION,
-                 {Json::value_t::array, Json::value_t::object, Json::value_t::number_float,
-                  Json::value_t::number_integer, Json::value_t::number_unsigned},
-                 false},
-                {keys::DebugOverlay::CHARACTER_SIZE,
-                 {Json::value_t::number_integer, Json::value_t::number_unsigned},
-                 false},
-                {keys::DebugOverlay::COLOR, {Json::value_t::string, Json::value_t::object}, false},
-                {keys::DebugOverlay::UPDATE_INTERVAL_MS,
-                 {Json::value_t::number_integer, Json::value_t::number_unsigned},
-                 false},
-                {keys::DebugOverlay::SMOOTHING_SHIFT,
-                 {Json::value_t::number_integer, Json::value_t::number_unsigned},
-                 false},
-            });
+        const auto dataOpt = json_utils::parseAndValidateNonCritical(
+            fileContent,
+            path,
+            "DebugOverlayLoader",
+            {},
+            json_utils::kConfigParseOnlyOptions);
 
         // Если парсинг/валидация не удалась — остаёмся на дефолтных настройках.
         if (!dataOpt) {
             LOG_WARN(core::log::cat::Config,
-                     "[DebugOverlayLoader] Некорректный JSON или структура в '{}'. "
+                     "[DebugOverlayLoader] Не удалось разобрать JSON в '{}'. "
                      "Используется конфигурация debug overlay по умолчанию. "
                      "Подробности — в логах уровня DEBUG (если включены).",
                      path);
@@ -88,8 +74,22 @@ namespace core::config {
         //  - если ключа нет → оставляем значение по умолчанию из структуры DebugOverlayBlueprint.
         // ----------------------------------------------------------------------------------------
 
-        // enabled (bool, если значение с JSON-файла не получено —> остаётся по умолчанию "true")
-        cfg.enabled = json_utils::parseValue(data, keys::DebugOverlay::ENABLED, cfg.enabled);
+        // enabled (bool)
+        {
+            const auto it = data.find(keys::DebugOverlay::ENABLED);
+            if (it != data.end()) {
+                if (it->is_boolean()) {
+                    cfg.enabled = it->get<bool>();
+                } else {
+                    LOG_WARN(core::log::cat::Config,
+                             "[DebugOverlayLoader] Некорректное поле '{}' в '{}': "
+                             "ожидался boolean. Применён дефолт ({}).",
+                             keys::DebugOverlay::ENABLED,
+                             path,
+                             cfg.enabled);
+                }
+            }
+        }
 
         // position (Vector2f с поддержкой number/array/object)
         {

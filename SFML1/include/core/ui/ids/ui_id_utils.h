@@ -8,6 +8,7 @@
 // ================================================================================================
 #pragma once
 
+#include <optional>
 #include <string_view>
 
 #include "core/ui/anchor_utils.h"
@@ -28,6 +29,12 @@ namespace core::ui::ids {
     // string_view -> enum (парсинг JSON / пользовательского ввода)
     // --------------------------------------------------------------------------------------------
 
+    // Строгий парсинг без логов: неизвестное значение -> std::nullopt.
+    [[nodiscard]] std::optional<AnchorType> tryParseAnchor(std::string_view name) noexcept;
+    [[nodiscard]] std::optional<ScalingBehaviorKind> tryParseScaling(std::string_view name) noexcept;
+    [[nodiscard]] std::optional<LockBehaviorKind> tryParseLock(std::string_view name) noexcept;
+
+    // Мягкий fallback без логов (категорию/политику решает вызывающий код).
     [[nodiscard]] AnchorType
     anchorFromString(std::string_view name,
                      AnchorType defaultType = AnchorType::None) noexcept;
@@ -52,10 +59,12 @@ namespace core::ui::ids {
      */
     template <typename Identifier> inline std::string_view idToString(Identifier) noexcept {
         // Для неизвестных типов — просто метка.
-        return u8"UnknownUiId";
+        return "UnknownUiId";
     }
 
+    // --------------------------------------------------------------------------------------------
     // Специализации для AnchorType / ScalingBehaviorKind / LockBehaviorKind
+    // --------------------------------------------------------------------------------------------
 
     template <> inline std::string_view idToString<AnchorType>(AnchorType id) noexcept {
         return toString(id);

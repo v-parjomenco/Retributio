@@ -1,14 +1,17 @@
 #include "pch.h"
 
 #include "core/resources/resource_manager.h"
+
 #include <array>
 #include <cassert>
 #include <charconv>
 #include <stdexcept>
+#include <string>
 #include <system_error>
 #include <type_traits>
 
 #include "core/log/log_macros.h"
+#include "core/resources/paths/resource_paths.h"
 
 namespace core::resources {
 
@@ -84,8 +87,8 @@ namespace core::resources {
 
         template <typename Cache, typename Key>
         const types::FontResource&
-        ensureFontLoadedWithConfig(Cache& cache,
-                                   const Key& key,
+        ensureFontLoadedWithConfig(Cache&                 cache,
+                                   const Key&             key,
                                    const FontResourceConfig& config) {
             if (!cache.contains(key)) {
                 [[maybe_unused]] const bool wasLoaded = cache.load(key, config.path);
@@ -107,8 +110,8 @@ namespace core::resources {
 
         template <typename Cache, typename Key>
         const types::SoundBufferResource&
-        ensureSoundLoadedWithConfig(Cache&                  cache,
-                                    const Key&              key,
+        ensureSoundLoadedWithConfig(Cache&                    cache,
+                                    const Key&                key,
                                     const SoundResourceConfig& config) {
             if (!cache.contains(key)) {
                 [[maybe_unused]] const bool wasLoaded = cache.load(key, config.path);
@@ -129,6 +132,24 @@ namespace core::resources {
         }
 
     } // namespace
+
+    // --------------------------------------------------------------------------------------------
+    // Bootstrapping (реестр ресурсов)
+    // --------------------------------------------------------------------------------------------
+
+    void ResourceManager::loadRegistryFromJson(std::string_view filename) {
+        // Один раз при старте. Это boundary: валидируем на write.
+        // Повторный вызов почти наверняка означает ошибку жизненного цикла/инициализации.
+        if (mRegistryLoaded) {
+            LOG_PANIC(core::log::cat::Resources,
+                      "[ResourceManager::loadRegistryFromJson] "
+                      "Registry уже загружен; повторный вызов запрещён. filename='{}'",
+                      filename);
+        }
+        // Критические ошибки обрабатываются внутри ResourcePaths.
+        paths::ResourcePaths::loadFromJSON(std::string(filename));
+        mRegistryLoaded = true;
+    }
 
     // --------------------------------------------------------------------------------------------
     // Текстуры
@@ -324,7 +345,7 @@ namespace core::resources {
     // --------------------------------------------------------------------------------------------
 
     void ResourceManager::setMissingTextureFallback(ids::TextureID id) {
-        mMissingTextureID        = id;
+        mMissingTextureID          = id;
         mHasMissingTextureFallback = true;
 
         // Прогреваем/валидируем fallback-текстуру сразу.
@@ -332,14 +353,14 @@ namespace core::resources {
     }
 
     void ResourceManager::setMissingFontFallback(ids::FontID id) {
-        mMissingFontID        = id;
+        mMissingFontID          = id;
         mHasMissingFontFallback = true;
 
         (void)getFont(id);
     }
 
     void ResourceManager::setMissingSoundFallback(ids::SoundID id) {
-        mMissingSoundID        = id;
+        mMissingSoundID          = id;
         mHasMissingSoundFallback = true;
 
         (void)getSound(id);

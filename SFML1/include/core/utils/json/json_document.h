@@ -1,12 +1,15 @@
 // ================================================================================================
 // File: core/utils/json/json_document.h
-// Purpose: JSON document parsing + validation pipeline
-// (NOT a DOM wrapper — just utility functions).
-//          Provides parseAndValidateCritical/NonCritical for config loading.
-// Used by: ConfigLoader, DebugOverlayLoader, WindowConfigLoader, EngineSettingsLoader.
+// Purpose: JSON parsing + (optional) structural validation helpers for config loading.
+// Used by: Config loaders (engine/game), resource registries, bootstrap code.
+// Related headers:
+//  - core/utils/json/json_common.h
+//  - core/utils/json/json_validator.h   // only for SchemaPolicy::Validate / KeyRule API
+//  - third_party/json/json_silent.hpp
+//  - core/log/log_macros.h
 // Notes:
-//  - This is NOT a document class — just parsing+validation helper functions.
-//  - "Document" refers to the conceptual JSON config file being loaded.
+//  - Not a DOM wrapper. "Document" means a loaded JSON text file.
+//  - Duplicate key policy is enforced at parse-time via callback.
 // ================================================================================================
 #pragma once
 
@@ -55,18 +58,22 @@ namespace core::utils::json {
      * Дубликаты ключей запрещены, схема валидируется.
      */
     inline constexpr JsonParseOptions kConfigStrictOptions{
-        .duplicateKeys = DuplicateKeyPolicy::Reject,
-        .schema = SchemaPolicy::Validate
-    };
+        .duplicateKeys = DuplicateKeyPolicy::Reject, .schema = SchemaPolicy::Validate};
+
+    /**
+     * @brief Пресет для конфигов:
+     * дубликаты ключей запрещены, но schema-проверка отключена,
+     * потому что вся диагностика делается через парсеры *WithIssue.
+     */
+    inline constexpr JsonParseOptions kConfigParseOnlyOptions{
+        .duplicateKeys = DuplicateKeyPolicy::Reject, .schema = SchemaPolicy::Skip};
 
     /**
      * @brief Пресет для "быстрого" режима (сейвы/стриминг/программная генерация).
      * Дубликаты не проверяем, схему можно пропускать.
      */
-    inline constexpr JsonParseOptions kFastOptions{
-        .duplicateKeys = DuplicateKeyPolicy::Ignore,
-        .schema = SchemaPolicy::Skip
-    };
+    inline constexpr JsonParseOptions kFastOptions{.duplicateKeys = DuplicateKeyPolicy::Ignore,
+                                                   .schema = SchemaPolicy::Skip};
 
     // --------------------------------------------------------------------------------------------
     // Базовый API (явные опции)
@@ -74,92 +81,68 @@ namespace core::utils::json {
 
     // Парсинг JSON-текста + (опциональная) проверка структуры.
     // Критический режим: LOG_PANIC; при ошибке завершает процесс.
-    [[nodiscard]] json
-    parseAndValidateCritical(const std::string& fileContent,
-                             std::string_view path,
-                             std::string_view moduleTag,
-                             std::span<const JsonValidator::KeyRule> rules,
-                             JsonParseOptions options);
+    [[nodiscard]] json parseAndValidateCritical(const std::string& fileContent,
+                                                std::string_view path, std::string_view moduleTag,
+                                                std::span<const JsonValidator::KeyRule> rules,
+                                                JsonParseOptions options);
 
     // Парсинг JSON-текста + (опциональная) проверка структуры.
     // Некритический режим: LOG_DEBUG + возврат nullopt при ошибке.
-    [[nodiscard]] std::optional<json>
-    parseAndValidateNonCritical(const std::string& fileContent,
-                                std::string_view path,
-                                std::string_view moduleTag,
-                                std::span<const JsonValidator::KeyRule> rules,
-                                JsonParseOptions options);
+    [[nodiscard]] std::optional<json> parseAndValidateNonCritical(
+        const std::string& fileContent, std::string_view path, std::string_view moduleTag,
+        std::span<const JsonValidator::KeyRule> rules, JsonParseOptions options);
 
     // --------------------------------------------------------------------------------------------
     // Backward-compatible overloads (по умолчанию — строгий режим для конфигов)
     // --------------------------------------------------------------------------------------------
 
     [[nodiscard]] inline json
-    parseAndValidateCritical(const std::string& fileContent,
-                             std::string_view path,
+    parseAndValidateCritical(const std::string& fileContent, std::string_view path,
                              std::string_view moduleTag,
                              std::span<const JsonValidator::KeyRule> rules) {
         return parseAndValidateCritical(fileContent, path, moduleTag, rules, kConfigStrictOptions);
     }
 
     [[nodiscard]] inline std::optional<json>
-    parseAndValidateNonCritical(const std::string& fileContent,
-                                std::string_view path,
+    parseAndValidateNonCritical(const std::string& fileContent, std::string_view path,
                                 std::string_view moduleTag,
                                 std::span<const JsonValidator::KeyRule> rules) {
-        return parseAndValidateNonCritical(fileContent, path, moduleTag, rules, kConfigStrictOptions);
+        return parseAndValidateNonCritical(fileContent, path, moduleTag, rules,
+                                           kConfigStrictOptions);
     }
 
     // --------------------------------------------------------------------------------------------
     // Перегрузки для синтаксиса { rule1, rule2, ... } без явного std::vector
     // --------------------------------------------------------------------------------------------
 
-    [[nodiscard]] inline json
-    parseAndValidateCritical(const std::string& fileContent,
-                             std::string_view path,
-                             std::string_view moduleTag,
-                             std::initializer_list<JsonValidator::KeyRule> rules,
-                             JsonParseOptions options) {
-        return parseAndValidateCritical(fileContent,
-                                        path,
-                                        moduleTag,
-                                        std::span(rules.begin(), rules.end()),
-                                        options);
+    [[nodiscard]] inline json parseAndValidateCritical(
+        const std::string& fileContent, std::string_view path, std::string_view moduleTag,
+        std::initializer_list<JsonValidator::KeyRule> rules, JsonParseOptions options) {
+        return parseAndValidateCritical(fileContent, path, moduleTag,
+                                        std::span(rules.begin(), rules.end()), options);
     }
 
-    [[nodiscard]] inline std::optional<json>
-    parseAndValidateNonCritical(const std::string& fileContent,
-                                std::string_view path,
-                                std::string_view moduleTag,
-                                std::initializer_list<JsonValidator::KeyRule> rules,
-                                JsonParseOptions options) {
-        return parseAndValidateNonCritical(fileContent,
-                                           path,
-                                           moduleTag,
-                                           std::span(rules.begin(), rules.end()),
-                                           options);
+    [[nodiscard]] inline std::optional<json> parseAndValidateNonCritical(
+        const std::string& fileContent, std::string_view path, std::string_view moduleTag,
+        std::initializer_list<JsonValidator::KeyRule> rules, JsonParseOptions options) {
+        return parseAndValidateNonCritical(fileContent, path, moduleTag,
+                                           std::span(rules.begin(), rules.end()), options);
     }
 
     [[nodiscard]] inline json
-    parseAndValidateCritical(const std::string& fileContent,
-                             std::string_view path,
+    parseAndValidateCritical(const std::string& fileContent, std::string_view path,
                              std::string_view moduleTag,
                              std::initializer_list<JsonValidator::KeyRule> rules) {
-        return parseAndValidateCritical(fileContent,
-                                        path,
-                                        moduleTag,
+        return parseAndValidateCritical(fileContent, path, moduleTag,
                                         std::span(rules.begin(), rules.end()),
                                         kConfigStrictOptions);
     }
 
     [[nodiscard]] inline std::optional<json>
-    parseAndValidateNonCritical(const std::string& fileContent,
-                                std::string_view path,
+    parseAndValidateNonCritical(const std::string& fileContent, std::string_view path,
                                 std::string_view moduleTag,
                                 std::initializer_list<JsonValidator::KeyRule> rules) {
-        return parseAndValidateNonCritical(fileContent,
-                                           path,
-                                           moduleTag,
+        return parseAndValidateNonCritical(fileContent, path, moduleTag,
                                            std::span(rules.begin(), rules.end()),
                                            kConfigStrictOptions);
     }

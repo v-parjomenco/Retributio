@@ -1,9 +1,16 @@
 // ================================================================================================
 // File: game/skyguard/config/loader/window_config_loader.h
-// Purpose: Loader for SkyGuard WindowConfig from JSON (skyguard_game.json).
-// Used by: game::skyguard::Game / bootstrap code.
-// Related headers: game/skyguard/config/window_config.h,
-//                  core/utils/json/json_utils.h, core/utils/file_loader.h
+// Purpose: Load SkyGuard WindowConfig from JSON (non-critical, defaults on any failure).
+// Used by: game::skyguard::Game / bootstrap.
+// Related headers:
+//  - game/skyguard/config/window_config.h
+//  - core/utils/file_loader.h
+//  - core/utils/json/json_document.h
+//  - core/utils/json/json_parsers.h
+//  - game/skyguard/config/config_keys.h
+// Notes:
+//  - Read/parse failure -> defaults + one WARN.
+//  - Invalid individual fields fall back to defaults; semantic clamps are applied on load.
 // ================================================================================================
 #pragma once
 

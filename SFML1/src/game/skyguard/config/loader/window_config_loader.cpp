@@ -4,7 +4,6 @@
 
 #include "core/log/log_macros.h"
 #include "core/utils/file_loader.h"
-#include "core/utils/json/json_accessors.h"
 #include "core/utils/json/json_document.h"
 #include "core/utils/json/json_parsers.h"
 
@@ -51,19 +50,12 @@ namespace game::skyguard::config {
             fileContent,
             path,
             "SkyGuard::WindowConfigLoader",
-            {
-                {gk::WINDOW_WIDTH,
-                 {Json::value_t::number_integer, Json::value_t::number_unsigned},
-                 false},
-                {gk::WINDOW_HEIGHT,
-                 {Json::value_t::number_integer, Json::value_t::number_unsigned},
-                 false},
-                {gk::WINDOW_TITLE, {Json::value_t::string}, false},
-            });
+            {},
+            json_utils::kConfigParseOnlyOptions);
 
         if (!dataOpt) {
             LOG_WARN(core::log::cat::Config,
-                     "[SkyGuard::WindowConfigLoader] Некорректный JSON или структура в '{}'. "
+                     "[SkyGuard::WindowConfigLoader] Не удалось разобрать JSON в '{}'. "
                      "Используются значения по умолчанию (width={}, height={}, title='{}'). "
                      "Подробности — в логах уровня DEBUG (если включены).",
                      path,
@@ -185,7 +177,21 @@ namespace game::skyguard::config {
             }
         }
 
-        cfg.title = json_utils::parseValue<std::string>(data, gk::WINDOW_TITLE, cfg.title);
+        // title (string)
+        {
+            const auto it = data.find(gk::WINDOW_TITLE);
+            if (it != data.end()) {
+                if (it->is_string()) {
+                    cfg.title = it->get_ref<const std::string&>();
+                } else {
+                    LOG_WARN(core::log::cat::Config,
+                             "[SkyGuard::WindowConfigLoader] Некорректное поле '{}': "
+                             "ожидалась строка. Применён дефолт ('{}').",
+                             gk::WINDOW_TITLE,
+                             cfg.title);
+                }
+            }
+        }
 
         return cfg;
     }

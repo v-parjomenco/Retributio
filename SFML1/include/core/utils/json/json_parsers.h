@@ -1,11 +1,15 @@
 // ================================================================================================
 // File: core/utils/json/json_parsers.h
-// Purpose: "WithIssue" diagnostic parsers for common SFML value types (no logs, noexcept).
+// Purpose: "WithIssue" diagnostic parsers for enum and common SFML value types (no logs, noexcept).
 // Used by: Config loaders, json_accessors.cpp (parseValue specializations), other parsers.
+// Notes:
+//  - All public parsers are noexcept and must not trigger allocations/exceptions.
+//  - string_view fields in results are valid only while the source json object is alive.
 // ================================================================================================
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 #include <SFML/Graphics/Color.hpp>
@@ -15,6 +19,87 @@
 #include "core/utils/json/json_common.h"
 
 namespace core::utils::json {
+
+    // --------------------------------------------------------------------------------------------
+    // Диагностический парсер enum (без логов, без исключений наружу)
+    // --------------------------------------------------------------------------------------------
+
+    struct EnumParseIssue {
+        enum class Kind : std::uint8_t { None, MissingKey, WrongType, UnknownValue };
+        Kind kind{Kind::None};
+        std::string_view raw{}; // валиден только пока жив исходный json
+    };
+
+    template <typename Enum>
+    struct EnumParseResult {
+        Enum value{};
+        EnumParseIssue issue{};
+    };
+
+    [[nodiscard]] std::string_view describe(const EnumParseIssue& issue) noexcept;
+
+    namespace detail {
+
+        struct StringViewParseIssue {
+            enum class Kind : std::uint8_t { None, MissingKey, WrongType };
+            Kind kind{Kind::None};
+        };
+
+        struct StringViewParseResult {
+            std::string_view value{};
+            StringViewParseIssue issue{};
+        };
+
+        [[nodiscard]] StringViewParseResult parseStringViewWithIssue(
+            const json& data,
+            std::string_view key) noexcept;
+
+        StringViewParseResult parseStringViewWithIssue(
+            const json&&,
+            std::string_view) noexcept = delete;
+
+        [[nodiscard]] bool tryGetFiniteFloat(const json& v, float& out) noexcept;
+
+    } // namespace detail
+
+    template <typename Enum, typename Mapper>
+    [[nodiscard]] EnumParseResult<Enum> parseEnumWithIssue(
+        const json& data,
+        std::string_view key,
+        Enum defaultValue,
+        Mapper mapper) noexcept
+    {
+        EnumParseResult<Enum> r{};
+        r.value = defaultValue;
+
+        const auto s = detail::parseStringViewWithIssue(data, key);
+        using SK = detail::StringViewParseIssue::Kind;
+
+        if (s.issue.kind == SK::MissingKey) {
+            r.issue.kind = EnumParseIssue::Kind::MissingKey;
+            return r;
+        }
+        if (s.issue.kind == SK::WrongType) {
+            r.issue.kind = EnumParseIssue::Kind::WrongType;
+            return r;
+        }
+
+        if (auto idOpt = mapper(s.value)) {
+            r.value = *idOpt;
+            return r;
+        }
+
+        r.issue.kind = EnumParseIssue::Kind::UnknownValue;
+        r.issue.raw  = s.value;
+        return r;
+    }
+
+    template <typename Enum, typename Mapper>
+    EnumParseResult<Enum> parseEnumWithIssue(
+        const json&&,
+        std::string_view,
+        Enum,
+        Mapper) noexcept = delete;
 
     // --------------------------------------------------------------------------------------------
     // Диагностический парсер sf::Vector2f (без логов, без исключений наружу)
@@ -187,15 +272,5 @@ namespace core::utils::json {
         const json& data,
         std::string_view key,
         const sf::Color& defaultValue) noexcept;
-
-    // --------------------------------------------------------------------------------------------
-    // Внутренние утилиты (нужны json_accessors.cpp; наружу не предназначены)
-    // --------------------------------------------------------------------------------------------
-
-    namespace detail {
-
-        [[nodiscard]] bool tryGetFiniteFloat(const json& v, float& out) noexcept;
-
-    } // namespace detail
 
 } // namespace core::utils::json

@@ -5,7 +5,6 @@
 #include "core/config/config_keys.h"
 #include "core/log/log_macros.h"
 #include "core/utils/file_loader.h"
-#include "core/utils/json/json_accessors.h"
 #include "core/utils/json/json_document.h"
 #include "core/utils/json/json_parsers.h"
 
@@ -51,17 +50,13 @@ namespace core::config {
             *fileContentOpt,
             path,
             "EngineSettingsLoader",
-            {
-                {eng_keys::VSYNC, {Json::value_t::boolean}, false},
-                {eng_keys::FRAME_LIMIT,
-                 {Json::value_t::number_integer, Json::value_t::number_unsigned},
-                 false},
-            });
+            {},
+            json_utils::kConfigParseOnlyOptions);
 
         if (!dataOpt) {
             // Type B: JSON/валидация упали → один заметный WARN (Release-видимый) + дефолты.
             LOG_WARN(core::log::cat::Config,
-                     "[EngineSettingsLoader] Некорректный JSON или структура в '{}'. "
+                     "[EngineSettingsLoader] Не удалось разобрать JSON в '{}'. "
                      "Используются значения по умолчанию (vsyncEnabled={}, frameLimit={}). "
                      "Подробности — в логах уровня DEBUG (если включены).",
                      path,
@@ -90,7 +85,21 @@ namespace core::config {
             return cfg;
         }
 
-        cfg.vsyncEnabled = json_utils::parseValue<bool>(data, eng_keys::VSYNC, cfg.vsyncEnabled);
+        // vsyncEnabled (bool)
+        {
+            const auto it = data.find(eng_keys::VSYNC);
+            if (it != data.end()) {
+                if (it->is_boolean()) {
+                    cfg.vsyncEnabled = it->get<bool>();
+                } else {
+                    LOG_WARN(core::log::cat::Config,
+                             "[EngineSettingsLoader] Некорректное поле '{}': "
+                             "ожидался boolean. Применён дефолт ({}).",
+                             eng_keys::VSYNC,
+                             cfg.vsyncEnabled);
+                }
+            }
+        }
 
         // frameLimit: ловим отрицательные и out-of-range значения,
         // даже если тип формально number_integer.
