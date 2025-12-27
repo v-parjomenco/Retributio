@@ -250,6 +250,18 @@
     <Filter Include="include\game\skyguard\dev">
       <UniqueIdentifier>{80e824ba-19a1-4b15-85e6-8815080fefb6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\config\loader\detail">
+      <UniqueIdentifier>{87ed052b-2a5f-43a5-9ac8-d562a2a8ab29}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\game\skyguard\config\loader\detail">
+      <UniqueIdentifier>{9cfbca1d-606b-433b-9999-991e36d39786}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\config\loader\detail">
+      <UniqueIdentifier>{57773ff7-e708-46d0-96a4-bd58d2f4222b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\config\loader\detail">
+      <UniqueIdentifier>{bab239ce-eb98-4ba2-b071-675a6acf788b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -320,6 +332,9 @@
     </ClCompile>
     <ClCompile Include="src\game\skyguard\dev\stress_scene.cpp">
       <Filter>src\game\skyguard\dev</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\config\loader\detail\non_critical_config_report.cpp">
+      <Filter>src\core\config\loader\detail</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -544,6 +559,9 @@
     </ClInclude>
     <ClInclude Include="include\game\skyguard\config\config_paths.h">
       <Filter>include\game\skyguard\config</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\config\loader\detail\non_critical_config_report.h">
+      <Filter>include\core\config\loader\detail</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

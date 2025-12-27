@@ -2,6 +2,12 @@
 
 #include "game/skyguard/config/loader/window_config_loader.h"
 
+#include <array>
+#include <cstdint>
+#include <string>
+#include <string_view>
+
+#include "core/config/loader/detail/non_critical_config_report.h"
 #include "core/log/log_macros.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_document.h"
@@ -14,26 +20,41 @@ namespace {
     using core::utils::FileLoader;
 
     namespace json_utils = core::utils::json;
-    namespace gk         = game::skyguard::config::keys::Game;
+    namespace gk = game::skyguard::config::keys::Game;
 
     using Json = json_utils::json;
+    using Report = core::config::loader::detail::NonCriticalConfigReport;
+
+    static constexpr std::string_view kLoaderTag = "SkyGuard::WindowConfigLoader";
+    static constexpr std::string_view kKnownKeysHint = "windowWidth/windowHeight/windowTitle";
+
+    static constexpr std::array kKnownKeys{gk::WINDOW_WIDTH, gk::WINDOW_HEIGHT, gk::WINDOW_TITLE};
+
+    static_assert(kKnownKeys.size() <= Report::kMaxFields,
+                  "NonCriticalConfigReport buffer too small for WindowConfigLoader");
+
+    [[nodiscard]] bool hasAnyKnownKey(const Json& data) noexcept {
+        for (const std::string_view key : kKnownKeys) {
+            if (data.find(key) != data.end()) {
+                return true;
+            }
+        }
+        return false;
+    }
 
 } // namespace
 
 namespace game::skyguard::config {
 
     WindowConfig loadWindowConfig(const std::string& path) {
-        // Стартуем с безопасных дефолтов (источник истины №1 для значений по умолчанию).
         WindowConfig cfg{};
 
-        // ----------------------------------------------------------------------------------------
-        // Низкоуровневое чтение файла
-        // ----------------------------------------------------------------------------------------
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
             LOG_WARN(core::log::cat::Config,
-                     "[SkyGuard::WindowConfigLoader] Файл не найден или не читается: '{}'. "
+                     "[{}] Файл не найден или не читается: '{}'. "
                      "Используются значения по умолчанию (width={}, height={}, title='{}').",
+                     kLoaderTag,
                      path,
                      cfg.width,
                      cfg.height,
@@ -41,23 +62,19 @@ namespace game::skyguard::config {
             return cfg;
         }
 
-        const std::string& fileContent = *fileContentOpt;
-
-        // ----------------------------------------------------------------------------------------
-        // Парсинг + валидация как НЕ критичного конфига.
-        // ----------------------------------------------------------------------------------------
         const auto dataOpt = json_utils::parseAndValidateNonCritical(
-            fileContent,
+            *fileContentOpt,
             path,
-            "SkyGuard::WindowConfigLoader",
+            kLoaderTag,
             {},
             json_utils::kConfigParseOnlyOptions);
 
         if (!dataOpt) {
             LOG_WARN(core::log::cat::Config,
-                     "[SkyGuard::WindowConfigLoader] Не удалось разобрать JSON в '{}'. "
+                     "[{}] Не удалось разобрать JSON в '{}'. "
                      "Используются значения по умолчанию (width={}, height={}, title='{}'). "
-                     "Подробности — в логах уровня DEBUG (если включены).",
+                     "Подробности — DEBUG.",
+                     kLoaderTag,
                      path,
                      cfg.width,
                      cfg.height,
@@ -67,146 +84,77 @@ namespace game::skyguard::config {
 
         const Json& data = *dataOpt;
 
-        // ВАЖНО: формат window config — объект с ключами верхнего уровня.
-        // Гибкость формата (number/array/object) допускается для значений отдельных полей,
-        // но корень должен быть объектом, иначе ключи windowWidth/windowHeight/windowTitle
-        // не имеют смысла.
         if (!data.is_object()) {
             LOG_WARN(core::log::cat::Config,
-                     "[SkyGuard::WindowConfigLoader] Корневой JSON в '{}' должен быть object. "
+                     "[{}] Корневой JSON в '{}' должен быть object. "
                      "Используются значения по умолчанию (width={}, height={}, title='{}').",
-                     path, cfg.width, cfg.height, cfg.title);
+                     kLoaderTag,
+                     path,
+                     cfg.width,
+                     cfg.height,
+                     cfg.title);
             return cfg;
         }
 
-        // ----------------------------------------------------------------------------------------
-        // Заполнение WindowConfig из JSON (fallback на значения по умолчанию)
-        // ----------------------------------------------------------------------------------------
+        Report report{};
 
-        const bool hasWidth =
-            (data.find(gk::WINDOW_WIDTH) != data.end());
-        const bool hasHeight =
-            (data.find(gk::WINDOW_HEIGHT) != data.end());
-        const bool hasTitle =
-            (data.find(gk::WINDOW_TITLE) != data.end());
-
-        if (!hasWidth && !hasHeight && !hasTitle) {
-            LOG_WARN(core::log::cat::Config,
-                     "[SkyGuard::WindowConfigLoader] Конфиг '{}' прочитан, но не содержит "
-                     "ни одного известного ключа (windowWidth/windowHeight/windowTitle). "
-                     "Используются значения по умолчанию.",
-                     path);
+        if (!hasAnyKnownKey(data)) {
+            report.emitWarnNoKnownKeys(kLoaderTag, path, kKnownKeysHint);
             return cfg;
         }
 
+        // width
         {
             const std::uint32_t defaultWidth = cfg.width;
+
             const auto res =
-                json_utils::parseUIntWithIssue<std::uint32_t>(data,
-                                                             gk::WINDOW_WIDTH,
-                                                             defaultWidth);
+                json_utils::parseUIntWithIssue<std::uint32_t>(data, gk::WINDOW_WIDTH, defaultWidth);
 
             cfg.width = res.value;
+            core::config::loader::detail::noteUIntIssue(report, gk::WINDOW_WIDTH, res);
 
+            // validate-on-write: 0 недопустим
+            const bool hasKey = (data.find(gk::WINDOW_WIDTH) != data.end());
             using Kind = json_utils::UnsignedParseIssue::Kind;
-            if (res.issue.kind != Kind::None && res.issue.kind != Kind::MissingKey) {
-
-                if (res.issue.kind == Kind::Negative) {
-                    LOG_WARN(core::log::cat::Config,
-                             "[SkyGuard::WindowConfigLoader] Некорректное поле '{}': "
-                             "значение отрицательное ({}). Применён дефолт ({}).",
-                             gk::WINDOW_WIDTH,
-                             res.rawSigned,
-                             defaultWidth);
-                } else if (res.issue.kind == Kind::OutOfRange) {
-                    LOG_WARN(core::log::cat::Config,
-                             "[SkyGuard::WindowConfigLoader] Некорректное поле '{}': "
-                             "значение вне диапазона ({}). Применён дефолт ({}).",
-                             gk::WINDOW_WIDTH,
-                             res.rawUnsigned,
-                             defaultWidth);
-                } else {
-                    LOG_WARN(core::log::cat::Config,
-                             "[SkyGuard::WindowConfigLoader] Некорректное поле '{}': "
-                             "ожидалось целое число. Применён дефолт ({}).",
-                             gk::WINDOW_WIDTH,
-                             defaultWidth);
-                }
-            }
-
-            // Семантическая валидация (validate-on-write):
-            // 0x0 окно недопустимо для VideoMode/рендера, поэтому не принимаем ноль.
-            // Это НЕ hot path: выполняется один раз на загрузке конфига.
-            if (hasWidth && res.issue.kind == Kind::None && cfg.width == 0u) {
-                LOG_WARN(core::log::cat::Config,
-                         "[SkyGuard::WindowConfigLoader] Некорректное поле '{}': "
-                         "значение не может быть 0. Применён дефолт ({}).",
-                         gk::WINDOW_WIDTH,
-                         defaultWidth);
+            if (hasKey && res.issue.kind == Kind::None && cfg.width == 0u) {
+                report.addSemanticInvalidField(gk::WINDOW_WIDTH);
                 cfg.width = defaultWidth;
             }
         }
 
+        // height
         {
             const std::uint32_t defaultHeight = cfg.height;
+
             const auto res =
-                json_utils::parseUIntWithIssue<std::uint32_t>(data,
-                                                             gk::WINDOW_HEIGHT,
-                                                             defaultHeight);
+                json_utils::parseUIntWithIssue<std::uint32_t>(data, gk::WINDOW_HEIGHT, defaultHeight);
 
             cfg.height = res.value;
+            core::config::loader::detail::noteUIntIssue(report, gk::WINDOW_HEIGHT, res);
 
+            // validate-on-write: 0 недопустим
+            const bool hasKey = (data.find(gk::WINDOW_HEIGHT) != data.end());
             using Kind = json_utils::UnsignedParseIssue::Kind;
-            if (res.issue.kind != Kind::None && res.issue.kind != Kind::MissingKey) {
-
-                if (res.issue.kind == Kind::Negative) {
-                    LOG_WARN(core::log::cat::Config,
-                             "[SkyGuard::WindowConfigLoader] Некорректное поле '{}': "
-                             "значение отрицательное ({}). Применён дефолт ({}).",
-                             gk::WINDOW_HEIGHT,
-                             res.rawSigned,
-                             defaultHeight);
-                } else if (res.issue.kind == Kind::OutOfRange) {
-                    LOG_WARN(core::log::cat::Config,
-                             "[SkyGuard::WindowConfigLoader] Некорректное поле '{}': "
-                             "значение вне диапазона ({}). Применён дефолт ({}).",
-                             gk::WINDOW_HEIGHT,
-                             res.rawUnsigned,
-                             defaultHeight);
-                } else {
-                    LOG_WARN(core::log::cat::Config,
-                             "[SkyGuard::WindowConfigLoader] Некорректное поле '{}': "
-                             "ожидалось целое число. Применён дефолт ({}).",
-                             gk::WINDOW_HEIGHT,
-                             defaultHeight);
-                }
-            }
-
-            // Семантическая валидация (validate-on-write): высота 0 недопустима.
-            if (hasHeight && res.issue.kind == Kind::None && cfg.height == 0u) {
-                LOG_WARN(core::log::cat::Config,
-                         "[SkyGuard::WindowConfigLoader] Некорректное поле '{}': "
-                         "значение не может быть 0. Применён дефолт ({}).",
-                         gk::WINDOW_HEIGHT,
-                         defaultHeight);
+            if (hasKey && res.issue.kind == Kind::None && cfg.height == 0u) {
+                report.addSemanticInvalidField(gk::WINDOW_HEIGHT);
                 cfg.height = defaultHeight;
             }
         }
 
-        // title (string)
+        // title
         {
             const auto it = data.find(gk::WINDOW_TITLE);
             if (it != data.end()) {
                 if (it->is_string()) {
                     cfg.title = it->get_ref<const std::string&>();
                 } else {
-                    LOG_WARN(core::log::cat::Config,
-                             "[SkyGuard::WindowConfigLoader] Некорректное поле '{}': "
-                             "ожидалась строка. Применён дефолт ('{}').",
-                             gk::WINDOW_TITLE,
-                             cfg.title);
+                    report.addInvalidField(gk::WINDOW_TITLE);
                 }
             }
+        }
+
+        if (report.hasAnyIssues()) {
+            report.emitWarnPartialApply(kLoaderTag, path, kKnownKeysHint);
         }
 
         return cfg;

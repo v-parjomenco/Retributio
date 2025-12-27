@@ -307,6 +307,7 @@
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp" />
     <ClCompile Include="src\core\config\loader\debug_overlay_loader.cpp" />
+    <ClCompile Include="src\core\config\loader\detail\non_critical_config_report.cpp" />
     <ClCompile Include="src\core\config\loader\engine_settings_loader.cpp" />
     <ClCompile Include="src\core\ecs\systems\debug_overlay_system.cpp" />
     <ClCompile Include="src\core\ecs\systems\movement_system.cpp" />
@@ -349,6 +350,7 @@
     <ClInclude Include="include\core\config\config_keys.h" />
     <ClInclude Include="include\core\config\engine_settings.h" />
     <ClInclude Include="include\core\config\loader\debug_overlay_loader.h" />
+    <ClInclude Include="include\core\config\loader\detail\non_critical_config_report.h" />
     <ClInclude Include="include\core\config\loader\engine_settings_loader.h" />
     <ClInclude Include="include\core\config\properties\anchor_properties.h" />
     <ClInclude Include="include\core\config\properties\controls_properties.h" />

@@ -3,10 +3,11 @@
 #include "core/ecs/systems/debug_overlay_system.h"
 
 #include <array>
+#include <cassert>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
-#include <limits>
+#include <string>
 #include <system_error>
 
 #include "core/config/properties/debug_overlay_runtime_properties.h"
@@ -25,11 +26,6 @@ namespace {
             out.append("?");
         }
     }
-
-    constexpr std::uint64_t kMaxIntAsU64 =
-        static_cast<std::uint64_t>(std::numeric_limits<int>::max());
-    constexpr std::uint8_t kMaxEmaShift =
-static_cast<std::uint8_t>(std::numeric_limits<std::uint64_t>::digits - 1); // 63
 
 #if defined(SFML1_PROFILE)
     void appendMs1DecimalFromUs(std::string& out, std::uint64_t us) {
@@ -93,18 +89,24 @@ namespace core::ecs {
 
     void DebugOverlaySystem::applyRuntimeProperties(
         const core::config::properties::DebugOverlayRuntimeProperties& props) noexcept {
+        // Контракт: loader валидирует/клампит. Здесь trust-on-read.
+#if !defined(NDEBUG)
+        assert(props.updateIntervalMs <=
+                   core::config::properties::DebugOverlayRuntimeProperties::kMaxUpdateIntervalMs &&
+               "updateIntervalMs violates contract (must be clamped in loader)");
+        assert(props.smoothingShift <=
+                   core::config::properties::DebugOverlayRuntimeProperties::kMaxSmoothingShift &&
+               "smoothingShift violates contract (must be clamped in loader)");
+#endif
         // 0 ms => обновлять каждый кадр.
         if (props.updateIntervalMs == 0) {
             mUpdateInterval = sf::Time::Zero;
         } else {
-            const std::uint64_t raw = static_cast<std::uint64_t>(props.updateIntervalMs);
-            const int clampedMs = static_cast<int>((raw > kMaxIntAsU64) ? kMaxIntAsU64 : raw);
-            mUpdateInterval = sf::milliseconds(clampedMs);
+            mUpdateInterval = sf::milliseconds(static_cast<int>(props.updateIntervalMs));
         }
 
-        // ВАЖНО: shift используется в (1ull << shift). shift>=64 => UB.
-        mSmoothingShift =
-            (props.smoothingShift > kMaxEmaShift) ? kMaxEmaShift : props.smoothingShift;
+        mSmoothingShift = props.smoothingShift;
+
         // При изменении режима сбрасываем сглаживание, чтобы не было "хвоста".
 #if defined(SFML1_PROFILE)
         mSmoothedCpuTotalUs = 0;

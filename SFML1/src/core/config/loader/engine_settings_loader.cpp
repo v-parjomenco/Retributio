@@ -1,8 +1,13 @@
 #include "pch.h"
 
 #include "core/config/loader/engine_settings_loader.h"
+#include <array>
+#include <cstdint>
+#include <string>
+#include <string_view>
 
 #include "core/config/config_keys.h"
+#include "core/config/loader/detail/non_critical_config_report.h"
 #include "core/log/log_macros.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_document.h"
@@ -13,86 +18,70 @@ namespace {
     using core::utils::FileLoader;
 
     namespace json_utils = core::utils::json;
-    namespace eng_keys   = core::config::keys::EngineSettings;
+    namespace eng_keys = core::config::keys::EngineSettings;
 
     using Json = json_utils::json;
+    using Report = core::config::loader::detail::NonCriticalConfigReport;
+
+    static constexpr std::string_view kLoaderTag = "EngineSettingsLoader";
+    static constexpr std::string_view kKnownKeysHint = "vsync/frameLimit";
+
+    static constexpr std::array kKnownKeys{eng_keys::VSYNC, eng_keys::FRAME_LIMIT};
+
+    static_assert(kKnownKeys.size() <= Report::kMaxFields,
+                  "NonCriticalConfigReport buffer too small for EngineSettingsLoader");
+
+    [[nodiscard]] bool hasAnyKnownKey(const Json& data) noexcept {
+        for (const std::string_view key : kKnownKeys) {
+            if (data.find(key) != data.end()) {
+                return true;
+            }
+        }
+        return false;
+    }
 
 } // namespace
 
 namespace core::config {
 
     EngineSettings loadEngineSettings(const std::string& path) {
-        // Стартуем с безопасных дефолтов (источник истины №1 для значений по умолчанию).
         EngineSettings cfg{};
 
-        // ----------------------------------------------------------------------------------------
-        // Низкоуровневое чтение файла.
-        // Ошибка здесь НЕ фатальная: движок может работать с дефолтами.
-        // ----------------------------------------------------------------------------------------
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
-            // Type B config: I/O-ошибка → WARN + безопасные дефолты.
             LOG_WARN(core::log::cat::Config,
-                     "[EngineSettingsLoader] Файл настроек движка не найден "
-                     "или не читается: '{}'. "
+                     "[{}] Файл настроек движка не найден или не читается: '{}'. "
                      "Используются значения по умолчанию (vsyncEnabled={}, frameLimit={}).",
-                     path,
-                     cfg.vsyncEnabled,
-                     cfg.frameLimit);
+                     kLoaderTag, path, cfg.vsyncEnabled, cfg.frameLimit);
             return cfg;
         }
 
-        // ----------------------------------------------------------------------------------------
-        // Парсинг + валидация как НЕ критичного конфига.
-        // parseAndValidateNonCritical пишет детали в DEBUG и возвращает nullopt.
-        // ----------------------------------------------------------------------------------------
         const auto dataOpt = json_utils::parseAndValidateNonCritical(
-            *fileContentOpt,
-            path,
-            "EngineSettingsLoader",
-            {},
-            json_utils::kConfigParseOnlyOptions);
+            *fileContentOpt, path, kLoaderTag, {}, json_utils::kConfigParseOnlyOptions);
 
         if (!dataOpt) {
-            // Type B: JSON/валидация упали → один заметный WARN (Release-видимый) + дефолты.
             LOG_WARN(core::log::cat::Config,
-                     "[EngineSettingsLoader] Не удалось разобрать JSON в '{}'. "
+                     "[{}] Не удалось разобрать JSON в '{}'. "
                      "Используются значения по умолчанию (vsyncEnabled={}, frameLimit={}). "
-                     "Подробности — в логах уровня DEBUG (если включены).",
-                     path,
-                     cfg.vsyncEnabled,
-                     cfg.frameLimit);
+                     "Подробности — DEBUG.",
+                     kLoaderTag, path, cfg.vsyncEnabled, cfg.frameLimit);
             return cfg;
         }
 
         const Json& data = *dataOpt;
 
-        // ВАЖНО: формат файла настроек — объект с ключами верхнего уровня.
-        // Гибкость (number/array/object/string) относится к значениям конкретных полей,
-        // а не к типу корня конфигурации.
         if (!data.is_object()) {
             LOG_WARN(core::log::cat::Config,
-                     "[EngineSettingsLoader] Корневой JSON в '{}' должен быть object. "
+                     "[{}] Корневой JSON в '{}' должен быть object. "
                      "Используются значения по умолчанию (vsyncEnabled={}, frameLimit={}).",
-                     path, cfg.vsyncEnabled, cfg.frameLimit);
+                     kLoaderTag, path, cfg.vsyncEnabled, cfg.frameLimit);
             return cfg;
         }
 
-        // ----------------------------------------------------------------------------------------
-        // Заполнение полей из JSON с fallback на EngineSettings по умолчанию.
-        // ----------------------------------------------------------------------------------------
+        Report report{};
 
-        const bool hasVsync =
-            (data.find(eng_keys::VSYNC) != data.end());
-        const bool hasFrameLimit =
-            (data.find(eng_keys::FRAME_LIMIT) != data.end());
-
-        if (!hasVsync && !hasFrameLimit) {
-            LOG_WARN(core::log::cat::Config,
-                     "[EngineSettingsLoader] Конфиг '{}' прочитан, но не содержит "
-                     "ни одного известного ключа (vsyncEnabled/frameLimit). "
-                     "Используются значения по умолчанию.",
-                     path);
+        if (!hasAnyKnownKey(data)) {
+            report.emitWarnNoKnownKeys(kLoaderTag, path, kKnownKeysHint);
             return cfg;
         }
 
@@ -103,53 +92,22 @@ namespace core::config {
                 if (it->is_boolean()) {
                     cfg.vsyncEnabled = it->get<bool>();
                 } else {
-                    LOG_WARN(core::log::cat::Config,
-                             "[EngineSettingsLoader] Некорректное поле '{}': "
-                             "ожидался boolean. Применён дефолт ({}).",
-                             eng_keys::VSYNC,
-                             cfg.vsyncEnabled);
+                    report.addInvalidField(eng_keys::VSYNC);
                 }
             }
         }
 
-        // frameLimit: ловим отрицательные и out-of-range значения,
-        // даже если тип формально number_integer.
+        // frameLimit (uint32_t)
         {
-            const std::uint32_t defaultLimit = cfg.frameLimit;
-
-            const auto res =
-                json_utils::parseUIntWithIssue<std::uint32_t>(data,
-                                                             eng_keys::FRAME_LIMIT,
-                                                             defaultLimit);
+            const auto res = json_utils::parseUIntWithIssue<std::uint32_t>(
+                data, eng_keys::FRAME_LIMIT, cfg.frameLimit);
 
             cfg.frameLimit = res.value;
+            core::config::loader::detail::noteUIntIssue(report, eng_keys::FRAME_LIMIT, res);
+        }
 
-            using Kind = json_utils::UnsignedParseIssue::Kind;
-            if (res.issue.kind != Kind::None && res.issue.kind != Kind::MissingKey) {
-
-                if (res.issue.kind == Kind::Negative) {
-                    LOG_WARN(core::log::cat::Config,
-                             "[EngineSettingsLoader] Некорректное поле '{}': "
-                             "значение отрицательное ({}). Применён дефолт ({}).",
-                             eng_keys::FRAME_LIMIT,
-                             res.rawSigned,
-                             defaultLimit);
-                } else if (res.issue.kind == Kind::OutOfRange) {
-                    LOG_WARN(core::log::cat::Config,
-                             "[EngineSettingsLoader] Некорректное поле '{}': "
-                             "значение вне диапазона ({}). Применён дефолт ({}).",
-                             eng_keys::FRAME_LIMIT,
-                             res.rawUnsigned,
-                             defaultLimit);
-                } else {
-                    // WrongType
-                    LOG_WARN(core::log::cat::Config,
-                             "[EngineSettingsLoader] Некорректное поле '{}': "
-                             "ожидалось целое число. Применён дефолт ({}).",
-                             eng_keys::FRAME_LIMIT,
-                             defaultLimit);
-                }
-            }
+        if (report.hasAnyIssues()) {
+            report.emitWarnPartialApply(kLoaderTag, path, kKnownKeysHint);
         }
 
         return cfg;
