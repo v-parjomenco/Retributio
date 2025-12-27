@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string_view>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 
 #include "core/log/log_macros.h"
@@ -31,25 +32,85 @@ namespace {
     } // namespace registry_keys
 
     // --------------------------------------------------------------------------------------------
-    // Универсальный загрузчик простых карт ID -> Config(path), где value = строка пути.
-    // Используется для FontConfig / SoundConfig.
+    // Универсальный загрузчик простых мап ID -> Config(path), где value = строка пути.
+    // Strict mode: любая ошибка -> LOG_PANIC.
     // --------------------------------------------------------------------------------------------
     template <typename EnumID, typename Mapper, typename Config>
-    void loadSimplePathConfigMap(const Json& data, std::string_view keyName, Mapper mapper,
-                                 std::unordered_map<EnumID, Config>& outMap) {
+    void loadSimplePathConfigMapStrict(const Json& data,
+                                       std::string_view keyName,
+                                       Mapper mapper,
+                                       std::unordered_map<EnumID, Config>& outMap) {
 
         outMap.clear();
 
-        // Ключ может отсутствовать (например, звуки ещё не используются).
         const auto it = data.find(keyName);
         if (it == data.end()) {
+            LOG_PANIC(core::log::cat::Resources,
+                      "[ResourcePaths] Отсутствует обязательный блок '{}'.",
+                      keyName);
+        }
+
+        const Json& node = *it;
+        if (!node.is_object()) {
+            LOG_PANIC(core::log::cat::Resources,
+                      "[ResourcePaths] Блок '{}' должен быть объектом.",
+                      keyName);
+        }
+
+        outMap.reserve(node.size());
+
+        for (auto nodeIt = node.begin(); nodeIt != node.end(); ++nodeIt) {
+            std::string_view idStr = nodeIt.key();
+            const Json&      value = nodeIt.value();
+
+            if (!value.is_string()) {
+                LOG_PANIC(core::log::cat::Resources,
+                          "[ResourcePaths] Некорректный {} '{}': "
+                          "значение должно быть строкой пути.",
+                          keyName,
+                          idStr);
+            }
+
+            // Структурный if-else: делаем flow explicit для статического анализатора.
+            // idOpt валиден только в else-ветке, где гарантированно mapper вернул значение.
+            if (const auto idOpt = mapper(idStr); !idOpt) {
+                LOG_PANIC(core::log::cat::Resources,
+                          "[ResourcePaths] Неизвестный ID в resources.json: {}",
+                          idStr);
+            } else {
+                Config cfg{};
+                cfg.path = value.get<std::string>();
+
+                // emplace вместо operator[]: избегаем default-construct + move-assign.
+                // Дубликатов ключей быть не должно (валидируем на этапе authoring/парсинга).
+                outMap.emplace(*idOpt, std::move(cfg));
+            }
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Мягкий режим загрузчика звуков: неизвестные ID или недопустимые записи -> LOG_WARN + пропуск.
+    // Допускается отсутствие блока.
+    // --------------------------------------------------------------------------------------------
+    template <typename EnumID, typename Mapper, typename Config>
+    void loadSimplePathConfigMapSoft(const Json& data,
+                                     std::string_view keyName,
+                                     Mapper mapper,
+                                     std::unordered_map<EnumID, Config>& outMap) {
+
+        outMap.clear();
+
+        const auto it = data.find(keyName);
+        if (it == data.end()) {
+            // sounds: блок опциональный. Отсутствие = нормальный сценарий (ничего не грузим).
             return;
         }
 
         const Json& node = *it;
         if (!node.is_object()) {
             LOG_WARN(core::log::cat::Resources,
-                     "[ResourcePaths] {} не является объектом, пропускаем весь блок.", keyName);
+                     "[ResourcePaths] Блок '{}' не является объектом, пропускаем весь блок.",
+                     keyName);
             return;
         }
 
@@ -57,26 +118,27 @@ namespace {
 
         for (auto nodeIt = node.begin(); nodeIt != node.end(); ++nodeIt) {
             std::string_view idStr = nodeIt.key();
-            const Json& value = nodeIt.value();
+            const Json&      value = nodeIt.value();
 
             if (!value.is_string()) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourcePaths] Пропущен {} '{}': "
-                         "значение должно быть строкой пути.",
-                         keyName, idStr);
+                         "[ResourcePaths] Пропущен {} '{}': значение должно быть строкой пути.",
+                         keyName,
+                         idStr);
                 continue;
             }
 
-            auto idOpt = mapper(idStr);
-            if (!idOpt) {
+            if (const auto idOpt = mapper(idStr); !idOpt) {
                 LOG_WARN(core::log::cat::Resources,
-                         "[ResourcePaths] Неизвестный ID в resources.json: {}", idStr);
-                continue;
-            }
+                         "[ResourcePaths] Неизвестный ID в resources.json: {}",
+                         idStr);
+            } else {
+                Config cfg{};
+                cfg.path = value.get<std::string>();
 
-            Config cfg{};
-            cfg.path = value.get<std::string>();
-            outMap[*idOpt] = std::move(cfg);
+                // emplace вместо operator[]: избегаем default-construct + move-assign.
+                outMap.emplace(*idOpt, std::move(cfg));
+            }
         }
     }
 
@@ -103,8 +165,6 @@ namespace {
         Mapper mapper,
         std::unordered_map<core::resources::ids::TextureID, TextureConfig>& outMap) {
 
-        using core::resources::ids::TextureID;
-
         outMap.clear();
 
         const auto it = data.find(keyName);
@@ -114,10 +174,9 @@ namespace {
 
         const Json& node = *it;
         if (!node.is_object()) {
-            LOG_WARN(core::log::cat::Resources,
-                     "[ResourcePaths] {} не является объектом, пропускаем весь блок.",
-                     keyName);
-            return;
+            LOG_PANIC(core::log::cat::Resources,
+                      "[ResourcePaths] Блок '{}' должен быть объектом.",
+                      keyName);
         }
 
         outMap.reserve(node.size());
@@ -126,59 +185,59 @@ namespace {
             std::string_view idString = nodeIt.key();
             const Json&      value    = nodeIt.value();
 
-            auto idOpt = mapper(idString);
-            if (!idOpt) {
-                LOG_WARN(core::log::cat::Resources,
-                         "[ResourcePaths] Неизвестный TextureID в resources.json: {}",
-                         idString);
-                continue;
-            }
+            // Структурный if-else: проверяем ID первым, весь happy path идёт в else-блок.
+            // Это устраняет C26829 (MSVC Intellisense не может протрассировать [[noreturn]]
+            // через макрос LOG_PANIC, но понимает, что в else-ветке idOpt гарантированно валиден).
+            if (const auto idOpt = mapper(idString); !idOpt) {
+                LOG_PANIC(core::log::cat::Resources,
+                          "[ResourcePaths] Неизвестный TextureID в resources.json: {}",
+                          idString);
+            } else {
+                if (!value.is_object()) {
+                    LOG_PANIC(core::log::cat::Resources,
+                              "[ResourcePaths] Некорректная текстура '{}': ожидался объект с "
+                              "полями конфигурации.",
+                              idString);
+                }
 
-            if (!value.is_object()) {
-                LOG_WARN(core::log::cat::Resources,
-                         "[ResourcePaths] Пропущена текстура '{}': ожидался объект с "
-                         "полями конфигурации.",
-                         idString);
-                continue;
-            }
+                const auto id = *idOpt;
 
-            TextureConfig cfg{};
+                TextureConfig cfg{};
 
-            // path — обязателен.
-            const auto pathIterator = value.find("path");
-            if (pathIterator == value.end() || !pathIterator->is_string()) {
-                LOG_WARN(core::log::cat::Resources,
-                         "[ResourcePaths] Пропущена текстура '{}': поле 'path' обязательно "
-                         "и должно быть строкой.",
-                         idString);
-                continue;
-            }
+                // path — обязателен.
+                const auto pathIterator = value.find("path");
+                if (pathIterator == value.end() || !pathIterator->is_string()) {
+                    LOG_PANIC(core::log::cat::Resources,
+                              "[ResourcePaths] Некорректная текстура '{}': поле 'path' обязательно "
+                              "и должно быть строкой.",
+                              idString);
+                }
 
-            cfg.path = pathIterator->get<std::string>();
+                cfg.path = pathIterator->get<std::string>();
 
-            // Вспомогательная лямбда для булевых флагов.
-            auto readBooleanWithDefault =
-                [&](const char* fieldName, bool defaultValue) {
+                // Вспомогательная лямбда для булевых флагов.
+                auto readBooleanWithDefault = [&](const char* fieldName, bool defaultValue) {
                     const auto flagIterator = value.find(fieldName);
                     if (flagIterator == value.end()) {
                         return defaultValue;
                     }
                     if (!flagIterator->is_boolean()) {
-                        LOG_WARN(core::log::cat::Resources,
-                                 "[ResourcePaths] Игнорируем поле '{}' для текстуры '{}': "
-                                 "ожидался boolean. Используем значение по умолчанию.",
-                                 fieldName,
-                                 idString);
-                        return defaultValue;
+                        LOG_PANIC(core::log::cat::Resources,
+                                  "[ResourcePaths] Некорректное поле '{}' для текстуры '{}': "
+                                  "ожидался boolean.",
+                                  fieldName,
+                                  idString);
                     }
                     return flagIterator->get<bool>();
                 };
 
-            cfg.smooth         = readBooleanWithDefault("smooth", true);
-            cfg.repeated       = readBooleanWithDefault("repeated", false);
-            cfg.generateMipmap = readBooleanWithDefault("mipmap", false);
+                cfg.smooth         = readBooleanWithDefault("smooth", true);
+                cfg.repeated       = readBooleanWithDefault("repeated", false);
+                cfg.generateMipmap = readBooleanWithDefault("mipmap", false);
 
-            outMap[*idOpt] = std::move(cfg);
+                // Здесь operator[] ок: по контракту ключа ещё нет, cfg уже полностью готов.
+                outMap[id] = std::move(cfg);
+            }
         }
     }
 
@@ -272,7 +331,23 @@ namespace core::resources::paths {
             {
                 {registry_keys::Textures, {Json::value_t::object}, true},
                 {registry_keys::Fonts,    {Json::value_t::object}, true},
-                {registry_keys::Sounds,   {Json::value_t::object}, false},
+
+                // sounds: soft-политика. Поле опционально, а при неверном типе мы НЕ падаем,
+                // потому что хотим LOG_WARN + skip внутри loadSimplePathConfigMapSoft(...).
+                // Поэтому разрешаем любой JSON-тип на этом уровне
+                // (валидация типа — в soft-лоадере).
+                {registry_keys::Sounds,
+                 {
+                     Json::value_t::null,
+                     Json::value_t::object,
+                     Json::value_t::array,
+                     Json::value_t::string,
+                     Json::value_t::boolean,
+                     Json::value_t::number_integer,
+                     Json::value_t::number_unsigned,
+                     Json::value_t::number_float
+                 },
+                 false},
             });
 
         // Заполнение карт через специализированные загрузчики.
@@ -280,14 +355,14 @@ namespace core::resources::paths {
                              registry_keys::Textures,
                              ids::textureFromString,
                              getTextureMap());
-        loadSimplePathConfigMap(data,
-                                registry_keys::Fonts,
-                                ids::fontFromString,
-                                getFontMap());
-        loadSimplePathConfigMap(data,
-                                registry_keys::Sounds,
-                                ids::soundFromString,
-                                getSoundMap());
+        loadSimplePathConfigMapStrict(data,
+                                      registry_keys::Fonts,
+                                      ids::fontFromString,
+                                      getFontMap());
+        loadSimplePathConfigMapSoft(data,
+                                    registry_keys::Sounds,
+                                    ids::soundFromString,
+                                    getSoundMap());
     }
 
     // --------------------------------------------------------------------------------------------

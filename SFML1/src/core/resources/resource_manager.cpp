@@ -6,6 +6,7 @@
 #include <charconv>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -274,36 +275,32 @@ namespace core::resources {
     // --------------------------------------------------------------------------------------------
 
     const types::SoundBufferResource& ResourceManager::getSound(ids::SoundID id) {
+        if (auto* cached = mSounds.tryGet(id)) {
+            return *cached;
+        }
+
+        if (!paths::ResourcePaths::contains(id)) {
+            LOG_WARN(core::log::cat::Resources,
+                     "[ResourceManager::getSound(SoundID)] "
+                     "SoundID не зарегистрирован в реестре: {}. Возвращается пустой буфер.",
+                     ids::toString(id));
+            mSounds.insert(id, std::make_unique<types::SoundBufferResource>());
+            return mSounds.get(id);
+        }
         const auto& cfg = paths::ResourcePaths::getSoundConfig(id);
 
         auto [ptr, loadedNow] = mSounds.getOrLoad(id, cfg.path);
         (void)loadedNow;
 
         if (!ptr) {
-            if (mHasMissingSoundFallback && id != mMissingSoundID) {
-                LOG_WARN(core::log::cat::Resources,
-                         "[ResourceManager::getSound(SoundID)] "
-                         "Не удалось загрузить звук для ID: {}. path='{}'. "
-                         "Используется fallback: {}",
-                         ids::toString(id),
-                         cfg.path,
-                         ids::toString(mMissingSoundID));
-                return getSound(mMissingSoundID);
-            }
-
-            if (mHasMissingSoundFallback && id == mMissingSoundID) {
-                LOG_PANIC(core::log::cat::Resources,
-                          "[ResourceManager::getSound(SoundID)] "
-                          "Fallback-звук не загрузился. ID: {}, path='{}'",
-                          ids::toString(id),
-                          cfg.path);
-            }
-
-            LOG_PANIC(core::log::cat::Resources,
-                      "[ResourceManager::getSound(SoundID)] "
-                      "Не удалось загрузить звук. ID: {}, path='{}'. Fallback не задан.",
-                      ids::toString(id),
-                      cfg.path);
+            LOG_WARN(core::log::cat::Resources,
+                     "[ResourceManager::getSound(SoundID)] "
+                     "Не удалось загрузить звук для ID: {}. path='{}'. "
+                     "Возвращается пустой буфер.",
+                     ids::toString(id),
+                     cfg.path);
+            mSounds.insert(id, std::make_unique<types::SoundBufferResource>());
+            return mSounds.get(id);
         }
 
         return *ptr;
@@ -314,20 +311,12 @@ namespace core::resources {
         (void)loadedNow;
 
         if (!ptr) {
-            if (mHasMissingSoundFallback) {
-                LOG_WARN(core::log::cat::Resources,
-                         "[ResourceManager::getSound(std::string)] "
-                         "Не удалось загрузить звук по пути: '{}'. "
-                         "Используется fallback: {}",
-                         id,
-                         ids::toString(mMissingSoundID));
-                return getSound(mMissingSoundID);
-            }
-
-            LOG_PANIC(core::log::cat::Resources,
-                      "[ResourceManager::getSound(std::string)] "
-                      "Не удалось загрузить звук по пути: '{}'. Fallback не задан.",
-                      id);
+             LOG_WARN(core::log::cat::Resources,
+                     "[ResourceManager::getSound(std::string)] "
+                     "Не удалось загрузить звук по пути: '{}'. Возвращается пустой буфер.",
+                     id);
+            mDynamicSounds.insert(id, std::make_unique<types::SoundBufferResource>());
+            return mDynamicSounds.get(id);
         }
 
         return *ptr;
@@ -350,14 +339,8 @@ namespace core::resources {
         (void)getFont(id);
     }
 
-    void ResourceManager::setMissingSoundFallback(ids::SoundID id) {
-        mMissingSoundID          = id;
-        mHasMissingSoundFallback = true;
-        (void)getSound(id);
-    }
-
     // --------------------------------------------------------------------------------------------
-    // Metrics
+    // Метрики
     // --------------------------------------------------------------------------------------------
 
     ResourceManager::ResourceMetrics ResourceManager::getMetrics() const noexcept {
@@ -372,7 +355,7 @@ namespace core::resources {
     }
 
     // --------------------------------------------------------------------------------------------
-    // Preload API
+    // API для предзагрузки ресурсов
     // --------------------------------------------------------------------------------------------
 
     void ResourceManager::preloadTexture(ids::TextureID id) { (void)getTexture(id); }

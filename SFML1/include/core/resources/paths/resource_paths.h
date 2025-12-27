@@ -58,6 +58,8 @@ namespace core::resources::paths {
          *  - Вызывается ровно один раз при старте приложения (до любых get* вызовов).
          *  - Повторная загрузка является programmer error (Debug: assert).
          *  - Критические ошибки (файл/JSON/структура) → LOG_PANIC.
+         *  - textures/fonts: любая ошибка записи (тип/структура/ID) → LOG_PANIC.
+         *  - sounds: отсутствующий блок допустим, битые записи → LOG_WARN и пропуск.
          */
         static void loadFromJSON(const std::string& filename);
 
@@ -98,8 +100,6 @@ namespace core::resources::paths {
          *  - ID должен существовать в реестре (проверяется через contains()
          *    или гарантируется инвариантами инициализации/кодогеном).
          *  - Если ID отсутствует → LOG_PANIC.
-         *  - Если блок "sounds" отсутствует в resources.json, любые вызовы getSoundConfig(...)
-         *    считаются нарушением контракта.
          *  - Возвращает константную ссылку (read-only).
          *
          * Примечание: на текущем этапе SoundConfig содержит только путь.

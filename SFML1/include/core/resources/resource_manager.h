@@ -177,7 +177,6 @@ namespace core::resources {
 
         void setMissingTextureFallback(ids::TextureID id);
         void setMissingFontFallback(ids::FontID id);
-        void setMissingSoundFallback(ids::SoundID id);
 
         /// Статистика по загруженным ресурсам.
         struct ResourceMetrics {
@@ -274,9 +273,6 @@ namespace core::resources {
 
         bool mHasMissingFontFallback = false;
         ids::FontID mMissingFontID{};
-
-        bool mHasMissingSoundFallback = false;
-        ids::SoundID mMissingSoundID{};
 
         #if defined(SFML1_PROFILE)
             bool mProfileStressTexturesEnabled = false;

@@ -124,10 +124,6 @@ namespace game::skyguard {
         //  3) включаем строку ниже:
         //
         // mResources.setMissingTextureFallback(core::resources::ids::TextureID::MissingTexture);
-        //
-        // Аналогично для звуков, когда появится базовый "beep"/"ui_click" и др.:
-        //
-        // mResources.setMissingSoundFallback(core::resources::ids::SoundID::SomeDefault);
     }
 
     // initWorld() без try/catch — все исключения уходят наверх в main()
