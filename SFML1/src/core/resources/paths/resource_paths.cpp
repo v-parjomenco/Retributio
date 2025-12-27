@@ -1,9 +1,12 @@
 #include "pch.h"
 
 #include "core/resources/paths/resource_paths.h"
+
+#include <cassert>
 #include <cstdint>
-#include <stdexcept>
+#include <string_view>
 #include <type_traits>
+#include <utility>
 
 #include "core/log/log_macros.h"
 #include "core/resources/ids/resource_id_utils.h"
@@ -180,26 +183,34 @@ namespace {
     }
 
     // --------------------------------------------------------------------------------------------
-    // Универсальный геттер с проверкой (DRY principle).
-    // Бросает std::runtime_error, если конфиг не найден.
+    // Универсальный геттер с проверкой (DRY).
+    // Контракт: ID обязан существовать; иначе Debug: assert, Release/Profile: LOG_PANIC.
     // --------------------------------------------------------------------------------------------
     template <typename EnumID, typename Config>
     const Config& getResourceConfig(const std::unordered_map<EnumID, Config>& map,
-                                    EnumID                                     id,
-                                    const char*                                typeName) {
+                                    EnumID id,
+                                    const char* typeName) {
 
         const auto it = map.find(id);
+
+#ifndef NDEBUG
+        // Debug: ловим программистскую ошибку максимально рано и дёшево.
+        assert(it != map.end() && "Resource ID must be registered in resources.json");
+#endif
+
         if (it == map.end()) {
-            // Последний рубеж, программная ошибка, которая должна либо ловиться
-            // вызывающим кодом с логом, либо падать через глобальный обработчик
+            // Release/Profile: даём полный контекст и падаем согласно политике.
             using U = std::underlying_type_t<EnumID>;
             const auto raw = static_cast<std::uint64_t>(static_cast<U>(id));
 
-            throw std::runtime_error(
-                std::string("[ResourcePaths::get") + typeName +
-                "] Не найден ресурс для " + typeName + ": id=" + std::to_string(raw)
-            );
+            LOG_PANIC(core::log::cat::Resources,
+                      "[ResourcePaths::getResourceConfig{}] Не найден ресурс: id={}. "
+                      "ID не зарегистрирован в resources.json или "
+                      "вызов произошёл до loadFromJSON().",
+                      typeName,
+                      raw);
         }
+
         return it->second;
     }
 
@@ -207,9 +218,9 @@ namespace {
 
 namespace core::resources::paths {
 
-    // ============================================================================================
+    // --------------------------------------------------------------------------------------------
     // Meyer's Singleton pattern для внутренних map'ов (thread-safe initialization).
-    // ============================================================================================
+    // --------------------------------------------------------------------------------------------
 
     std::unordered_map<ids::TextureID, ResourcePaths::TextureConfig>&
     ResourcePaths::getTextureMap() {
@@ -231,11 +242,20 @@ namespace core::resources::paths {
         return instance;
     }
 
-    // ============================================================================================
+    // --------------------------------------------------------------------------------------------
     // Загрузка реестра из JSON
-    // ============================================================================================
+    // --------------------------------------------------------------------------------------------
 
     void ResourcePaths::loadFromJSON(const std::string& filename) {
+#ifndef NDEBUG
+        // Контракт: loadFromJSON вызывается ровно один раз при старте.
+        // Повторная загрузка = programmer error (возможна инвалидация ссылок/итераторов).
+        static bool sLoadedOnce = false;
+        assert(!sLoadedOnce &&
+               "ResourcePaths::loadFromJSON must be called exactly once during startup");
+        sLoadedOnce = true;
+#endif
+
         // Чтение файла.
         const auto fileContentOpt = FileLoader::loadTextFile(filename);
         if (!fileContentOpt) {
@@ -270,9 +290,9 @@ namespace core::resources::paths {
                                 getSoundMap());
     }
 
-    // ============================================================================================
+    // --------------------------------------------------------------------------------------------
     // Геттеры конфигураций
-    // ============================================================================================
+    // --------------------------------------------------------------------------------------------
 
     const ResourcePaths::TextureConfig& ResourcePaths::getTextureConfig(ids::TextureID id) {
         return getResourceConfig(getTextureMap(), id, "(TextureID)");
@@ -286,9 +306,9 @@ namespace core::resources::paths {
         return getResourceConfig(getSoundMap(), id, "(SoundID)");
     }
 
-    // ============================================================================================
+    // --------------------------------------------------------------------------------------------
     // Contains-методы
-    // ============================================================================================
+    // --------------------------------------------------------------------------------------------
 
     bool ResourcePaths::contains(ids::TextureID id) noexcept {
         const auto& map = getTextureMap();
@@ -305,9 +325,9 @@ namespace core::resources::paths {
         return map.find(id) != map.end();
     }
 
-    // ============================================================================================
+    // --------------------------------------------------------------------------------------------
     // Геттеры доступа ко всей коллекции сразу (для пакетной загрузки / предзагрузки)
-    // ============================================================================================
+    // --------------------------------------------------------------------------------------------
 
     const std::unordered_map<ids::TextureID, ResourcePaths::TextureConfig>&
     ResourcePaths::getAllTextureConfigs() noexcept {

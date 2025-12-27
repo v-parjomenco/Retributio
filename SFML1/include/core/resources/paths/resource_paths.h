@@ -2,14 +2,19 @@
 // File: core/resources/paths/resource_paths.h
 // Purpose: Maps resource enum IDs to file system paths via JSON registry.
 // Used by: ResourceManager, higher-level loading code.
+//
+// IMPORTANT: INTERNAL DETAIL OF THE RESOURCE LAYER
+//  - ResourcePaths is an implementation detail and MUST NOT be accessed directly
+//    by code outside ResourceManager and the composition root (bootstrap).
+//  - All external code must use ResourceManager as the facade.
+//  - Future: will be replaced by instance-owned ResourceRegistry when hot-reload,
+//    mods, or multi-context scenarios are needed.
+//
 // Notes:
 //  - Centralized, read-only lookup: ID -> filesystem path (+ low-level config).
 //  - Backed by internal static maps (Meyer's singleton) for safe initialization.
 //  - Does NOT deal with hot-reload, mods, DLC, or virtual filesystems.
 //    Those are implemented at higher layers.
-//  - ResourcePaths must be treated as an internal detail of the resource layer;
-//    no code outside ResourceManager and the bootstrapping / composition root is allowed to access
-//    or depend on ResourcePaths directly.
 // ================================================================================================
 #pragma once
 
@@ -32,13 +37,14 @@ namespace core::resources::paths {
      *  - предоставляет быстрый и типобезопасный доступ к этим данным.
      *
      * Реализация:
-     *  - внутри использует Meyer's Singleton для static map'ов, что даёт
-     *    безопасную инициализацию в многопоточной среде;
+     *  - внутри использует Meyer's Singleton для static map'ов (C++11+ thread-safe init);
      *  - интерфейс — статические методы (утилитарный "реестр").
+     *
+     * ВАЖНО:
+     *  - Это внутренность resource-layer. Снаружи только ResourceManager.
      */
     class ResourcePaths {
       public:
-        // Удобные псевдонимы для конфигураций.
         using TextureConfig = core::resources::config::TextureResourceConfig;
         using FontConfig = core::resources::config::FontResourceConfig;
         using SoundConfig = core::resources::config::SoundResourceConfig;
@@ -48,78 +54,72 @@ namespace core::resources::paths {
          *
          * @param filename Путь к JSON с описанием ресурсов (resources.json).
          *
-         * Критические ошибки (нет файла, невалидный JSON, неверная структура) логируются через
-         * core::log и приводят к фатальному завершению (panic), т.к. без реестра ресурсов
-         * игра продолжать работу не может.
+         * Контракт:
+         *  - Вызывается ровно один раз при старте приложения (до любых get* вызовов).
+         *  - Повторная загрузка является programmer error (Debug: assert).
+         *  - Критические ошибки (файл/JSON/структура) → LOG_PANIC.
          */
         static void loadFromJSON(const std::string& filename);
-
-        // ----------------------------------------------------------------------------------------
-        // Получить конфигурацию ресурса (бросает std::runtime_error, если она не найдена)
-        // ----------------------------------------------------------------------------------------
 
         /**
          * @brief Получить полную конфигурацию текстурного ресурса.
          *
-         * Если TextureID неизвестен — бросает std::runtime_error с сообщением в стиле
-         * "[ResourcePaths::getTextureConfig(TextureID)] ...".
+         * @param id Идентификатор текстуры (должен быть зарегистрирован в resources.json).
          *
-         * Возвращает константную ссылку на внутренний реестр (read-only).
-         * Мутировать возвращаемую конфигурацию категорически не рекомендуется.
+         * Контракт:
+         *  - ID должен существовать в реестре (проверяется через contains()
+         *    или гарантируется инвариантами инициализации/кодогеном).
+         *  - Если ID отсутствует → LOG_PANIC.
+         *  - Возвращает константную ссылку (read-only).
          */
         [[nodiscard]] static const TextureConfig& getTextureConfig(ids::TextureID id);
 
         /**
          * @brief Получить полную конфигурацию шрифта.
          *
-         * На текущем этапе FontConfig содержит только путь (path).
-         * Позже сюда могут добавиться другие низкоуровневые параметры.
+         * @param id Идентификатор шрифта (должен быть зарегистрирован в resources.json).
+         *
+         * Контракт:
+         *  - ID должен существовать в реестре (проверяется через contains()
+         *    или гарантируется инвариантами инициализации/кодогеном).
+         *  - Если ID отсутствует → LOG_PANIC.
+         *  - Возвращает константную ссылку (read-only).
+         *
+         * Примечание: на текущем этапе FontConfig содержит только путь.
          */
         [[nodiscard]] static const FontConfig& getFontConfig(ids::FontID id);
 
         /**
          * @brief Получить полную конфигурацию звукового ресурса (SoundBuffer).
          *
-         * На текущем этапе SoundConfig содержит только путь (path).
-         * Позже сюда могут добавиться другие низкоуровневые параметры.
+         * @param id Идентификатор звука (должен быть зарегистрирован в resources.json).
+         *
+         * Контракт:
+         *  - ID должен существовать в реестре (проверяется через contains()
+         *    или гарантируется инвариантами инициализации/кодогеном).
+         *  - Если ID отсутствует → LOG_PANIC.
+         *  - Если блок "sounds" отсутствует в resources.json, любые вызовы getSoundConfig(...)
+         *    считаются нарушением контракта.
+         *  - Возвращает константную ссылку (read-only).
+         *
+         * Примечание: на текущем этапе SoundConfig содержит только путь.
          */
         [[nodiscard]] static const SoundConfig& getSoundConfig(ids::SoundID id);
-
-        // ----------------------------------------------------------------------------------------
-        // Проверить наличие ресурса (без исключений)
-        // ----------------------------------------------------------------------------------------
 
         [[nodiscard]] static bool contains(ids::TextureID id) noexcept;
         [[nodiscard]] static bool contains(ids::FontID id) noexcept;
         [[nodiscard]] static bool contains(ids::SoundID id) noexcept;
 
-        // ----------------------------------------------------------------------------------------
-        // Получить все ресурсы (для batch-загрузки / предзагрузки)
-        // ----------------------------------------------------------------------------------------
-
-        /**
-         * @brief Доступ ко всем конфигурациям текстур.
-         *
-         * Используется, например, для глобальной предзагрузки ассетов
-         * (preloadAllTextures в ResourceManager) или тулов.
-         */
         [[nodiscard]] static const std::unordered_map<ids::TextureID, TextureConfig>&
         getAllTextureConfigs() noexcept;
 
-        /**
-         * @brief Доступ ко всем конфигурациям шрифтов.
-         */
         [[nodiscard]] static const std::unordered_map<ids::FontID, FontConfig>&
         getAllFontConfigs() noexcept;
 
-        /**
-         * @brief Доступ ко всем конфигурациям звуков.
-         */
         [[nodiscard]] static const std::unordered_map<ids::SoundID, SoundConfig>&
         getAllSoundConfigs() noexcept;
 
       private:
-        // Meyer's Singleton для гарантии корректной инициализации
         static std::unordered_map<ids::TextureID, TextureConfig>& getTextureMap();
         static std::unordered_map<ids::FontID, FontConfig>& getFontMap();
         static std::unordered_map<ids::SoundID, SoundConfig>& getSoundMap();

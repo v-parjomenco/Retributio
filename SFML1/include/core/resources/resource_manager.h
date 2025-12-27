@@ -5,11 +5,12 @@
 // Used by: Game, ECS systems (PlayerInitSystem, DebugOverlaySystem, UI, etc.)
 // Related headers: texture_resource.h, font_resource.h, soundbuffer_resource.h, resource_holder.h,
 //                  resource_ids.h
-// Notes:   
+// Notes:
 //  - Must be called once at boot
 // ================================================================================================
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 
@@ -53,6 +54,11 @@ namespace core::resources {
       public:
         ResourceManager() = default;
         ~ResourceManager() = default;
+
+        ResourceManager(const ResourceManager&) = delete;
+        ResourceManager& operator=(const ResourceManager&) = delete;
+        ResourceManager(ResourceManager&&) = delete;
+        ResourceManager& operator=(ResourceManager&&) = delete;
 
         // ----------------------------------------------------------------------------------------
         // Bootstrapping (реестр ресурсов)

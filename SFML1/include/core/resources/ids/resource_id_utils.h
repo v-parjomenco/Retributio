@@ -62,8 +62,11 @@ namespace core::resources::ids {
     }
 
     inline std::optional<SoundID> soundFromString(std::string_view name) noexcept {
-        // Сейчас в resources.json звуков может не быть — возвращаем пусто.
-        // Когда будем добавлять звуки, нужно расширишь этот switch-эквивалент.
+        // Сейчас SoundID не расширен: мы намеренно НЕ распознаём ни одного имени.
+        //
+        // Контракт (чтобы не было WARN-спама):
+        //  - пока здесь всегда nullopt, в resources.json не должно быть entries в блоке "sounds";
+        //  - появятся звуки -> расширяем SoundID + добавляем маппинг здесь + регистрируем sounds в JSON.
         (void) name;
         return std::nullopt;
     }

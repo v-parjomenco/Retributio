@@ -5,15 +5,15 @@
 // Notes:
 //  - Stores resources as std::unique_ptr<Resource> to avoid accidental copies.
 //  - Identifier is typically an enum class (TextureID, FontID, SoundID) or std::string.
-//  - Designed to be lightweight and ready for future streaming/lazy-loading strategies.
-//  - Fail-fast by default: missing resources приводят к std::runtime_error.
-//    Fallback/“розовый квадрат” должен реализовываться уровнем выше (ResourceManager / игра).
+//  - ResourceHolder does NOT log recoverable errors (avoids log duplication).
+//    Fallback/LOG_WARN/LOG_PANIC policies are the responsibility of the ResourceManager.
+//  - API getOrLoad(...) avoids redundant lookups: 1 lookup per hit.
 // ================================================================================================
 #pragma once
 
 #include <cassert>
+#include <cstddef>
 #include <memory>
-#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -21,24 +21,16 @@
 namespace core::resources::holders {
 
     /**
-     * @brief Универсальный хранитель ресурсов.
+     * @brief Универсальный хранитель ресурсов (кэш по ID).
      *
      * Хранит ресурсы как std::unique_ptr<Resource> в
      * std::unordered_map<Identifier, std::unique_ptr<Resource>>.
      *
      * Требования к Resource:
-     *  - должен предоставлять метод loadFromFile(const std::string& [, Args...]);
-     *  - обычно является тонкой обёрткой вокруг SFML-типа (sf::Texture, sf::Font, sf::SoundBuffer).
+     *  - должен предоставлять метод loadFromFile(const std::string& [, Args...]) -> bool.
      *
      * Требования к Identifier:
-     *  - должен быть пригоден для использования в std::unordered_map (т.е. иметь std::hash);
-     *  - чаще всего это enum class (TextureID, FontID, SoundID) или std::string.
-     *
-     * Поведение:
-     *  - load(...) загружает ресурс по ID и пути; при повторном вызове с тем же ID
-     *    возвращает false и ничего не делает;
-     *  - get(...) возвращает ссылку на ресурс или выбрасывает std::runtime_error, если его нет;
-     *  - insert(...) вставляет уже созданный ресурс; дубликаты в Debug-сборке подсвечиваются assert'ом.
+     *  - пригоден для std::unordered_map (std::hash + ==).
      */
     template <typename Resource, typename Identifier> class ResourceHolder {
       public:
@@ -51,25 +43,31 @@ namespace core::resources::holders {
         ResourceHolder& operator=(ResourceHolder&&) noexcept = default;
 
         /**
+         * @brief Получить ресурс или (при необходимости) загрузить его из файла.
+         *
+         * Семантика:
+         *  - Если ресурс уже есть в кэше -> возвращаем его (loadedNow=false).
+         *  - Если ресурса нет -> пробуем загрузить:
+         *      - успех: вставляем в кэш, возвращаем указатель (loadedNow=true)
+         *      - провал: кэш не меняем, возвращаем nullptr (loadedNow=false)
+         *
+         * Контракт:
+         *  - Метод НЕ логирует ошибки загрузки (чтобы не было дубля логов).
+         *  - Решение "warn/fallback/panic" принимает вызывающий код (обычно ResourceManager).
+         */
+        template <typename... Args>
+        [[nodiscard]] std::pair<Resource*, bool>
+        getOrLoad(const Identifier& id, const std::string& filename, Args&&... args);
+
+        /**
          * @brief Загрузить ресурс из файла и привязать к идентификатору.
          *
-         * @tparam Args Дополнительные аргументы, которые будут проброшены в Resource::loadFromFile.
+         * Возвращает:
+         *  - true  — ресурс был реально загружен впервые и добавлен в map;
+         *  - false — ресурс уже был в кэше ИЛИ загрузка провалилась.
          *
-         * @param id       Идентификатор ресурса.
-         * @param filename Путь к файлу.
-         * @param args     Дополнительные параметры для loadFromFile (если нужны конкретному типу).
-         *
-         * @return true  — ресурс был реально загружен впервые -> он добавляется в map.
-         * @return false — ресурс с таким ID уже существовал -> загрузка не выполнялась,
-         *                 map не изменяется.
-         *
-         * Если Resource::loadFromFile(...) вернул false (ошибка чтения/парсинга файла):
-         *      * генерируется std::runtime_error и ресурс не добавляется в map.
-         * 
-         * ВАЖНО:
-         *  - ResourceHolder сам ничего не логирует;
-         *  - ответственность за логирование/фоллбеки лежит на вызывающем коде
-         *    (обычно ResourceManager).
+         * ВАЖНО: чтобы отличить "уже был" от "провал загрузки" — используй tryGet(...) или
+         * getOrLoad(...).
          */
         template <typename... Args>
         [[nodiscard]] bool load(const Identifier& id, const std::string& filename, Args&&... args);
@@ -77,30 +75,34 @@ namespace core::resources::holders {
         /**
          * @brief Вставить уже созданный ресурс (обычно после кастомной загрузки).
          *
-         * Используется, когда загрузка производится через отдельный loader
-         * (например, ResourceLoader::loadTexture) и мы хотим избежать повторного I/O.
-         *
          * Если resource == nullptr — вставка игнорируется.
-         * Если ресурс с таким ID уже есть — в Debug-сборке срабатывает assert,
-         * в Release — вставка тихо игнорируется (сохраняется первый ресурс).
+         * Если ресурс с таким ID уже есть — в Debug срабатывает assert,
+         * в Release — вставка игнорируется (сохраняется первый ресурс).
          */
         void insert(const Identifier& id, std::unique_ptr<Resource> resource);
 
-        /// @brief Получить ресурс по ID (выбрасывает std::runtime_error, если не найден).
+        /**
+         * @brief Быстрый "безопасный" доступ: вернуть указатель или nullptr.
+         *
+         * Это каноничный путь для менеджера, когда нужен fallback без исключений/UB.
+         */
+        [[nodiscard]] Resource* tryGet(const Identifier& id) noexcept;
+        [[nodiscard]] const Resource* tryGet(const Identifier& id) const noexcept;
+
+        /**
+         * @brief Контрактный доступ (trust on read): вернуть ссылку или LOG_PANIC на ошибке.
+         *
+         * Используй только там, где отсутствие ресурса = programmer error.
+         * ResourceManager обычно предпочитает tryGet/getOrLoad ради fallback-логики.
+         */
         [[nodiscard]] Resource& get(const Identifier& id);
-        /// @brief Константная версия get.
         [[nodiscard]] const Resource& get(const Identifier& id) const;
 
-        /// @brief Проверить, загружен ли ресурс с данным ID.
         [[nodiscard]] bool contains(const Identifier& id) const noexcept;
 
-        /// @brief Удалить конкретный ресурс из кэша (если он есть).
         void unload(const Identifier& id);
-
-        /// @brief Очистить все ресурсы данного хранилища.
         void clear() noexcept;
 
-        /// @brief Количество ресурсов в хранилище (для отладки/профилинга).
         [[nodiscard]] std::size_t size() const noexcept {
             return mResourceMap.size();
         }
@@ -111,5 +113,4 @@ namespace core::resources::holders {
 
 } // namespace core::resources::holders
 
-// Реализация шаблонов
 #include "resource_holder.inl"

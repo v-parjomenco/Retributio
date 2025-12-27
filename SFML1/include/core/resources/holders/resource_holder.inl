@@ -1,67 +1,139 @@
 #pragma once
 
 #include <type_traits>
+#include <utility>
 
+#include "core/log/log_macros.h"
 #include "core/resources/ids/resource_id_utils.h"
-#include "core/resources/ids/resource_ids.h"
 
 namespace core::resources::holders {
 
     // --------------------------------------------------------------------------------------------
+    // getOrLoad(...)
+    // --------------------------------------------------------------------------------------------
+
+    template <typename Resource, typename Identifier>
+    template <typename... Args>
+    [[nodiscard]] std::pair<Resource*, bool>
+    ResourceHolder<Resource, Identifier>::getOrLoad(const Identifier& id,
+                                                    const std::string& filename,
+                                                    Args&&... args) {
+
+        // 1 lookup на hit:
+        //  - try_emplace не конструирует value, если ключ уже существует
+        //  - создает "пустой" слот (nullptr), если ключа нет (мы обязаны его заполнить или удалить)
+        auto [it, inserted] = mResourceMap.try_emplace(id, nullptr);
+
+        // Если вставка не произошла — значит ресурс уже был
+        if (!inserted) {
+#ifndef NDEBUG
+            // Инвариант: в кэше не должно быть nullptr.
+            // Если это случилось — значит кто-то нарушил контракт (например, insert(id, nullptr)).
+            assert(it->second && 
+                   "[ResourceHolder::getOrLoad] Invariant broken: nullptr stored in cache.");
+#endif
+            return {it->second.get(), false};
+        }
+
+        // inserted == true: ключ добавлен, value пока nullptr.
+        // Пытаемся загрузить ресурс.
+        auto resource = std::make_unique<Resource>();
+
+        if (!resource->loadFromFile(filename, std::forward<Args>(args)...)) {
+            // Ошибка I/O или парсинга.
+            // Откатываем вставку ключа, чтобы не держать мусор (nullptr) в map.
+            mResourceMap.erase(it);
+            // Логирование/фоллбек/паника — строго на уровне ResourceManager.
+            return {nullptr, false};
+        }
+
+        // Загрузка успешна — перемещаем владение в map.
+        it->second = std::move(resource);
+        return {it->second.get(), true};
+    }
+
+    // --------------------------------------------------------------------------------------------
     // load(...)
     // --------------------------------------------------------------------------------------------
-    // Загружаем ресурс из файла, с произвольными дополнительными параметрами,
-    // которые форвардятся в Resource::loadFromFile(filename, args...).
-    //
-    // Возвращает:
-    //  - true  — если ресурс был загружен впервые;
-    //  - false — если ресурс с таким ID уже присутствовал и загрузка не потребовалась.
-    // --------------------------------------------------------------------------------------------
+
     template <typename Resource, typename Identifier>
     template <typename... Args>
     [[nodiscard]] bool ResourceHolder<Resource, Identifier>::load(const Identifier& id,
                                                                   const std::string& filename,
                                                                   Args&&... args) {
 
-        // Защита от дубликатов ID: если ресурс уже есть — не загружаем его повторно.
-        if (mResourceMap.find(id) != mResourceMap.end()) {
-            return false; // ресурс уже был в кэше
+        auto [ptr, loadedNow] = getOrLoad(id, filename, std::forward<Args>(args)...);
+        // Возвращаем true только если загрузка прошла успешно И это был новый ресурс.
+        return ptr && loadedNow;
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // insert(...)
+    // --------------------------------------------------------------------------------------------
+
+    template <typename Resource, typename Identifier>
+    void ResourceHolder<Resource, Identifier>::insert(const Identifier& id,
+                                                      std::unique_ptr<Resource> resource) {
+        if (!resource) {
+            return;
         }
 
-        auto resource = std::make_unique<Resource>();
+        // try_emplace: один lookup, mapped_value не трогаем на hit.
+        auto [it, inserted] = mResourceMap.try_emplace(id, nullptr);
 
-        // Унифицированный вызов loadFromFile:
-        //  - при пустом Args... будет вызвана версия loadFromFile(const std::string&);
-        //  - при наличии аргументов — соответствующая перегрузка/шаблон ресурса.
-        if (!resource->loadFromFile(filename, std::forward<Args>(args)...)) {
-            throw std::runtime_error(
-                std::string("[ResourceHolder::load] Не удалось загрузить файл: ") + filename +
-                "\nID: " + core::resources::ids::idToString(id));
+        if (!inserted) {
+#ifndef NDEBUG
+            // В Debug подсвечиваем попытку перезаписать существующий ресурс.
+            // В Release просто игнорируем (first wins).
+            assert(false && "[ResourceHolder::insert] Resource with this ID already exists.");
+#endif
+            return;
         }
 
-        // Вставляем загруженный ресурс в map:
-        // std::move(resource) передаёт владение в mResourceMap.
-        mResourceMap.emplace(id, std::move(resource));
-        return true;
+        // Успешно зарезервировали слот — заполняем.
+        it->second = std::move(resource);
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // tryGet(...)
+    // --------------------------------------------------------------------------------------------
+
+    template <typename Resource, typename Identifier>
+    [[nodiscard]] Resource*
+    ResourceHolder<Resource, Identifier>::tryGet(const Identifier& id) noexcept {
+        const auto it = mResourceMap.find(id);
+        return (it != mResourceMap.end()) ? it->second.get() : nullptr;
+    }
+
+    template <typename Resource, typename Identifier>
+    [[nodiscard]] const Resource*
+    ResourceHolder<Resource, Identifier>::tryGet(const Identifier& id) const noexcept {
+        const auto it = mResourceMap.find(id);
+        return (it != mResourceMap.end()) ? it->second.get() : nullptr;
     }
 
     // --------------------------------------------------------------------------------------------
     // get(...)
     // --------------------------------------------------------------------------------------------
 
-    // Константная версия метода get.
-    // Возвращает ссылку на ресурс или выбрасывает std::runtime_error, если ресурс не найден.
     template <typename Resource, typename Identifier>
     const Resource& ResourceHolder<Resource, Identifier>::get(const Identifier& id) const {
-        auto found = mResourceMap.find(id);
-        if (found == mResourceMap.end()) {
-            throw std::runtime_error(std::string("[ResourceHolder::get] Ресурс не найден: ") +
-                                     core::resources::ids::idToString(id));
+        const Resource* ptr = tryGet(id);
+
+#ifndef NDEBUG
+        assert(ptr && "[ResourceHolder::get] Missing resource (contract violation).");
+#endif
+
+        if (!ptr) {
+            // Trust-on-Read нарушен: это фатальная ошибка логики.
+            LOG_PANIC(core::log::cat::Resources,
+                      "[ResourceHolder::get] Ресурс не найден (нарушение контракта). ID: {}",
+                      core::resources::ids::idToString(id));
         }
-        return *found->second;
+
+        return *ptr;
     }
 
-    // Неконстантная версия get реализована через константную (DRY).
     template <typename Resource, typename Identifier>
     Resource& ResourceHolder<Resource, Identifier>::get(const Identifier& id) {
         return const_cast<Resource&>(static_cast<const ResourceHolder&>(*this).get(id));
@@ -71,20 +143,16 @@ namespace core::resources::holders {
     // contains(...)
     // --------------------------------------------------------------------------------------------
 
-    // Проверить наличие ресурса по ID.
-    // noexcept подчёркивает отсутствие исключений: только поиск в unordered_map.
     template <typename Resource, typename Identifier>
     [[nodiscard]] bool
-    ResourceHolder<Resource, Identifier>::contains(const Identifier& id) const noexcept {        
-        const auto it = mResourceMap.find(id);
-        return it != mResourceMap.end();
+    ResourceHolder<Resource, Identifier>::contains(const Identifier& id) const noexcept {
+        return (mResourceMap.find(id) != mResourceMap.end());
     }
 
     // --------------------------------------------------------------------------------------------
     // unload(...)
     // --------------------------------------------------------------------------------------------
 
-    // Удалить ресурс по ID (если его нет — ничего не происходит).
     template <typename Resource, typename Identifier>
     void ResourceHolder<Resource, Identifier>::unload(const Identifier& id) {
         mResourceMap.erase(id);
@@ -94,37 +162,9 @@ namespace core::resources::holders {
     // clear(...)
     // --------------------------------------------------------------------------------------------
 
-    // Полная очистка хранилища.
     template <typename Resource, typename Identifier>
     void ResourceHolder<Resource, Identifier>::clear() noexcept {
         mResourceMap.clear();
-    }
-
-    // --------------------------------------------------------------------------------------------
-    // insert(...)
-    // --------------------------------------------------------------------------------------------
-
-    // Вставка уже загруженного ресурса через unique_ptr.
-    // Используется, например, ResourceLoader'ом, чтобы избежать двойной загрузки с диска.
-    // После вставки ResourceHolder будет владеть ресурсом.
-    //
-    // Поведение при дубликате:
-    //  - если ID уже существует, в Debug-сборке срабатывает assert (это подозрительная ситуация);
-    //  - в Release-сборке дубликат тихо игнорируется, первый ресурс сохраняется.
-    template <typename Resource, typename Identifier>
-    void ResourceHolder<Resource, Identifier>::insert(const Identifier& id,
-                                                      std::unique_ptr<Resource> resource) {
-        if (!resource) {
-            return; // ничего не вставляем, если nullptr
-        }
-
-        auto [it, inserted] = mResourceMap.emplace(id, std::move(resource));
-        if (!inserted) {
-            // В больших проектах дубликаты ID могут указывать на ошибки пайплайна ресурсов,
-            // поэтому в Debug мы явно подсвечиваем это место.
-            assert(false && "[ResourceHolder::insert] Resource with this ID already exists. "
-                            "Repeated insertion ignored.");
-        }
     }
 
 } // namespace core::resources::holders

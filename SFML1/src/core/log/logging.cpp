@@ -469,7 +469,7 @@ namespace {
 
         // Собираем текст для пользователя (на русском).
         const std::string userMessage = std::format(
-            "Критическая ошибка.\n\nКатегория: {}\n\n{}\n\nФайл: {}\nСтрока: {}",
+            "Категория: {}\n\n{}\n\nФайл: {}\nСтрока: {}",
             category,
             message,
             file ? file : "",
