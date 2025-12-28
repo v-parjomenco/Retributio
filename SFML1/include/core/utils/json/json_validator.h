@@ -1,13 +1,15 @@
 // ================================================================================================
 // File: core/utils/json/json_validator.h
-// Purpose: Lightweight schema-like validation helper for JSON configs.
-// Used by: json_utils::parseAndValidateCritical/NonCritical, config loaders.
+// Purpose: Minimal schema-like structural validation helper for JSON configs.
+// Used by: core/utils/json/json_document.h
 // Notes:
-//  - Pure structural validation: no logging, no UI, no engine-level dependencies.
-//  - On violation throws std::runtime_error with human-readable description.
+//  - Contract: STRUCTURE ONLY (root/object, required keys, and allowed JSON value types).
+//  - NOT a replacement for *WithIssue parsers. Semantic/range/cross-field validation belongs there.
+//  - No logging, no UI, no engine-level dependencies. On violation throws std::runtime_error.
 // ================================================================================================
 #pragma once
 
+#include <cstddef>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -26,16 +28,36 @@
 namespace core::utils::json {
 
     /**
-     * @brief Утилита для проверки корректности JSON-конфигурации.
+     * @brief Минимальный структурный валидатор JSON-конфигов (schema-like gate).
      *
-     * Проверяет, что ключи присутствуют и имеют допустимые типы данных.
-     * Поддерживает несколько возможных типов для одного ключа.
-     * Не занимается логированием/показом сообщений — только выбрасывает исключения.
+     * ВАЖНО (контракт):
+     *  - Это "структурный барьер" для SchemaPolicy::Validate: проверяет root/object, наличие ключей и типы.
+     *  - Он НЕ должен дублировать *WithIssue парсеры:
+     *      *WithIssue покрывают смысловую валидацию (диапазоны, зависимости полей, enum-мэппинг, etc.).
+     *  - Он НЕ является "универсальной схемой" и не развивается в полноценный JSON Schema движок.
+     *
+     * Поведение:
+     *  - При нарушении бросает std::runtime_error с человеко-читаемым текстом.
+     *  - Внутри нет логирования (логирование — ответственность верхнего слоя).
      */
     class JsonValidator {
       public:
         using json = nlohmann::json;
 
+        /**
+         * @brief Правило для ключа верхнего уровня (top-level).
+         *
+         * name:
+         *  - имя ключа (ожидается литерал/стабильная строка конфиг-формата).
+         * allowedTypes:
+         *  - список допустимых json::value_t для значения по ключу.
+         * required:
+         *  - если true — ключ обязан существовать.
+         *
+         * Примечание:
+         *  - intentionally хранит allowedTypes как vector, потому что это cold-path (граница загрузки).
+         *  - НЕ используйте это как "семантическую валидацию" — это только проверка типа.
+         */
         struct KeyRule {
             std::string name;
             std::vector<json::value_t> allowedTypes;
@@ -44,13 +66,21 @@ namespace core::utils::json {
 
         /**
          * @brief Проверяет, что JSON содержит все обязательные ключи и правильные типы.
-         * @param data  JSON-объект (конфиг)
+         *
+         * @param data  JSON-объект (конфиг).
          * @param rules Список правил (std::span позволяет передавать vector/array без копирования).
-         * @throws std::runtime_error при нарушении хотя бы одного правила или если root не объект.
+         *
+         * @throws std::runtime_error при нарушении хотя бы одного правила
+         *         или если root не object.
+         *
+         * Примечание по дизайну:
+         *  - Это intentionally "flat" валидатор: проверяет только ключи текущего объекта (top-level).
+         *  - Структуру вложенных объектов/массивов проверяйте в *WithIssue парсерах.
          */
         static void validate(const json& data, std::span<const KeyRule> rules) {
             // Защита от передачи массива/null/примитива вместо конфига.
             if (!data.is_object()) {
+                // '\n' в начале — сознательно: в логах/трейсах сообщение читается как отдельный блок.
                 throw std::runtime_error("\nConfig validation error: root JSON is not an object");
             }
 
@@ -76,18 +106,17 @@ namespace core::utils::json {
 
                 if (!valid) {
                     std::string expected;
-                    expected.reserve(rule.allowedTypes.size() * 8); // small optimization
+                    // Ошибка — cold-path. Reserve здесь чисто косметика, чтобы не плодить реаллокации.
+                    expected.reserve(rule.allowedTypes.size() * 8);
 
                     for (std::size_t i = 0; i < rule.allowedTypes.size(); ++i) {
-                        // Используем string_view без лишних аллокаций
                         expected += typeName(rule.allowedTypes[i]);
                         if (i + 1 < rule.allowedTypes.size()) {
                             expected += " or ";
                         }
                     }
 
-                    // std::string(typeName(type)) нужен для конкатенации
-                    // со строковыми литералами в C++20
+                    // std::string(...) нужен для конкатенации со строковыми литералами.
                     throw std::runtime_error("\nConfig validation error: key '" + rule.name +
                                              "' has wrong type (" + std::string(typeName(type)) +
                                              "), expected " + expected);
@@ -97,7 +126,7 @@ namespace core::utils::json {
 
       private:
         // Возвращаем string_view, так как литералы живут вечно (static storage).
-        // Это Zero-overhead по сравнению с возвратом std::string.
+        // Zero-overhead по сравнению с возвратом std::string.
         static std::string_view typeName(nlohmann::json::value_t t) {
             switch (t) {
             case nlohmann::json::value_t::string:

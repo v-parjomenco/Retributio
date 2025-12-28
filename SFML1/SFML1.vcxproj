@@ -321,7 +321,6 @@
     <ClCompile Include="src\core\ui\anchor_policy.cpp" />
     <ClCompile Include="src\core\ui\ids\ui_id_utils.cpp" />
     <ClCompile Include="src\core\utils\file_loader.cpp" />
-    <ClCompile Include="src\core\utils\json\json_accessors.cpp" />
     <ClCompile Include="src\core\utils\json\json_document.cpp" />
     <ClCompile Include="src\core\utils\json\json_parsers.cpp" />
     <ClCompile Include="src\game\skyguard\config\loader\config_loader.cpp" />
@@ -400,7 +399,6 @@
     <ClInclude Include="include\core\ui\lock_behavior.h" />
     <ClInclude Include="include\core\ui\scaling_behavior.h" />
     <ClInclude Include="include\core\utils\file_loader.h" />
-    <ClInclude Include="include\core\utils\json\json_accessors.h" />
     <ClInclude Include="include\core\utils\json\json_common.h" />
     <ClInclude Include="include\core\utils\json\json_document.h" />
     <ClInclude Include="include\core\utils\json\json_parsers.h" />

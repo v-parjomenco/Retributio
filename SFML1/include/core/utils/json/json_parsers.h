@@ -1,7 +1,7 @@
 // ================================================================================================
 // File: core/utils/json/json_parsers.h
 // Purpose: "WithIssue" diagnostic parsers for enum and common SFML value types (no logs, noexcept).
-// Used by: Config loaders, json_accessors.cpp (parseValue specializations), other parsers.
+// Used by: Config loaders, other parsers.
 // Notes:
 //  - All public parsers are noexcept and must not trigger allocations/exceptions.
 //  - string_view fields in results are valid only while the source json object is alive.

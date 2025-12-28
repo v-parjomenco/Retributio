@@ -324,9 +324,6 @@
     <ClCompile Include="src\core\utils\json\json_parsers.cpp">
       <Filter>src\core\utils\json</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\utils\json\json_accessors.cpp">
-      <Filter>src\core\utils\json</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\utils\json\json_document.cpp">
       <Filter>src\core\utils\json</Filter>
     </ClCompile>
@@ -540,9 +537,6 @@
       <Filter>include\third_party\entt</Filter>
     </ClInclude>
     <ClInclude Include="include\core\utils\json\json_parsers.h">
-      <Filter>include\core\utils\json</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\utils\json\json_accessors.h">
       <Filter>include\core\utils\json</Filter>
     </ClInclude>
     <ClInclude Include="include\core\utils\json\json_document.h">
