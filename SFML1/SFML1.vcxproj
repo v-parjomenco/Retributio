@@ -403,6 +403,7 @@
     <ClInclude Include="include\core\utils\json\json_document.h" />
     <ClInclude Include="include\core\utils\json\json_parsers.h" />
     <ClInclude Include="include\core\utils\json\json_validator.h" />
+    <ClInclude Include="include\core\utils\math_constants.h" />
     <ClInclude Include="include\game\skyguard\config\blueprints\player_blueprint.h" />
     <ClInclude Include="include\game\skyguard\config\config_keys.h" />
     <ClInclude Include="include\game\skyguard\config\config_paths.h" />

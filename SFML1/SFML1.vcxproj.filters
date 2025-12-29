@@ -557,6 +557,9 @@
     <ClInclude Include="include\core\config\loader\detail\non_critical_config_report.h">
       <Filter>include\core\config\loader\detail</Filter>
     </ClInclude>
+    <ClInclude Include="include\core\utils\math_constants.h">
+      <Filter>include\core\utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="include\core\resources\holders\resource_holder.inl">
