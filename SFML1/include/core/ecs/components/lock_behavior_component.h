@@ -18,7 +18,6 @@ namespace core::ecs {
     * Данные:
     *  - kind             — какая политика применяется (World / Screen);
     *  - previousViewSize — размер view на предыдущем шаге (для ScreenLock);
-    *  - initialized      — был ли уже инициализирован previousViewSize.
     *
     * Логика политики реализована в LockSystem::onResize().
     * Здесь только данные, без какой-либо логики.
