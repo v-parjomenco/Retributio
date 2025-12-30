@@ -19,10 +19,13 @@
 namespace core::ecs {
     class ScalingSystem;
     class LockSystem;
-    class InputSystem;
     class DebugOverlaySystem;
     class RenderSystem;
 } // namespace core::ecs
+
+namespace game::skyguard::ecs {
+    class AircraftControlSystem;
+} // namespace game::skyguard::ecs
 
 namespace game::skyguard {
 
@@ -73,7 +76,7 @@ namespace game::skyguard {
         //  - Поэтому эти raw pointers стабильны по адресу, пока живёт World/SystemManager.
         core::ecs::ScalingSystem* mScalingSystem{nullptr};
         core::ecs::LockSystem* mLockSystem{nullptr};
-        core::ecs::InputSystem* mInputSystem{nullptr};
+        game::skyguard::ecs::AircraftControlSystem* mAircraftControlSystem{nullptr};
         core::ecs::DebugOverlaySystem* mDebugOverlay{nullptr};
         core::ecs::RenderSystem* mRenderSystem{nullptr};
     };

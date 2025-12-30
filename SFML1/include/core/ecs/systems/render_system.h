@@ -15,6 +15,7 @@
     #include <SFML/Graphics/RenderWindow.hpp>
     #include <SFML/Graphics/Texture.hpp>
     #include <SFML/Graphics/Vertex.hpp>
+    #include <SFML/System/Vector2.hpp>
 
     #include "core/ecs/entity.h"
     #include "core/ecs/system.h"
@@ -83,10 +84,22 @@
             struct RenderKey {
                 float zOrder{};
                 core::resources::ids::TextureID textureId{};
-                Entity entity{NullEntity};
+                std::uint32_t tieBreak{};
+                std::size_t packetIndex{};
             };
 
             std::vector<RenderKey> mKeys;
+            struct RenderPacket {
+                sf::Vector2f position{};
+                sf::Vector2f origin{};
+                sf::Vector2f scale{};
+                sf::IntRect rect{};
+                float cachedSin{};
+                float cachedCos{};
+                bool isRotated{false};
+            };
+
+            std::vector<RenderPacket> mPackets;
 
             // CPU-batch вершин: 1 спрайт = 2 треугольника = 6 вершин.
             // Важно: вектор живёт как scratch-buffer (reserve один раз, clear каждый кадр).

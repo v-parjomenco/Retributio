@@ -15,8 +15,7 @@ namespace core::ecs {
      *
      * Хранит МГНОВЕННУЮ скорость сущности в мировых координатах:
      *  - linear  — линейная скорость (пикс/с), модуль + направление;
-     *  - angular — угловая скорость (°/с), пока не используется,
-     *    будет применять вращение к Transform.rotation.
+     *  - angularDegreesPerSec — угловая скорость (°/с).
      *
      * Важно:
      *  - это "то, что происходит сейчас", в отличие от MovementStatsComponent,
@@ -25,7 +24,7 @@ namespace core::ecs {
      */
     struct VelocityComponent {
         sf::Vector2f linear{0.f, 0.f}; // мгновенная линейная скорость, пикс/с
-        float angular{0.f};            // скорость вращения (°/с) - пока не используется
+        float angularDegreesPerSec{0.f}; // скорость вращения (°/с)
     };
 
 } // namespace core::ecs

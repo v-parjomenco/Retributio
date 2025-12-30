@@ -48,9 +48,18 @@ namespace core::resources::ids {
     const char* toString(FontID id) noexcept;
     const char* toString(SoundID id) noexcept;
 
+    // --------------------------------------------------------------------------------------------
+    // Каноничное сравнение/сортировка ID: перевод в underlying type.
+    // --------------------------------------------------------------------------------------------
+    template <typename Enum>
+    [[nodiscard]] constexpr std::underlying_type_t<Enum> toUnderlying(Enum id) noexcept {
+        static_assert(std::is_enum_v<Enum>, "toUnderlying expects enum type");
+        return static_cast<std::underlying_type_t<Enum>>(id);
+    }
+
 } // namespace core::resources::ids
 
-    // --------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Hash-специализации для resource ids
 // ------------------------------------------------------------------------------------------------
 namespace std {

@@ -262,6 +262,12 @@
     <Filter Include="src\game\skyguard\config\loader\detail">
       <UniqueIdentifier>{bab239ce-eb98-4ba2-b071-675a6acf788b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\game\skyguard\config\properties">
+      <UniqueIdentifier>{b3c9a047-885a-45c0-a215-5dff959a1ae7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\config\properties">
+      <UniqueIdentifier>{b94ba5ac-6bfe-4b87-911c-f1a4a4c245a8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -559,6 +565,15 @@
     </ClInclude>
     <ClInclude Include="include\core\utils\math_constants.h">
       <Filter>include\core\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\properties\aircraft_control_properties.h">
+      <Filter>include\game\skyguard\config\properties</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\ecs\components\aircraft_control_component.h">
+      <Filter>include\game\skyguard\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\ecs\systems\aircraft_control_system.h">
+      <Filter>include\game\skyguard\ecs\systems</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

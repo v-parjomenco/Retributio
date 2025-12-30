@@ -30,6 +30,7 @@
 #include "core/ui/scaling_behavior.h"
 
 #include "game/skyguard/config/blueprints/player_blueprint.h"
+#include "game/skyguard/ecs/components/aircraft_control_component.h"
 
 namespace game::skyguard::ecs {
 
@@ -127,13 +128,20 @@ namespace game::skyguard::ecs {
 
                 core::ecs::TransformComponent tr{};
                 tr.position = anchoredPos;
+                tr.rotationDegrees = cfg.aircraftControl.initialRotationDegrees;
 
                 core::ecs::VelocityComponent vel{};
                 vel.linear = {0.f, 0.f};
+                vel.angularDegreesPerSec = 0.f;
 
                 world.addComponent<core::ecs::SpriteComponent>(entity, spriteComp);
                 world.addComponent<core::ecs::TransformComponent>(entity, tr);
                 world.addComponent<core::ecs::VelocityComponent>(entity, vel);
+                world.addComponent<game::skyguard::ecs::AircraftControlComponent>(
+                    entity,
+                    game::skyguard::ecs::AircraftControlComponent{
+                        cfg.aircraftControl.turnRateDegreesPerSec
+                    });
                 world.addComponent<core::ecs::ScalingBehaviorComponent>(entity, scalingComp);
                 world.addComponent<core::ecs::LockBehaviorComponent>(entity, lockComp);
 

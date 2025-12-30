@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstddef>
+#include <string>
 #include <string_view>
 
 #include <SFML/Window/Keyboard.hpp>
@@ -126,7 +127,7 @@ namespace game::skyguard::config {
         const auto fileContentOpt = FileLoader::loadTextFile(path);
         if (!fileContentOpt) {
             // Type A: обязательный контент. Без player.json нет смысла продолжать игру.
-            LOG_PANIC(core::log::cat::Gameplay,
+            LOG_PANIC(core::log::cat::Config,
                       "[ConfigLoader] Не удалось открыть обязательную конфигурацию игрока: {}",
                       path);
         }
@@ -170,14 +171,14 @@ namespace game::skyguard::config {
                 break;
 
             case Kind::MissingKey:
-                LOG_PANIC(core::log::cat::Gameplay,
+                LOG_PANIC(core::log::cat::Config,
                           "[ConfigLoader] Обязательное поле '{}' отсутствует. file={}",
                           keys::Player::TEXTURE,
                           path);
                 break;
 
             case Kind::WrongType:
-                LOG_PANIC(core::log::cat::Gameplay,
+                LOG_PANIC(core::log::cat::Config,
                           "[ConfigLoader] Некорректное поле '{}': {}. file={}",
                           keys::Player::TEXTURE,
                           json_utils::describe(res.issue),
@@ -185,7 +186,7 @@ namespace game::skyguard::config {
                 break;
 
             case Kind::UnknownValue:
-                LOG_PANIC(core::log::cat::Gameplay,
+                LOG_PANIC(core::log::cat::Config,
                           "[ConfigLoader] Неизвестный texture ID '{}' (key='{}', file={})",
                           res.issue.raw,
                           keys::Player::TEXTURE,
@@ -193,7 +194,7 @@ namespace game::skyguard::config {
                 break;
 
             default:
-                LOG_PANIC(core::log::cat::Gameplay,
+                LOG_PANIC(core::log::cat::Config,
                           "[ConfigLoader] Некорректное поле '{}': неизвестная ошибка. file={}",
                           keys::Player::TEXTURE,
                           path);
@@ -210,7 +211,7 @@ namespace game::skyguard::config {
 
             using Kind = json_utils::Vec2ParseIssue::Kind;
             if (scaleRes.issue.kind != Kind::None) {
-                LOG_PANIC(core::log::cat::Gameplay,
+                LOG_PANIC(core::log::cat::Config,
                           "[ConfigLoader] Некорректное поле '{}': {} (file={})",
                           keys::Player::SCALE,
                           json_utils::describe(scaleRes.issue),
@@ -228,7 +229,7 @@ namespace game::skyguard::config {
 
             using Kind = json_utils::FloatParseIssue::Kind;
             if (res.issue.kind != Kind::None) {
-                LOG_PANIC(core::log::cat::Gameplay,
+                LOG_PANIC(core::log::cat::Config,
                           "[ConfigLoader] Некорректное поле '{}': {} (file={})",
                           key,
                           json_utils::describe(res.issue),
@@ -241,6 +242,28 @@ namespace game::skyguard::config {
         readRequiredFloat(keys::Player::SPEED, cfg.movement.maxSpeed);
         readRequiredFloat(keys::Player::ACCELERATION, cfg.movement.acceleration);
         readRequiredFloat(keys::Player::FRICTION, cfg.movement.friction);
+        readRequiredFloat(keys::Player::TURN_RATE, cfg.aircraftControl.turnRateDegreesPerSec);
+
+        // Начальный поворот (опциональное поле, если битое -> WARN + default)
+        {
+            const auto rotRes = json_utils::parseFloatWithIssue(
+                data,
+                keys::Player::INITIAL_ROTATION_DEGREES,
+                cfg.aircraftControl.initialRotationDegrees);
+
+            using Kind = json_utils::FloatParseIssue::Kind;
+            if (rotRes.issue.kind == Kind::None) {
+                cfg.aircraftControl.initialRotationDegrees = rotRes.value;
+            } else if (rotRes.issue.kind != Kind::MissingKey) {
+                LOG_WARN(core::log::cat::Config,
+                         "[ConfigLoader] Некорректное поле '{}': {}. "
+                         "Применено значение по умолчанию ({}). file={}",
+                         keys::Player::INITIAL_ROTATION_DEGREES,
+                         json_utils::describe(rotRes.issue),
+                         cfg.aircraftControl.initialRotationDegrees,
+                         path);
+            }
+        }
 
         // ----------------------------------------------------------------------------------------
         // Anchor / resize / lock (мягко: missing -> default; 
@@ -285,83 +308,115 @@ namespace game::skyguard::config {
                                  path);
 
         // ----------------------------------------------------------------------------------------
-        // Управляющие клавиши (мягко по отсутствию ключей; строго по типу/значению)
+        // Управляющие клавиши
         //
         // Правило:
         //  - если ключ отсутствует -> остаётся дефолт (из cfg.controls);
-        //  - если тип неверный / имя клавиши неизвестно -> фатально (это уже "битый" ввод).
+        //  - если тип неверный / имя клавиши неизвестно ->  1x WARN + DEBUG details.
         // ----------------------------------------------------------------------------------------
-        const auto controlsIt = data.find(keys::Player::CONTROLS);
-        if (controlsIt != data.end()) {
+        if (const auto controlsIt = data.find(keys::Player::CONTROLS); controlsIt != data.end()) {
             if (!controlsIt->is_object()) {
-                LOG_PANIC(core::log::cat::Gameplay,
-                          "[ConfigLoader] Некорректное поле '{}': ожидался объект (file={})",
-                          keys::Player::CONTROLS,
-                          path);
-            }
+                LOG_WARN(core::log::cat::Config,
+                         "[ConfigLoader] Некорректный блок '{}': ожидался объект. "
+                         "Controls не применены, используются значения по умолчанию. file={}",
+                         keys::Player::CONTROLS, path);
+            } else {
+                const auto& c = *controlsIt;
 
-            const auto& c = *controlsIt;
+                const auto defaults = cfg.controls;
+                auto parsed = defaults;
 
-            auto parsed = cfg.controls;
+                bool hasHardError = false;
 
-            auto applyKey = [&](std::string_view controlKey, sf::Keyboard::Key& dst) {
-                const auto res = json_utils::parseKeyWithIssue(c, controlKey, dst);
-                dst = res.value;
+                auto applyKeyOptional = [&](std::string_view controlKey,
+                                            sf::Keyboard::Key& dst) {
+                    const auto res = json_utils::parseKeyWithIssue(c, controlKey, dst);
 
-                using Kind = json_utils::KeyParseIssue::Kind;
-                if (res.issue.kind == Kind::WrongType) {
-                    LOG_PANIC(core::log::cat::Gameplay,
-                              "[ConfigLoader] Некорректное поле controls '{}': "
-                              "ожидалась строка (file={})",
-                              controlKey,
+                    using Kind = json_utils::KeyParseIssue::Kind;
+                    switch (res.issue.kind) {
+                    case Kind::None:
+                        dst = res.value;
+                        return;
+
+                    case Kind::MissingKey:
+                        return;
+
+                    case Kind::WrongType:
+                        hasHardError = true;
+                        LOG_DEBUG(core::log::cat::Config,
+                                  "[ConfigLoader] controls.'{}': ожидалась строка. file={}",
+                                  controlKey,
+                                  path);
+                        return;
+
+                    case Kind::UnknownName:
+                        hasHardError = true;
+                        LOG_DEBUG(core::log::cat::Config,
+                                  "[ConfigLoader] controls.'{}': неизвестная клавиша '{}'. file={}",
+                                  controlKey,
+                                  res.rawName,
+                                  path);
+                        return;
+
+                    default:
+                        hasHardError = true;
+                        LOG_DEBUG(core::log::cat::Config,
+                                  "[ConfigLoader] controls.'{}': неизвестная ошибка. file={}",
+                                  controlKey,
+                                  path);
+                        return;
+                    }
+                };
+
+                applyKeyOptional(keys::Player::CONTROL_UP, parsed.up);
+                applyKeyOptional(keys::Player::CONTROL_DOWN, parsed.down);
+                applyKeyOptional(keys::Player::CONTROL_LEFT, parsed.left);
+                applyKeyOptional(keys::Player::CONTROL_RIGHT, parsed.right);
+
+                const auto layoutIssue =
+                    validateControlsLayout(parsed.up, parsed.down, parsed.left, parsed.right);
+
+                if (hasHardError || layoutIssue.kind != ControlsLayoutIssue::Kind::None) {
+                    const char* reason = "неизвестная причина";
+
+                    switch (layoutIssue.kind) {
+                    case ControlsLayoutIssue::Kind::None:
+                        reason = hasHardError ? "некорректные значения/типы" : "неизвестная причина";
+                        break;
+                    case ControlsLayoutIssue::Kind::Unknown:
+                        reason = "обнаружен Unknown";
+                        break;
+                    case ControlsLayoutIssue::Kind::Duplicate:
+                        reason = "обнаружены дубли";
+                        break;
+                    default:
+                        break;
+                    }
+
+                    LOG_WARN(core::log::cat::Config,
+                             "[ConfigLoader] Некорректный блок '{}': {}. "
+                             "Controls не применены, используются значения по умолчанию. file={}",
+                             keys::Player::CONTROLS,
+                             reason,
+                             path);
+
+                    LOG_DEBUG(core::log::cat::Config,
+                              "[ConfigLoader] controls defaults/applied: "
+                              "(up={}, down={}, left={}, right={}) -> "
+                              "(up={}, down={}, left={}, right={}). file={}",
+                              static_cast<int>(defaults.up),
+                              static_cast<int>(defaults.down),
+                              static_cast<int>(defaults.left),
+                              static_cast<int>(defaults.right),
+                              static_cast<int>(parsed.up),
+                              static_cast<int>(parsed.down),
+                              static_cast<int>(parsed.left),
+                              static_cast<int>(parsed.right),
                               path);
+                } else {
+                    cfg.controls = parsed;
                 }
-                if (res.issue.kind == Kind::UnknownName) {
-                    LOG_PANIC(core::log::cat::Gameplay,
-                              "[ConfigLoader] Некорректное поле controls '{}': "
-                              "неизвестная клавиша '{}' (file={})",
-                              controlKey,
-                              res.rawName,
-                              path);
-                }
-            };
-
-            applyKey(keys::Player::CONTROL_UP, parsed.up);
-            applyKey(keys::Player::CONTROL_DOWN, parsed.down);
-            applyKey(keys::Player::CONTROL_LEFT, parsed.left);
-            applyKey(keys::Player::CONTROL_RIGHT, parsed.right);
-
-            const auto issue =
-                validateControlsLayout(parsed.up, parsed.down, parsed.left, parsed.right);
-
-            if (issue.kind != ControlsLayoutIssue::Kind::None) {
-                const char* reason = "неизвестная причина";
-
-                switch (issue.kind) {
-                case ControlsLayoutIssue::Kind::Unknown:
-                    reason = "обнаружен Unknown";
-                    break;
-                case ControlsLayoutIssue::Kind::Duplicate:
-                    reason = "обнаружены дубли";
-                    break;
-                case ControlsLayoutIssue::Kind::None:
-                default:
-                    break;
-                }
-
-                LOG_PANIC(core::log::cat::Gameplay,
-                          "[ConfigLoader] Невалидная раскладка controls ({}; key={}). "
-                          "(up={}, down={}, left={}, right={}). file={}",
-                          reason,
-                          static_cast<int>(issue.key),
-                          static_cast<int>(parsed.up),
-                          static_cast<int>(parsed.down),
-                          static_cast<int>(parsed.left),
-                          static_cast<int>(parsed.right),
-                          path);
             }
-
-            cfg.controls = parsed;
         }
 
         return cfg;

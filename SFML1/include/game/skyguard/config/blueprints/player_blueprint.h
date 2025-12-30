@@ -10,6 +10,7 @@
 #include "core/config/properties/controls_properties.h"
 #include "core/config/properties/movement_properties.h"
 #include "core/config/properties/sprite_properties.h"
+#include "game/skyguard/config/properties/aircraft_control_properties.h"
 
 namespace game::skyguard::config::blueprints {
 
@@ -32,6 +33,7 @@ namespace game::skyguard::config::blueprints {
         core::config::properties::MovementProperties movement;
         core::config::properties::AnchorProperties anchor;
         core::config::properties::ControlsProperties controls;
+        game::skyguard::config::properties::AircraftControlProperties aircraftControl;
     };
 
 } // namespace game::skyguard::config::blueprints

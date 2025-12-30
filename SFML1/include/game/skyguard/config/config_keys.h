@@ -39,6 +39,9 @@ namespace game::skyguard::config::keys {
         inline constexpr const char* CONTROL_DOWN = "down";
         inline constexpr const char* CONTROL_LEFT = "left";
         inline constexpr const char* CONTROL_RIGHT = "right";
+
+        inline constexpr const char* TURN_RATE = "turn_rate";
+        inline constexpr const char* INITIAL_ROTATION_DEGREES = "initial_rotation_degrees";
     } // namespace Player
 
 } // namespace game::skyguard::config::keys

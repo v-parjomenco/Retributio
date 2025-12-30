@@ -12,16 +12,19 @@
 
 namespace core::ecs {
 
-    /** 
-    * @brief Базовая система движения: position += velocity * dt.
-    * 
-    * Контракт:
-    * - работает только по сущностям, у которых есть TransformComponent + VelocityComponent;
-    * - выполняет интегрирование Эйлером: position += velocity * dt.
-    * 
-    * Примечание:
-    * - dt должен быть строго положительным; источник dt — TimeService/игровой цикл.
-    */
+    /**
+     * @brief Базовая система движения: position += velocity * dt.
+     *
+     * Контракт:
+     *  - работает только по сущностям, у которых есть TransformComponent + VelocityComponent;
+     *  - выполняет интегрирование Эйлером:
+     *      position += linear * dt
+     *      rotationDegrees += angularDegreesPerSec * dt
+     *
+     * Примечание:
+     *  - dt валидируется на write-boundary (TimeService).
+     *  - при dt == 0.f система делает ранний выход (no-op).
+     */
     class MovementSystem final : public ISystem {
       public:
         MovementSystem() = default;

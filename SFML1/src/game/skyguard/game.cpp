@@ -12,7 +12,6 @@
 #include "core/config/loader/engine_settings_loader.h"
 #include "core/debug/debug_config.h"
 #include "core/ecs/systems/debug_overlay_system.h"
-#include "core/ecs/systems/input_system.h"
 #include "core/ecs/systems/lock_system.h"
 #include "core/ecs/systems/movement_system.h"
 #include "core/ecs/systems/render_system.h"
@@ -25,6 +24,7 @@
 #include "game/skyguard/config/loader/window_config_loader.h"
 #include "game/skyguard/config/window_config.h"
 #include "game/skyguard/ecs/systems/player_init_system.h"
+#include "game/skyguard/ecs/systems/aircraft_control_system.h"
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
     #include "game/skyguard/dev/stress_scene.h"
@@ -154,9 +154,9 @@ namespace game::skyguard {
         mWorld.addSystem<game::skyguard::ecs::PlayerInitSystem>(
             mResources, baseViewSize, initialViewSize, std::move(players));
 
-        // ВАЖНО: Input должен обновляться ДО Movement, т.к. Input пишет VelocityComponent,
+        // ВАЖНО: AircraftControl должен обновляться ДО Movement, т.к. пишет VelocityComponent,
         // а Movement читает VelocityComponent в этом же тике.
-        mInputSystem    = &mWorld.addSystem<core::ecs::InputSystem>();
+        mAircraftControlSystem = &mWorld.addSystem<game::skyguard::ecs::AircraftControlSystem>();
         mWorld.addSystem<core::ecs::MovementSystem>();
 
         // Эти системы требуют прямого доступа (onResize, onKeyEvent),
@@ -244,7 +244,7 @@ namespace game::skyguard {
             }
             // Нажатие клавиш.
             else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
-                mInputSystem->onKeyEvent(keyPressed->code, true);
+                mAircraftControlSystem->onKeyEvent(keyPressed->code, true);
 
                 // Debug overlay toggle: хоткей работает во всех сборках (Debug/Release/Profile).
                 // Политика: хоткей ВСЕГДА активен, независимо от дефолтного состояния overlay
@@ -255,12 +255,12 @@ namespace game::skyguard {
             }
             // Отпускание клавиш.
             else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) {
-                mInputSystem->onKeyEvent(keyReleased->code, false);
+                mAircraftControlSystem->onKeyEvent(keyReleased->code, false);
             }
 
             // Потеря фокуса: сбрасываем ввод, чтобы не залипали клавиши при Alt-Tab/клике мимо окна.
             else if (event->is<sf::Event::FocusLost>()) {
-                mInputSystem->resetState();
+                mAircraftControlSystem->resetState();
             }
 
             // Изменение размера окна.

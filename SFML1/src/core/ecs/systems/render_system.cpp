@@ -8,10 +8,13 @@
 #include <cmath>
 #include <cstddef>
 
+#include <SFML/System/Angle.hpp>
+
 #include "core/ecs/components/sprite_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/world.h"
 #include "core/log/log_macros.h"
+#include "core/utils/math_constants.h"
 
 namespace {
 
@@ -113,6 +116,59 @@ namespace {
         out[5].position = p3; out[5].color = color; out[5].texCoords = t3;
     }
 
+    void writeSpriteTrianglesRotated(sf::Vertex* out,
+                                     const sf::Vector2f& position,
+                                     const sf::Vector2f& origin,
+                                     const sf::Vector2f& scale,
+                                     const sf::IntRect& rect,
+                                     const float cachedSin,
+                                     const float cachedCos) noexcept {
+        const float w = static_cast<float>(rect.size.x);
+        const float h = static_cast<float>(rect.size.y);
+
+        const float ox = origin.x;
+        const float oy = origin.y;
+
+        const float sx = scale.x;
+        const float sy = scale.y;
+
+        const sf::Vector2f l0{(-ox)    * sx, (-oy)    * sy};
+        const sf::Vector2f l1{(w - ox) * sx, (-oy)    * sy};
+        const sf::Vector2f l2{(w - ox) * sx, (h - oy) * sy};
+        const sf::Vector2f l3{(-ox)    * sx, (h - oy) * sy};
+
+        const auto rotate = [&](const sf::Vector2f& v) noexcept -> sf::Vector2f {
+            return {
+                (v.x * cachedCos) - (v.y * cachedSin),
+                (v.x * cachedSin) + (v.y * cachedCos)
+            };
+        };
+
+        const sf::Vector2f p0 = rotate(l0) + position;
+        const sf::Vector2f p1 = rotate(l1) + position;
+        const sf::Vector2f p2 = rotate(l2) + position;
+        const sf::Vector2f p3 = rotate(l3) + position;
+
+        const float u0 = static_cast<float>(rect.position.x);
+        const float v0 = static_cast<float>(rect.position.y);
+        const float u1 = u0 + w;
+        const float v1 = v0 + h;
+
+        const sf::Vector2f t0{u0, v0};
+        const sf::Vector2f t1{u1, v0};
+        const sf::Vector2f t2{u1, v1};
+        const sf::Vector2f t3{u0, v1};
+
+        const sf::Color color = sf::Color::White;
+
+        out[0].position = p0; out[0].color = color; out[0].texCoords = t0;
+        out[1].position = p1; out[1].color = color; out[1].texCoords = t1;
+        out[2].position = p2; out[2].color = color; out[2].texCoords = t2;
+        out[3].position = p0; out[3].color = color; out[3].texCoords = t0;
+        out[4].position = p2; out[4].color = color; out[4].texCoords = t2;
+        out[5].position = p3; out[5].color = color; out[5].texCoords = t3;
+    }
+
     [[nodiscard]] Aabb2 computeSpriteAabbNoRotation(const sf::Vector2f& position,
                                                     const sf::Vector2f& origin,
                                                     const sf::Vector2f& scale,
@@ -151,6 +207,50 @@ namespace {
         return out;
     }
 
+    [[nodiscard]] Aabb2 computeSpriteAabbRotated(const sf::Vector2f& position,
+                                                 const sf::Vector2f& origin,
+                                                 const sf::Vector2f& scale,
+                                                 const sf::IntRect& rect,
+                                                 const float cachedSin,
+                                                 const float cachedCos) noexcept {
+        const float w = static_cast<float>(rect.size.x);
+        const float h = static_cast<float>(rect.size.y);
+
+        const float ox = origin.x;
+        const float oy = origin.y;
+        const float sx = scale.x;
+        const float sy = scale.y;
+
+        const sf::Vector2f l0{(-ox)    * sx, (-oy)    * sy};
+        const sf::Vector2f l1{(w - ox) * sx, (-oy)    * sy};
+        const sf::Vector2f l2{(w - ox) * sx, (h - oy) * sy};
+        const sf::Vector2f l3{(-ox)    * sx, (h - oy) * sy};
+
+        const auto rotate = [&](const sf::Vector2f& v) noexcept -> sf::Vector2f {
+            return {
+                (v.x * cachedCos) - (v.y * cachedSin),
+                (v.x * cachedSin) + (v.y * cachedCos)
+            };
+        };
+
+        const sf::Vector2f p0 = rotate(l0) + position;
+        const sf::Vector2f p1 = rotate(l1) + position;
+        const sf::Vector2f p2 = rotate(l2) + position;
+        const sf::Vector2f p3 = rotate(l3) + position;
+
+        const float minX = std::min(std::min(p0.x, p1.x), std::min(p2.x, p3.x));
+        const float maxX = std::max(std::max(p0.x, p1.x), std::max(p2.x, p3.x));
+        const float minY = std::min(std::min(p0.y, p1.y), std::min(p2.y, p3.y));
+        const float maxY = std::max(std::max(p0.y, p1.y), std::max(p2.y, p3.y));
+
+        Aabb2 out{};
+        out.minX = minX;
+        out.minY = minY;
+        out.maxX = maxX;
+        out.maxY = maxY;
+        return out;
+    }
+
 } // namespace
 
 namespace core::ecs {
@@ -164,6 +264,10 @@ namespace core::ecs {
     }
 
     void RenderSystem::render(World& world, sf::RenderWindow& window) {
+#if !defined(NDEBUG)
+        assert(window.getView().getRotation() == sf::Angle::Zero &&
+               "RenderSystem: view rotation is not supported (view.getRotation() must be 0).");
+#endif
 
         // view-culling работаем в world-space координатах текущего view.
         const Aabb2 viewAabb = makeViewAabb(window.getView());
@@ -193,17 +297,20 @@ namespace core::ecs {
         // ----------------------------------------------------------------------------------------
 
         mKeys.clear();
+        mPackets.clear();
         mTextureCache.clear();
 
         auto ecsView = world.view<TransformComponent, SpriteComponent>();
         mKeys.reserve(ecsView.size_hint());
+        mPackets.reserve(ecsView.size_hint());
 
         // Per-frame cache: TextureID -> (sf::Texture*, fullRect).
         // Должен покрывать И explicitRect кейсы тоже.
         const auto findTextureEntry = [&](core::resources::ids::TextureID id)
             -> TextureCacheEntry* {
             for (auto& e : mTextureCache) {
-                if (e.id == id) {
+                if (core::resources::ids::toUnderlying(e.id) ==
+                    core::resources::ids::toUnderlying(id)) {
                     return &e;
                 }
             }
@@ -239,6 +346,7 @@ namespace core::ecs {
 #if !defined(NDEBUG)
             const bool dataFinite =
                 isFiniteVec2(tr.position) &&
+                std::isfinite(tr.rotationDegrees) &&
                 isFiniteVec2(spr.origin) &&
                 isFiniteVec2(spr.scale) &&
                 std::isfinite(spr.zOrder);
@@ -266,8 +374,25 @@ namespace core::ecs {
                 rect = texEntry->fullRect;
             }
 
-            const Aabb2 spriteAabb =
-                computeSpriteAabbNoRotation(tr.position, spr.origin, spr.scale, rect);
+            const float rotationDegrees = tr.rotationDegrees;
+            // Контракт: 0° должен быть РОВНО 0 (fast-path). Поэтому сравнение точное, без epsilon.
+            const bool isRotated = (rotationDegrees != 0.f);
+
+            float cachedSin = 0.f;
+            float cachedCos = 1.f;
+            Aabb2 spriteAabb{};
+
+            if (isRotated) {
+                const float radians = rotationDegrees * core::utils::kDegToRad;
+                cachedSin = std::sin(radians);
+                cachedCos = std::cos(radians);
+
+                spriteAabb = computeSpriteAabbRotated(
+                    tr.position, spr.origin, spr.scale, rect, cachedSin, cachedCos);
+            } else {
+                spriteAabb = computeSpriteAabbNoRotation(
+                    tr.position, spr.origin, spr.scale, rect);
+            }
 
             if (!intersectsInclusive(spriteAabb, viewAabb)) {
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
@@ -282,10 +407,22 @@ namespace core::ecs {
                 (void)getTextureEntryCached(spr.textureId);
             }
 
+            const std::size_t packetIndex = mPackets.size();
+            mPackets.push_back(RenderPacket{
+                .position = tr.position,
+                .origin = spr.origin,
+                .scale = spr.scale,
+                .rect = rect,
+                .cachedSin = cachedSin,
+                .cachedCos = cachedCos,
+                .isRotated = isRotated
+            });
+
             mKeys.push_back(RenderKey{
                 .zOrder = spr.zOrder,
                 .textureId = spr.textureId,
-                .entity = entity
+                .tieBreak = core::ecs::toUint(entity),
+                .packetIndex = packetIndex
             });
         }
 
@@ -331,11 +468,16 @@ namespace core::ecs {
                           return false;
                       }
 
-                      if (a.textureId != b.textureId) {
-                          return a.textureId < b.textureId;
+                      const auto aTex = core::resources::ids::toUnderlying(a.textureId);
+                      const auto bTex = core::resources::ids::toUnderlying(b.textureId);
+                      if (aTex < bTex) {
+                          return true;
+                      }
+                      if (bTex < aTex) {
+                          return false;
                       }
 
-                      return core::ecs::toUint(a.entity) < core::ecs::toUint(b.entity);
+                      return a.tieBreak < b.tieBreak;
                   });
 
 #if defined(SFML1_PROFILE)
@@ -378,8 +520,6 @@ namespace core::ecs {
         const sf::Texture* currentTexture = firstEntry.texture;
         states.texture = currentTexture;
 
-        sf::IntRect fullRect = firstEntry.fullRect;
-
         std::size_t batchDrawCalls = 0;
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
@@ -411,7 +551,8 @@ namespace core::ecs {
 
 #if defined(SFML1_PROFILE)
             const auto drawEnd = std::chrono::steady_clock::now();
-            drawUs += static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+            drawUs += static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::microseconds>(
                 drawEnd - drawStart).count());
 #endif
 
@@ -420,13 +561,12 @@ namespace core::ecs {
         };
 
         for (const auto& key : mKeys) {
-            const Entity entity = key.entity;
-
-            const auto& transform = ecsView.get<TransformComponent>(entity);
-            const auto& spr = ecsView.get<SpriteComponent>(entity);
+            const RenderPacket& packet = mPackets[key.packetIndex];
 
             const bool zChanged = floatNotEqual(key.zOrder, currentZ);
-            const bool textureChanged = (key.textureId != currentTextureId);
+            const bool textureChanged =
+                (core::resources::ids::toUnderlying(key.textureId) !=
+                 core::resources::ids::toUnderlying(currentTextureId));
 
             if (zChanged || textureChanged) {
                 flush();
@@ -439,8 +579,6 @@ namespace core::ecs {
                     currentTexture = entry.texture;
                     states.texture = currentTexture;
 
-                    fullRect = entry.fullRect;
-
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
                     ++textureSwitches;
                     trackUniqueTexturePtr(currentTexture);
@@ -448,13 +586,23 @@ namespace core::ecs {
                 }
             }
 
-            const sf::IntRect rect = hasExplicitRect(spr.textureRect) ? spr.textureRect : fullRect;
+            const sf::IntRect rect = packet.rect;
 
-            writeSpriteTriangles(mVertices.data() + vertexWrite,
-                                 transform.position,
-                                 spr.origin,
-                                 spr.scale,
-                                 rect);
+            if (packet.isRotated) {
+                writeSpriteTrianglesRotated(mVertices.data() + vertexWrite,
+                                            packet.position,
+                                            packet.origin,
+                                            packet.scale,
+                                            rect,
+                                            packet.cachedSin,
+                                            packet.cachedCos);
+            } else {
+                writeSpriteTriangles(mVertices.data() + vertexWrite,
+                                     packet.position,
+                                     packet.origin,
+                                     packet.scale,
+                                     rect);
+            }
             vertexWrite += 6;
         }
 

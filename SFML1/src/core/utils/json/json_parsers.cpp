@@ -151,19 +151,51 @@ namespace {
         return r;
     }
 
-    sf::Keyboard::Key parseKeyString(std::string_view name) noexcept {
+    // Парсинг без таблицы разбора для символов A..Z / a..z and 0..9;
+
+    [[nodiscard]] sf::Keyboard::Key parseKeyString(std::string_view name) noexcept {
         using K = sf::Keyboard::Key;
 
+        if (name.size() == 1) {
+            char c = name[0];
+
+            if (c >= 'a' && c <= 'z') {
+                c = static_cast<char>(c - ('a' - 'A'));
+            }
+
+            if (c >= 'A' && c <= 'Z') {
+                const int base = static_cast<int>(K::A);
+                return static_cast<K>(base + (c - 'A'));
+            }
+
+            if (c >= '0' && c <= '9') {
+                const int base = static_cast<int>(K::Num0);
+                return static_cast<K>(base + (c - '0'));
+            }
+
+            return K::Unknown;
+        }
+
+        // "Num0".."Num9" (на случай, если кому-то так удобнее, чем "0".."9")
+        if (name.size() == 4 && name[0] == 'N' && name[1] == 'u' && name[2] == 'm') {
+            const char d = name[3];
+            if (d >= '0' && d <= '9') {
+                const int base = static_cast<int>(K::Num0);
+                return static_cast<K>(base + (d - '0'));
+            }
+        }
+
+        // Ключевые слова (multi-token). Маленькая таблица, линейный поиск — ок на границе загрузки.
         static constexpr std::array<std::pair<std::string_view, K>, 15> kMap{{
-            {"W", K::W},
-            {"A", K::A},
-            {"S", K::S},
-            {"D", K::D},
             {"Up", K::Up},
             {"Down", K::Down},
             {"Left", K::Left},
             {"Right", K::Right},
             {"Space", K::Space},
+            {"Escape", K::Escape},
+            {"Enter", K::Enter},
+            {"Tab", K::Tab},
+            {"Backspace", K::Backspace},
             {"LShift", K::LShift},
             {"RShift", K::RShift},
             {"LControl", K::LControl},

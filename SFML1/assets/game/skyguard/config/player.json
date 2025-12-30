@@ -5,9 +5,11 @@
     "y": 0.12
   },
 
-  "speed": 500.0,
+  "speed": 400.0,
   "acceleration": 800.0,
-  "friction": 6.0,
+  "friction": 100.0,
+  "turn_rate": 80.0,
+  "initial_rotation_degrees": 270.0,
 
   "resize_scaling": "Uniform",
   "lock_behavior": "ScreenLock",
