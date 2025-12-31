@@ -33,6 +33,16 @@ namespace core::config {
          *  - это именно user/dev-настройка, а не часть архитектуры движка.
          */
         std::uint32_t frameLimit = 0;
+
+        /**
+         * @brief Размер ячейки spatial grid (world units).
+         *
+         * Контракт:
+         *  - Дефолт: 256.f;
+         *  - В Debug SpatialIndex проверяет диапазон [64..2048];
+         *  - Неверное значение в JSON игнорируется, остаётся дефолт.
+         */
+        float spatialCellSize = 256.f;
     };
 
 } // namespace core::config

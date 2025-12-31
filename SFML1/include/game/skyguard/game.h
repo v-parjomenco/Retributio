@@ -12,6 +12,7 @@
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/System/Time.hpp>
 
+#include "core/config/engine_settings.h"
 #include "core/ecs/world.h"
 #include "core/resources/resource_manager.h"
 #include "core/time/time_service.h"
@@ -55,6 +56,7 @@ namespace game::skyguard {
       private:
         sf::RenderWindow mWindow;
         core::resources::ResourceManager mResources;
+        core::config::EngineSettings mEngineSettings;
 
         core::time::TimeService mTime; // сервис времени (вне ECS)
         core::ecs::World mWorld;       // ECS-мир

@@ -41,12 +41,14 @@ namespace {
     };
 
     [[nodiscard]] ControlsLayoutIssue validateControlsLayout(
-        sf::Keyboard::Key up,
-        sf::Keyboard::Key down,
-        sf::Keyboard::Key left,
-        sf::Keyboard::Key right) noexcept
+        sf::Keyboard::Key thrustForward,
+        sf::Keyboard::Key thrustBackward,
+        sf::Keyboard::Key turnLeft,
+        sf::Keyboard::Key turnRight) noexcept
     {
-        const std::array<sf::Keyboard::Key, 4> keysArr{up, down, left, right};
+        const std::array<sf::Keyboard::Key, 4> keysArr{
+            thrustForward, thrustBackward, turnLeft, turnRight
+        };
 
         for (const auto k : keysArr) {
             if (k == sf::Keyboard::Key::Unknown) {
@@ -312,7 +314,7 @@ namespace game::skyguard::config {
         //
         // Правило:
         //  - если ключ отсутствует -> остаётся дефолт (из cfg.controls);
-        //  - если тип неверный / имя клавиши неизвестно ->  1x WARN + DEBUG details.
+        //  - если тип неверный / имя клавиши неизвестно / дубли -> 1x WARN
         // ----------------------------------------------------------------------------------------
         if (const auto controlsIt = data.find(keys::Player::CONTROLS); controlsIt != data.end()) {
             if (!controlsIt->is_object()) {
@@ -368,13 +370,15 @@ namespace game::skyguard::config {
                     }
                 };
 
-                applyKeyOptional(keys::Player::CONTROL_UP, parsed.up);
-                applyKeyOptional(keys::Player::CONTROL_DOWN, parsed.down);
-                applyKeyOptional(keys::Player::CONTROL_LEFT, parsed.left);
-                applyKeyOptional(keys::Player::CONTROL_RIGHT, parsed.right);
+                applyKeyOptional(keys::Player::CONTROL_THRUST_FORWARD, parsed.thrustForward);
+                applyKeyOptional(keys::Player::CONTROL_THRUST_BACKWARD, parsed.thrustBackward);
+                applyKeyOptional(keys::Player::CONTROL_TURN_LEFT, parsed.turnLeft);
+                applyKeyOptional(keys::Player::CONTROL_TURN_RIGHT, parsed.turnRight);
 
-                const auto layoutIssue =
-                    validateControlsLayout(parsed.up, parsed.down, parsed.left, parsed.right);
+                const auto layoutIssue = validateControlsLayout(parsed.thrustForward,
+                                                                parsed.thrustBackward,
+                                                                parsed.turnLeft,
+                                                                parsed.turnRight);
 
                 if (hasHardError || layoutIssue.kind != ControlsLayoutIssue::Kind::None) {
                     const char* reason = "неизвестная причина";
@@ -402,16 +406,17 @@ namespace game::skyguard::config {
 
                     LOG_DEBUG(core::log::cat::Config,
                               "[ConfigLoader] controls defaults/applied: "
-                              "(up={}, down={}, left={}, right={}) -> "
-                              "(up={}, down={}, left={}, right={}). file={}",
-                              static_cast<int>(defaults.up),
-                              static_cast<int>(defaults.down),
-                              static_cast<int>(defaults.left),
-                              static_cast<int>(defaults.right),
-                              static_cast<int>(parsed.up),
-                              static_cast<int>(parsed.down),
-                              static_cast<int>(parsed.left),
-                              static_cast<int>(parsed.right),
+                              "(thrust_forward={}, thrust_backward={}, turn_left={}, turn_right={}) -> "
+                              "(thrust_forward={}, thrust_backward={}, turn_left={}, turn_right={}). "
+                              "file={}",
+                              static_cast<int>(defaults.thrustForward),
+                              static_cast<int>(defaults.thrustBackward),
+                              static_cast<int>(defaults.turnLeft),
+                              static_cast<int>(defaults.turnRight),
+                              static_cast<int>(parsed.thrustForward),
+                              static_cast<int>(parsed.thrustBackward),
+                              static_cast<int>(parsed.turnLeft),
+                              static_cast<int>(parsed.turnRight),
                               path);
                 } else {
                     cfg.controls = parsed;

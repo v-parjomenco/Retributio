@@ -24,9 +24,13 @@ namespace {
     using Report = core::config::loader::detail::NonCriticalConfigReport;
 
     static constexpr std::string_view kLoaderTag = "EngineSettingsLoader";
-    static constexpr std::string_view kKnownKeysHint = "vsync/frameLimit";
+    static constexpr std::string_view kKnownKeysHint = "vsync/frameLimit/spatialCellSize";
 
-    static constexpr std::array kKnownKeys{eng_keys::VSYNC, eng_keys::FRAME_LIMIT};
+    static constexpr std::array kKnownKeys{
+        eng_keys::VSYNC,
+        eng_keys::FRAME_LIMIT,
+        eng_keys::SPATIAL_CELL_SIZE
+    };
 
     static_assert(kKnownKeys.size() <= Report::kMaxFields,
                   "NonCriticalConfigReport buffer too small for EngineSettingsLoader");
@@ -51,8 +55,9 @@ namespace core::config {
         if (!fileContentOpt) {
             LOG_WARN(core::log::cat::Config,
                      "[{}] Файл настроек движка не найден или не читается: '{}'. "
-                     "Используются значения по умолчанию (vsyncEnabled={}, frameLimit={}).",
-                     kLoaderTag, path, cfg.vsyncEnabled, cfg.frameLimit);
+                     "Используются значения по умолчанию (vsyncEnabled={}, frameLimit={}, "
+                     "spatialCellSize={}).",
+                     kLoaderTag, path, cfg.vsyncEnabled, cfg.frameLimit, cfg.spatialCellSize);
             return cfg;
         }
 
@@ -62,9 +67,9 @@ namespace core::config {
         if (!dataOpt) {
             LOG_WARN(core::log::cat::Config,
                      "[{}] Не удалось разобрать JSON в '{}'. "
-                     "Используются значения по умолчанию (vsyncEnabled={}, frameLimit={}). "
-                     "Подробности — DEBUG.",
-                     kLoaderTag, path, cfg.vsyncEnabled, cfg.frameLimit);
+                     "Используются значения по умолчанию (vsyncEnabled={}, frameLimit={}, "
+                     "spatialCellSize={}). Подробности — DEBUG.",
+                     kLoaderTag, path, cfg.vsyncEnabled, cfg.frameLimit, cfg.spatialCellSize);
             return cfg;
         }
 
@@ -73,8 +78,9 @@ namespace core::config {
         if (!data.is_object()) {
             LOG_WARN(core::log::cat::Config,
                      "[{}] Корневой JSON в '{}' должен быть object. "
-                     "Используются значения по умолчанию (vsyncEnabled={}, frameLimit={}).",
-                     kLoaderTag, path, cfg.vsyncEnabled, cfg.frameLimit);
+                     "Используются значения по умолчанию (vsyncEnabled={}, frameLimit={}, "
+                     "spatialCellSize={}).",
+                     kLoaderTag, path, cfg.vsyncEnabled, cfg.frameLimit, cfg.spatialCellSize);
             return cfg;
         }
 
@@ -104,6 +110,23 @@ namespace core::config {
 
             cfg.frameLimit = res.value;
             core::config::loader::detail::noteUIntIssue(report, eng_keys::FRAME_LIMIT, res);
+        }
+
+        // spatialCellSize (float)
+        {
+            const auto res = json_utils::parseFloatWithIssue(data, eng_keys::SPATIAL_CELL_SIZE,
+                                                             cfg.spatialCellSize);
+
+            using Kind = json_utils::FloatParseIssue::Kind;
+            if (res.issue.kind == Kind::None) {
+                if (res.value >= 64.f && res.value <= 2048.f) {
+                    cfg.spatialCellSize = res.value;
+                } else {
+                    report.addSemanticInvalidField(eng_keys::SPATIAL_CELL_SIZE);
+                }
+            } else if (res.issue.kind != Kind::MissingKey) {
+                report.addInvalidField(eng_keys::SPATIAL_CELL_SIZE);
+            }
         }
 
         if (report.hasAnyIssues()) {

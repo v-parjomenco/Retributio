@@ -3,6 +3,7 @@
 #include "game/skyguard/game.h"
 
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
@@ -16,6 +17,7 @@
 #include "core/ecs/systems/movement_system.h"
 #include "core/ecs/systems/render_system.h"
 #include "core/ecs/systems/scaling_system.h"
+#include "core/ecs/systems/spatial_index_system.h"
 #include "core/log/log_macros.h"
 #include "core/time/time_config.h"
 
@@ -65,27 +67,25 @@ namespace game::skyguard {
         // ----------------------------------------------------------------------------------------
         // Загружаем движковые настройки рендеринга (EngineSettings)
         // ----------------------------------------------------------------------------------------
-        const cfg::EngineSettings engineSettings =
-            cfg::loadEngineSettings(skycfg_paths::ENGINE_SETTINGS);
+        mEngineSettings = cfg::loadEngineSettings(skycfg_paths::ENGINE_SETTINGS);
 
         // Политика применения:
         //  - VSync ON  => frameLimit должен быть выключен (0), чтобы не было двойного ограничения.
         //  - VSync OFF => применяем frameLimit из конфига.
-        mWindow.setVerticalSyncEnabled(engineSettings.vsyncEnabled);
-        if (!engineSettings.vsyncEnabled) {
-            mWindow.setFramerateLimit(engineSettings.frameLimit);
+        mWindow.setVerticalSyncEnabled(mEngineSettings.vsyncEnabled);
+        if (!mEngineSettings.vsyncEnabled) {
+            mWindow.setFramerateLimit(mEngineSettings.frameLimit);
         } else {
-            mWindow.setFramerateLimit(0);
+            // Frame limiter — это CPU pacing fallback. 
+            // В Win11/DWM vsync может не блокировать CPU каждый кадр.
+            // Поэтому НЕ отключаем frameLimit автоматически.
+            mWindow.setFramerateLimit(mEngineSettings.frameLimit);
         }
 
         // Логируем итоговые настройки рендеринга один раз при запуске игры.
-        LOG_INFO(core::log::cat::Gameplay,
-                 "[EngineSettings] VSync: {}, frameLimit: {}{}",
-                 (engineSettings.vsyncEnabled ? "enabled" : "disabled"),
-                 engineSettings.frameLimit,
-                 (engineSettings.vsyncEnabled
-                      ? " (VSync enabled, frameLimit ignored)."
-                      : " (VSync disabled, frameLimit applied)."));
+        LOG_INFO(core::log::cat::Gameplay, "[EngineSettings] VSync: {}, frameLimit: {}",
+                 (mEngineSettings.vsyncEnabled ? "enabled" : "disabled"),
+                 mEngineSettings.frameLimit);
 
         // ----------------------------------------------------------------------------------------
         // Инициализация ресурсного слоя (реестр ресурсов + fallback-ресурсы)
@@ -158,10 +158,13 @@ namespace game::skyguard {
         // а Movement читает VelocityComponent в этом же тике.
         mAircraftControlSystem = &mWorld.addSystem<game::skyguard::ecs::AircraftControlSystem>();
         mWorld.addSystem<core::ecs::MovementSystem>();
+        auto& spatialSystem =
+            mWorld.addSystem<core::ecs::SpatialIndexSystem>(mEngineSettings.spatialCellSize);
 
         // Эти системы требуют прямого доступа (onResize, onKeyEvent),
         // поэтому сохраняем указатели.
-        mRenderSystem   = &mWorld.addSystem<core::ecs::RenderSystem>(mResources);
+        mRenderSystem =
+            &mWorld.addSystem<core::ecs::RenderSystem>(mResources, spatialSystem.index());
         mScalingSystem  = &mWorld.addSystem<core::ecs::ScalingSystem>();
         mLockSystem     = &mWorld.addSystem<core::ecs::LockSystem>();
         mDebugOverlay   = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
@@ -299,7 +302,16 @@ namespace game::skyguard {
     void Game::render() {
         mWindow.clear();
         mWorld.render(mWindow); // отрисовываем ECS-мир
+#if defined(SFML1_PROFILE)
+        const auto t0 = std::chrono::steady_clock::now();
         mWindow.display();
+        const auto t1 = std::chrono::steady_clock::now();
+        const auto us = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count());
+        mTime.setLastPresentUs(us);
+#else
+        mWindow.display();
+#endif
     }
 
 } // namespace game::skyguard

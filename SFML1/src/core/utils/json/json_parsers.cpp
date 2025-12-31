@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -156,6 +157,11 @@ namespace {
     [[nodiscard]] sf::Keyboard::Key parseKeyString(std::string_view name) noexcept {
         using K = sf::Keyboard::Key;
 
+        static_assert((static_cast<int>(K::Z) - static_cast<int>(K::A)) == 25,
+                      "SFML Keyboard layout changed: A..Z are expected contiguous.");
+        static_assert((static_cast<int>(K::Num9) - static_cast<int>(K::Num0)) == 9,
+                      "SFML Keyboard layout changed: Num0..Num9 are expected contiguous.");
+
         if (name.size() == 1) {
             char c = name[0];
 
@@ -174,15 +180,6 @@ namespace {
             }
 
             return K::Unknown;
-        }
-
-        // "Num0".."Num9" (на случай, если кому-то так удобнее, чем "0".."9")
-        if (name.size() == 4 && name[0] == 'N' && name[1] == 'u' && name[2] == 'm') {
-            const char d = name[3];
-            if (d >= '0' && d <= '9') {
-                const int base = static_cast<int>(K::Num0);
-                return static_cast<K>(base + (d - '0'));
-            }
         }
 
         // Ключевые слова (multi-token). Маленькая таблица, линейный поиск — ок на границе загрузки.

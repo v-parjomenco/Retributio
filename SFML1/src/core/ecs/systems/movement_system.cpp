@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "core/ecs/systems/movement_system.h"
 
+#include "core/ecs/components/spatial_dirty_tag.h"
 #include "core/ecs/world.h"
 
 namespace core::ecs {
@@ -13,10 +14,20 @@ namespace core::ecs {
         // EnTT view: итерируем только сущности с Transform + Velocity.
         // Внутри view.each() оба компонента гарантированно присутствуют.
         auto view = world.view<TransformComponent, VelocityComponent>();
+        auto& registry = world.registry();
 
-        view.each([dt](TransformComponent& transform, const VelocityComponent& velocity) {
+        view.each([dt, &registry](Entity entity, TransformComponent& transform,
+                                  const VelocityComponent& velocity) {
+            const bool hasLinear = (velocity.linear.x != 0.f) || (velocity.linear.y != 0.f);
+            const bool hasAngular = (velocity.angularDegreesPerSec != 0.f);
+
+            if (!(hasLinear || hasAngular)) {
+                return;
+            }
+
             transform.position += velocity.linear * dt;
             transform.rotationDegrees += velocity.angularDegreesPerSec * dt;
+            registry.emplace_or_replace<SpatialDirtyTag>(entity);
         });
     }
 

@@ -21,13 +21,15 @@
     #include "core/ecs/system.h"
     #include "core/resources/ids/resource_ids.h"
     #include "core/resources/resource_manager.h"
+    #include "core/spatial/spatial_index.h"
 
     namespace core::ecs {
 
         class RenderSystem final : public ISystem {
           public:
-            explicit RenderSystem(core::resources::ResourceManager& resources)
-                : mResources(&resources) {
+            RenderSystem(core::resources::ResourceManager& resources,
+                         core::spatial::SpatialIndex& spatialIndex)
+                : mResources(&resources), mSpatialIndex(&spatialIndex) {
                 // Ожидаемо маленькое число уникальных текстур в кадре (десятки).
                 // Reserve делаем один раз, чтобы исключить аллокации в горячем пути.
                 mTextureCache.reserve(kExpectedUniqueTexturesPerFrame);
@@ -74,6 +76,7 @@
 
           private:
             core::resources::ResourceManager* mResources;
+            core::spatial::SpatialIndex* mSpatialIndex;
 
             // Ожидаемо маленькое число уникальных текстур в кадре (десятки).
             // Держим один общий лимит, чтобы и Release работал без аллокаций на кэше прямоугольников.
@@ -100,6 +103,8 @@
             };
 
             std::vector<RenderPacket> mPackets;
+            std::vector<core::ecs::Entity> mVisibleEntities;
+            std::size_t mLastVisibleCount = 0;
 
             // CPU-batch вершин: 1 спрайт = 2 треугольника = 6 вершин.
             // Важно: вектор живёт как scratch-buffer (reserve один раз, clear каждый кадр).
@@ -108,10 +113,9 @@
             struct TextureCacheEntry {
                 core::resources::ids::TextureID id{};
                 const sf::Texture* texture = nullptr;
-                sf::IntRect fullRect{};
             };
             
-            // Per-frame cache: TextureID -> (sf::Texture*, fullRect)
+            // Per-frame cache: TextureID -> sf::Texture*
             // Линейный поиск намеренно: ожидаемо десятки уникальных текстур, overhead минимальный.
             std::vector<TextureCacheEntry> mTextureCache;
 

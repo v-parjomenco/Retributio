@@ -35,10 +35,10 @@ namespace game::skyguard::config::keys {
         inline constexpr const char* LOCK_BEHAVIOR = core::config::keys::Common::LOCK_BEHAVIOR;
 
         inline constexpr const char* CONTROLS = "controls";
-        inline constexpr const char* CONTROL_UP = "up";
-        inline constexpr const char* CONTROL_DOWN = "down";
-        inline constexpr const char* CONTROL_LEFT = "left";
-        inline constexpr const char* CONTROL_RIGHT = "right";
+        inline constexpr const char* CONTROL_THRUST_FORWARD = "thrust_forward";
+        inline constexpr const char* CONTROL_THRUST_BACKWARD = "thrust_backward";
+        inline constexpr const char* CONTROL_TURN_LEFT = "turn_left";
+        inline constexpr const char* CONTROL_TURN_RIGHT = "turn_right";
 
         inline constexpr const char* TURN_RATE = "turn_rate";
         inline constexpr const char* INITIAL_ROTATION_DEGREES = "initial_rotation_degrees";

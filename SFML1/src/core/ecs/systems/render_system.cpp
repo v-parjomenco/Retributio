@@ -11,39 +11,22 @@
 #include <SFML/System/Angle.hpp>
 
 #include "core/ecs/components/sprite_component.h"
+#include "core/ecs/components/spatial_handle_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/world.h"
 #include "core/log/log_macros.h"
+#include "core/spatial/aabb2.h"
 #include "core/utils/math_constants.h"
 
 namespace {
 
-    [[nodiscard]] sf::IntRect makeFullRect(const sf::Texture& texture) noexcept {
-        const auto ts = texture.getSize();
-        return sf::IntRect(sf::Vector2i{0, 0},
-                           sf::Vector2i{static_cast<int>(ts.x), static_cast<int>(ts.y)});
-    }
-
-    struct Aabb2 {
-        float minX = 0.f;
-        float minY = 0.f;
-        float maxX = 0.f;
-        float maxY = 0.f;
-    };
-
 #if !defined(NDEBUG)
-[[nodiscard]] bool isFiniteVec2(const sf::Vector2f& v) noexcept {
-    return std::isfinite(v.x) && std::isfinite(v.y);
-}
+    [[nodiscard]] bool isFiniteVec2(const sf::Vector2f& v) noexcept {
+        return std::isfinite(v.x) && std::isfinite(v.y);
+    }
 #endif
 
-    [[nodiscard]] bool intersectsInclusive(const Aabb2& a, const Aabb2& b) noexcept {
-        // Инклюзивное пересечение (касание границ считаем видимым).
-        return (a.maxX >= b.minX) && (a.minX <= b.maxX) &&
-               (a.maxY >= b.minY) && (a.minY <= b.maxY);
-    }
-
-    [[nodiscard]] Aabb2 makeViewAabb(const sf::View& view) noexcept {
+    [[nodiscard]] core::spatial::Aabb2 makeViewAabb(const sf::View& view) noexcept {
         // ПРИМЕЧАНИЕ: Culling работает только для неповернутого view (view.getRotation() == 0).
         // При повороте view AABB в world-space больше не описывает видимую область корректно,
         // понадобится более общий тест (OBB/матрица вида).
@@ -51,7 +34,7 @@ namespace {
         const sf::Vector2f center = view.getCenter();
         const sf::Vector2f topLeft{center.x - size.x * 0.5f, center.y - size.y * 0.5f};
 
-        Aabb2 out{};
+        core::spatial::Aabb2 out{};
         out.minX = topLeft.x;
         out.minY = topLeft.y;
         out.maxX = topLeft.x + size.x;
@@ -65,18 +48,11 @@ namespace {
         return (a < b) || (b < a);
     }
 
-    [[nodiscard]] bool hasExplicitRect(const sf::IntRect& r) noexcept {
-        // Политика: (0,0) => full texture. Rect должен быть явно положительным.
-        // Отражение с помощью отрицательного размера rect НЕ поддерживается;
-        // для зеркального отображения используйте отрицательный scale.
-        return (r.size.x > 0) && (r.size.y > 0);
-    }
-
     void writeSpriteTriangles(sf::Vertex* out,
-                          const sf::Vector2f& position,
-                          const sf::Vector2f& origin,
-                          const sf::Vector2f& scale,
-                          const sf::IntRect& rect) noexcept {
+                              const sf::Vector2f& position,
+                              const sf::Vector2f& origin,
+                              const sf::Vector2f& scale,
+                              const sf::IntRect& rect) noexcept {
         const float w = static_cast<float>(rect.size.x);
         const float h = static_cast<float>(rect.size.y);
 
@@ -169,88 +145,6 @@ namespace {
         out[5].position = p3; out[5].color = color; out[5].texCoords = t3;
     }
 
-    [[nodiscard]] Aabb2 computeSpriteAabbNoRotation(const sf::Vector2f& position,
-                                                    const sf::Vector2f& origin,
-                                                    const sf::Vector2f& scale,
-                                                    const sf::IntRect& rect) noexcept {
-        // Должно соответствовать writeSpriteTriangles(): те же локальные точки и тот же порядок
-        // transform (origin -> scale -> translate). Так culling совпадает с реальной геометрией.
-        const float w = static_cast<float>(rect.size.x);
-        const float h = static_cast<float>(rect.size.y);
-
-        const float ox = origin.x;
-        const float oy = origin.y;
-        const float sx = scale.x;
-        const float sy = scale.y;
-        const float px = position.x;
-        const float py = position.y;
-
-        const float x0 = ((-ox)     * sx) + px;
-        const float y0 = ((-oy)     * sy) + py;
-        const float x1 = ((w - ox)  * sx) + px;
-        const float y1 = ((-oy)     * sy) + py;
-        const float x2 = ((w - ox)  * sx) + px;
-        const float y2 = ((h - oy)  * sy) + py;
-        const float x3 = ((-ox)     * sx) + px;
-        const float y3 = ((h - oy)  * sy) + py;
-
-        const float minX = std::min(std::min(x0, x1), std::min(x2, x3));
-        const float maxX = std::max(std::max(x0, x1), std::max(x2, x3));
-        const float minY = std::min(std::min(y0, y1), std::min(y2, y3));
-        const float maxY = std::max(std::max(y0, y1), std::max(y2, y3));
-
-        Aabb2 out{};
-        out.minX = minX;
-        out.minY = minY;
-        out.maxX = maxX;
-        out.maxY = maxY;
-        return out;
-    }
-
-    [[nodiscard]] Aabb2 computeSpriteAabbRotated(const sf::Vector2f& position,
-                                                 const sf::Vector2f& origin,
-                                                 const sf::Vector2f& scale,
-                                                 const sf::IntRect& rect,
-                                                 const float cachedSin,
-                                                 const float cachedCos) noexcept {
-        const float w = static_cast<float>(rect.size.x);
-        const float h = static_cast<float>(rect.size.y);
-
-        const float ox = origin.x;
-        const float oy = origin.y;
-        const float sx = scale.x;
-        const float sy = scale.y;
-
-        const sf::Vector2f l0{(-ox)    * sx, (-oy)    * sy};
-        const sf::Vector2f l1{(w - ox) * sx, (-oy)    * sy};
-        const sf::Vector2f l2{(w - ox) * sx, (h - oy) * sy};
-        const sf::Vector2f l3{(-ox)    * sx, (h - oy) * sy};
-
-        const auto rotate = [&](const sf::Vector2f& v) noexcept -> sf::Vector2f {
-            return {
-                (v.x * cachedCos) - (v.y * cachedSin),
-                (v.x * cachedSin) + (v.y * cachedCos)
-            };
-        };
-
-        const sf::Vector2f p0 = rotate(l0) + position;
-        const sf::Vector2f p1 = rotate(l1) + position;
-        const sf::Vector2f p2 = rotate(l2) + position;
-        const sf::Vector2f p3 = rotate(l3) + position;
-
-        const float minX = std::min(std::min(p0.x, p1.x), std::min(p2.x, p3.x));
-        const float maxX = std::max(std::max(p0.x, p1.x), std::max(p2.x, p3.x));
-        const float minY = std::min(std::min(p0.y, p1.y), std::min(p2.y, p3.y));
-        const float maxY = std::max(std::max(p0.y, p1.y), std::max(p2.y, p3.y));
-
-        Aabb2 out{};
-        out.minX = minX;
-        out.minY = minY;
-        out.maxX = maxX;
-        out.maxY = maxY;
-        return out;
-    }
-
 } // namespace
 
 namespace core::ecs {
@@ -267,10 +161,11 @@ namespace core::ecs {
 #if !defined(NDEBUG)
         assert(window.getView().getRotation() == sf::Angle::Zero &&
                "RenderSystem: view rotation is not supported (view.getRotation() must be 0).");
+        assert(mSpatialIndex != nullptr && "RenderSystem: SpatialIndex pointer must be valid.");
 #endif
 
         // view-culling работаем в world-space координатах текущего view.
-        const Aabb2 viewAabb = makeViewAabb(window.getView());
+        const core::spatial::Aabb2 viewAabb = makeViewAabb(window.getView());
 
 #if defined(SFML1_PROFILE)
         const auto totalStart = std::chrono::steady_clock::now();
@@ -296,16 +191,31 @@ namespace core::ecs {
         // Шаг 1: Gather + Culling — собираем ключи только для видимых спрайтов.
         // ----------------------------------------------------------------------------------------
 
+        const auto ensureCapacity = [](auto& vec, std::size_t count) {
+            const std::size_t current = vec.capacity();
+            if (count > current) {
+                const std::size_t grow = std::max(count / 2, std::size_t{256});
+                vec.reserve(count + grow);
+            }
+        };
+
+        ensureCapacity(mVisibleEntities, mLastVisibleCount);
+
+        mVisibleEntities.clear();
         mKeys.clear();
         mPackets.clear();
         mTextureCache.clear();
 
-        auto ecsView = world.view<TransformComponent, SpriteComponent>();
-        mKeys.reserve(ecsView.size_hint());
-        mPackets.reserve(ecsView.size_hint());
+        mSpatialIndex->query(viewAabb, mVisibleEntities);
 
-        // Per-frame cache: TextureID -> (sf::Texture*, fullRect).
-        // Должен покрывать И explicitRect кейсы тоже.
+        const std::size_t visibleCount = mVisibleEntities.size();
+        mLastVisibleCount = visibleCount;
+
+        ensureCapacity(mKeys, visibleCount);
+        ensureCapacity(mPackets, visibleCount);
+        ensureCapacity(mVertices, visibleCount * 6);
+
+        // Per-frame cache: TextureID -> sf::Texture*.
         const auto findTextureEntry = [&](core::resources::ids::TextureID id)
             -> TextureCacheEntry* {
             for (auto& e : mTextureCache) {
@@ -331,17 +241,23 @@ namespace core::ecs {
             TextureCacheEntry entry{};
             entry.id = id;
             entry.texture = &tex;
-            entry.fullRect = makeFullRect(tex);
             mTextureCache.push_back(entry);
             return mTextureCache.back();
         };
 
-        for (const Entity entity : ecsView) {
+        auto ecsView = world.view<TransformComponent, SpriteComponent, SpatialHandleComponent>();
+
+        for (const Entity entity : mVisibleEntities) {
+#if !defined(NDEBUG)
+            assert(ecsView.contains(entity) &&
+                   "RenderSystem: SpatialIndex returned entity without (Transform, Sprite, SpatialHandle).");
+#endif
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
             ++totalCandidates;
 #endif
             const auto& spr = ecsView.get<SpriteComponent>(entity);
             const auto& tr = ecsView.get<TransformComponent>(entity);
+            const auto& sh = ecsView.get<SpatialHandleComponent>(entity);
 
 #if !defined(NDEBUG)
             const bool dataFinite =
@@ -359,52 +275,29 @@ namespace core::ecs {
             }
 #endif
 
-            const TextureCacheEntry* texEntry = nullptr;
-            sf::IntRect rect{};
-            if (hasExplicitRect(spr.textureRect)) {
+            const sf::IntRect rect = spr.textureRect;
 #if !defined(NDEBUG)
-                // Политика: если rect задан, он должен быть положительным.
-                assert((spr.textureRect.size.x > 0 && spr.textureRect.size.y > 0) &&
-                       "SpriteComponent.textureRect must be (0,0)"
-                       "for full texture or positive sizes.");
+            assert((rect.size.x > 0 && rect.size.y > 0) &&
+                   "RenderSystem: SpriteComponent.textureRect must be explicit with positive size.");
 #endif
-                rect = spr.textureRect;
-            } else {
-                texEntry = &getTextureEntryCached(spr.textureId);
-                rect = texEntry->fullRect;
-            }
 
-            const float rotationDegrees = tr.rotationDegrees;
-            // Контракт: 0° должен быть РОВНО 0 (fast-path). Поэтому сравнение точное, без epsilon.
-            const bool isRotated = (rotationDegrees != 0.f);
-
-            float cachedSin = 0.f;
-            float cachedCos = 1.f;
-            Aabb2 spriteAabb{};
-
-            if (isRotated) {
-                const float radians = rotationDegrees * core::utils::kDegToRad;
-                cachedSin = std::sin(radians);
-                cachedCos = std::cos(radians);
-
-                spriteAabb = computeSpriteAabbRotated(
-                    tr.position, spr.origin, spr.scale, rect, cachedSin, cachedCos);
-            } else {
-                spriteAabb = computeSpriteAabbNoRotation(
-                    tr.position, spr.origin, spr.scale, rect);
-            }
-
-            if (!intersectsInclusive(spriteAabb, viewAabb)) {
+            // Точный culling по AABB, которая поддерживается SpatialIndexSystem (dirty-on-write).
+            if (!core::spatial::intersectsInclusive(sh.lastAabb, viewAabb)) {
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
                 ++culled;
 #endif
                 continue;
             }
 
-            // ВАЖНО: в стресс-сцене rect обычно explicit, но текстура всё равно нужна в draw-фазе.
-            // Резолвим TextureID -> sf::Texture* максимум один раз на кадр для каждого ID.
-            if (texEntry == nullptr) {
-                (void)getTextureEntryCached(spr.textureId);
+            // Sin/cos считаем только для реально отрисуемых (после culling).
+            const float rotationDegrees = tr.rotationDegrees;
+            const bool isRotated = (rotationDegrees != 0.f);
+            float cachedSin = 0.f;
+            float cachedCos = 1.f;
+            if (isRotated) {
+                const float radians = rotationDegrees * core::utils::kDegToRad;
+                cachedSin = std::sin(radians);
+                cachedCos = std::cos(radians);
             }
 
             const std::size_t packetIndex = mPackets.size();
@@ -432,6 +325,10 @@ namespace core::ecs {
             gatherUs = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
                 gatherEnd - gatherStart).count());
         }
+#endif
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        ensureCapacity(mUniqueTexturePointers, mTextureCache.size());
 #endif
 
         if (mKeys.empty()) {
@@ -507,16 +404,8 @@ namespace core::ecs {
         core::resources::ids::TextureID currentTextureId = mKeys.front().textureId;
         float currentZ = mKeys.front().zOrder;
 
-        const auto resolveTextureFromCache = [&](core::resources::ids::TextureID id)
-            -> const TextureCacheEntry& {
-            if (TextureCacheEntry* e = findTextureEntry(id)) {
-                return *e;
-            }
-            // На практике не должно случаться (мы кэшируем в gather), но держим safe fallback.
-            return getTextureEntryCached(id);
-        };
-        
-        const TextureCacheEntry& firstEntry = resolveTextureFromCache(currentTextureId);
+        // Lazy per-frame cache: резолв только при первой встрече textureId (обычно десятки/кадр).
+        const TextureCacheEntry& firstEntry = getTextureEntryCached(currentTextureId);
         const sf::Texture* currentTexture = firstEntry.texture;
         states.texture = currentTexture;
 
@@ -575,7 +464,7 @@ namespace core::ecs {
 
                 if (textureChanged) {
                     currentTextureId = key.textureId;
-                    const TextureCacheEntry& entry = resolveTextureFromCache(currentTextureId);
+                    const TextureCacheEntry& entry = getTextureEntryCached(currentTextureId);
                     currentTexture = entry.texture;
                     states.texture = currentTexture;
 

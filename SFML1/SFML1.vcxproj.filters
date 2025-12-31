@@ -268,6 +268,18 @@
     <Filter Include="src\game\skyguard\config\properties">
       <UniqueIdentifier>{b94ba5ac-6bfe-4b87-911c-f1a4a4c245a8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\ecs\render">
+      <UniqueIdentifier>{2dacc563-825b-43be-8a64-f7b1ff510c9b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\ecs\render">
+      <UniqueIdentifier>{b72b71a6-c420-4e48-aa46-342fca21db01}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\spatial">
+      <UniqueIdentifier>{921bb49b-1ef9-44ba-ad9c-72cfa5e84b6c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\spatial">
+      <UniqueIdentifier>{2b9be747-12e4-49ce-8d47-469614cb7403}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -338,6 +350,12 @@
     </ClCompile>
     <ClCompile Include="src\core\config\loader\detail\non_critical_config_report.cpp">
       <Filter>src\core\config\loader\detail</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ecs\systems\spatial_index_system.cpp">
+      <Filter>src\core\ecs\systems</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\spatial\spatial_index.cpp">
+      <Filter>src\core\spatial</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -574,6 +592,30 @@
     </ClInclude>
     <ClInclude Include="include\game\skyguard\ecs\systems\aircraft_control_system.h">
       <Filter>include\game\skyguard\ecs\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\components\spatial_dirty_tag.h">
+      <Filter>include\core\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\components\spatial_handle_component.h">
+      <Filter>include\core\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\render\sprite_bounds.h">
+      <Filter>include\core\ecs\render</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\systems\spatial_index_system.h">
+      <Filter>include\core\ecs\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\spatial\aabb2.h">
+      <Filter>include\core\spatial</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\spatial\spatial_index.h">
+      <Filter>include\core\spatial</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\properties\aircraft_control_bindings_properties.h">
+      <Filter>include\game\skyguard\config\properties</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\ecs\components\aircraft_control_bindings_component.h">
+      <Filter>include\game\skyguard\ecs\components</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

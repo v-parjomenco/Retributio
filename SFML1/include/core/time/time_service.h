@@ -79,6 +79,9 @@ namespace core::time {
             mFrameCount = 0;
             mMinFps = std::numeric_limits<float>::max();
             mMaxFps = 0.f;
+#if defined(SFML1_PROFILE)
+            mLastPresentUs = 0;
+#endif
         }
 
         /**
@@ -168,6 +171,17 @@ namespace core::time {
             return mMaxFps;
         }
 
+#if defined(SFML1_PROFILE)
+        /// @brief Длительность блокировки present (window.display) в микросек. за последний кадр.
+        [[nodiscard]] std::uint64_t getLastPresentUs() const noexcept {
+            return mLastPresentUs;
+        }
+
+        void setLastPresentUs(std::uint64_t us) noexcept {
+            mLastPresentUs = us;
+        }
+#endif
+
         // ------------------- Управление временем игры -------------------------------------------
 
         /// @brief Установить/снять паузу симуляции.
@@ -229,6 +243,10 @@ namespace core::time {
         std::uint64_t mFrameCount{0};
         float mMinFps{std::numeric_limits<float>::max()};
         float mMaxFps{0.f};
+
+#if defined(SFML1_PROFILE)
+        std::uint64_t mLastPresentUs{0};
+#endif
     };
 
 } // namespace core::time

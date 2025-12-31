@@ -15,7 +15,6 @@
 #include <SFML/Graphics/View.hpp>
 #include <SFML/System/Vector2.hpp>
 
-#include "core/ecs/components/keyboard_control_component.h"
 #include "core/ecs/components/lock_behavior_component.h"
 #include "core/ecs/components/movement_stats_component.h"
 #include "core/ecs/components/scaling_behavior_component.h"
@@ -31,6 +30,7 @@
 
 #include "game/skyguard/config/blueprints/player_blueprint.h"
 #include "game/skyguard/ecs/components/aircraft_control_component.h"
+#include "game/skyguard/ecs/components/aircraft_control_bindings_component.h"
 
 namespace game::skyguard::ecs {
 
@@ -111,7 +111,10 @@ namespace game::skyguard::ecs {
 
                 core::ecs::SpriteComponent spriteComp{};
                 spriteComp.textureId = cfg.sprite.textureId;
-                spriteComp.textureRect = {};
+                spriteComp.textureRect =
+                    sf::IntRect(sf::Vector2i{0, 0},
+                                sf::Vector2i{static_cast<int>(textureSize.x),
+                                             static_cast<int>(textureSize.y)});
                 spriteComp.baseScale = cfg.sprite.scale;
                 spriteComp.scale = effectiveScale;
                 spriteComp.origin = origin;
@@ -153,13 +156,13 @@ namespace game::skyguard::ecs {
                         cfg.movement.friction
                     });
 
-                world.addComponent<core::ecs::KeyboardControlComponent>(
+                world.addComponent<game::skyguard::ecs::AircraftControlBindingsComponent>(
                     entity,
-                    core::ecs::KeyboardControlComponent{
-                        cfg.controls.up,
-                        cfg.controls.down,
-                        cfg.controls.left,
-                        cfg.controls.right
+                    game::skyguard::ecs::AircraftControlBindingsComponent{
+                        cfg.controls.thrustForward,
+                        cfg.controls.thrustBackward,
+                        cfg.controls.turnLeft,
+                        cfg.controls.turnRight
                     });
 
 #if !defined(NDEBUG) && defined(SFML1_VERBOSE_PLAYER_SPAWN_LOGS)

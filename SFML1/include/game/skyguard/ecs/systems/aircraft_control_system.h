@@ -1,6 +1,6 @@
 // ================================================================================================
 // File: game/skyguard/ecs/systems/aircraft_control_system.h
-// Purpose: Game-layer aircraft controls (Q/E rotate, W/S thrust)
+// Purpose: Game-layer aircraft controls (turn/thrust bindings)
 // Used by: Game loop (event forwarding), World/SystemManager
 // ================================================================================================
 #pragma once
@@ -12,7 +12,6 @@
 #include <SFML/System/Vector2.hpp>
 #include <SFML/Window/Keyboard.hpp>
 
-#include "core/ecs/components/keyboard_control_component.h"
 #include "core/ecs/components/movement_stats_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/components/velocity_component.h"
@@ -21,6 +20,7 @@
 #include "core/utils/math_constants.h"
 
 #include "game/skyguard/ecs/components/aircraft_control_component.h"
+#include "game/skyguard/ecs/components/aircraft_control_bindings_component.h"
 
 namespace game::skyguard::ecs {
 
@@ -28,8 +28,8 @@ namespace game::skyguard::ecs {
      * @brief Игровая система управления кораблём (SkyGuard).
      *
      * Контракт:
-     *  - Q/E (left/right) -> angular velocity (deg/s).
-     *  - W/S (up/down)    -> thrust along forward (cos/sin).
+     *  - turnLeft/turnRight           -> angular velocity (deg/s).
+     *  - thrustForward/thrustBackward -> thrust along forward (cos/sin).
      *  - friction/maxSpeed применяются в game-layer.
      */
     class AircraftControlSystem final : public core::ecs::ISystem {
@@ -53,31 +53,31 @@ namespace game::skyguard::ecs {
                 return;
             }
 
-            auto view = world.view<core::ecs::KeyboardControlComponent,
+            auto view = world.view<AircraftControlBindingsComponent,
                                    core::ecs::MovementStatsComponent,
                                    core::ecs::TransformComponent,
                                    core::ecs::VelocityComponent,
                                    AircraftControlComponent>();
 
-            view.each([this, dt](const core::ecs::KeyboardControlComponent& controls,
+            view.each([this, dt](const AircraftControlBindingsComponent& controls,
                                  const core::ecs::MovementStatsComponent& stats,
                                  const core::ecs::TransformComponent& transform,
                                  core::ecs::VelocityComponent& velocity,
                                  const AircraftControlComponent& aircraft) {
                 float turnDir = 0.f;
-                if (isDown(controls.left)) {
+                if (isDown(controls.turnLeft)) {
                     turnDir -= 1.f;
                 }
-                if (isDown(controls.right)) {
+                if (isDown(controls.turnRight)) {
                     turnDir += 1.f;
                 }
                 velocity.angularDegreesPerSec = turnDir * aircraft.turnRateDegreesPerSec;
 
                 float thrustDir = 0.f;
-                if (isDown(controls.up)) {
+                if (isDown(controls.thrustForward)) {
                     thrustDir += 1.f;
                 }
-                if (isDown(controls.down)) {
+                if (isDown(controls.thrustBackward)) {
                     thrustDir -= 1.f;
                 }
 

@@ -51,7 +51,7 @@ namespace core::ecs {
         /// ID текстуры из enum (резолвится через ResourceManager)
         core::resources::ids::TextureID textureId{core::resources::ids::TextureID::Unknown};
 
-        /// Область текстуры для отрисовки (0,0,0,0 = вся текстура целиком)
+        /// Область текстуры для отрисовки (должна быть явно задана, с положительными размерами)
         sf::IntRect textureRect{};
 
         /// Базовый масштаб из конфига (IMMUTABLE, устанавливается при init)

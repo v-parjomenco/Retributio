@@ -228,6 +228,10 @@ namespace core::ecs {
             appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSBuildUs);
             mTextBuffer.append(" | draw ");
             appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSDrawUs);
+            if (mTime) {
+                mTextBuffer.append("\nPresent(ms): ");
+                appendMs1DecimalFromUs(mTextBuffer, mTime->getLastPresentUs());
+            }
 #endif
         }
 

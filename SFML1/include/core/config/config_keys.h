@@ -35,6 +35,7 @@ namespace core::config::keys {
     namespace EngineSettings {
         inline constexpr const char* VSYNC = "vsync";
         inline constexpr const char* FRAME_LIMIT = "frameLimit";
+        inline constexpr const char* SPATIAL_CELL_SIZE = "spatialCellSize";
     } // namespace EngineSettings
 
     // --------------------------------------------------------------------------------------------
