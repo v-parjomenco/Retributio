@@ -57,6 +57,26 @@ namespace core::time {
      */
     class TimeService {
       public:
+        // ----------------------------------------------------------------------------------------
+        // Public константы для вычисления game-level политики
+        // ----------------------------------------------------------------------------------------
+        
+        /// @brief Максимальное накопленное время для fixed-step (секунды).
+        ///
+        /// Используется:
+        ///  - внутри TimeService для clamp накопления (защита от spiral of death);
+        ///  - в Game::run() для вычисления максимального числа апдейтов за кадр:
+        ///      maxUpdates = kMaxAccumulatedSeconds / FIXED_TIME_STEP
+        ///
+        /// Архитектура:
+        ///  - TimeService управляет временем (константы, накопление);
+        ///  - Game управляет политикой (количество апдейтов), но выводит её из TimeService.
+        static constexpr float kMaxAccumulatedSeconds = 0.5f;
+
+        // ----------------------------------------------------------------------------------------
+        // Публичный API
+        // ----------------------------------------------------------------------------------------
+        
         TimeService() = default;
 
         /**
@@ -107,7 +127,7 @@ namespace core::time {
          *  }
          *
          * Накопление времени ведётся по scaled dt (с учётом паузы и timeScale), и ограничено
-         * сверху, чтобы не было "догоняющего ада" при огромном dt.
+         * сверху константой kMaxAccumulatedSeconds, дабы не было "догоняющего ада" при огромном dt.
          */
         [[nodiscard]] bool shouldUpdate(const sf::Time& fixedTimeStep) noexcept;
 
@@ -115,7 +135,8 @@ namespace core::time {
         ///
         /// Полезно при:
         ///  - загрузке сохранения (чтобы не было скачка времени);
-        ///  - резких скачках во времени/состоянии мира.
+        ///  - резких скачках во времени/состоянии мира;
+        ///  - достижении лимита апдейтов за кадр (spiral of death prevention).
         void clearAccumulatedTime() noexcept {
             mTimeSinceLastUpdate = sf::Time::Zero;
         }
@@ -209,9 +230,8 @@ namespace core::time {
         }
 
       private:
-        // Ограничения для защиты от экстремальных dt/накоплений (секунды)
-        static constexpr float kMaxDeltaSeconds = 0.25f;      // clamp raw dt до 250 мс
-        static constexpr float kMaxAccumulatedSeconds = 0.5f; // clamp накопления до 500 мс
+        // Ограничения для защиты от экстремальных dt (секунды)
+        static constexpr float kMaxDeltaSeconds = 0.25f; // clamp raw dt до 250 мс
 
         sf::Clock mClock;                // секундомер кадра
         sf::Time mRawDeltaTime{};        // "сырое" dt между кадрами

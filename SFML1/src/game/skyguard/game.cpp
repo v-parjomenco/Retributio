@@ -204,6 +204,15 @@ namespace game::skyguard {
 
         const sf::Time fixedTimeStep = timecfg::FIXED_TIME_STEP;
 
+        // ----------------------------------------------------------------------------------------
+        // Spiral of death prevention: вычисляем max апдейтов за кадр из инварианта TimeService.
+        // Формула выводится из константы TimeService::kMaxAccumulatedSeconds и fixed timestep.
+        // При текущих значениях (0.5s / (1/60)) ≈ 30 апдейтов максимум.
+        // ----------------------------------------------------------------------------------------
+        const int maxUpdatesPerFrame =
+            static_cast<int>(core::time::TimeService::kMaxAccumulatedSeconds /
+                             fixedTimeStep.asSeconds());
+
         LOG_INFO(core::log::cat::Gameplay, "Game loop started");
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
@@ -217,9 +226,20 @@ namespace game::skyguard {
             // Обрабатываем события окна и ввода.
             processEvents();
 
+            // ----------------------------------------------------------------------------------------
             // Выполняем один или несколько фиксированных шагов логики.
+            // Cap на количество апдейтов за кадр предотвращает spiral of death при лагах.
+            // ----------------------------------------------------------------------------------------
+            int updateCount = 0;
             while (mTime.shouldUpdate(fixedTimeStep)) {
                 update(fixedTimeStep);
+
+                if (++updateCount >= maxUpdatesPerFrame) {
+                    // Достигнут лимит апдейтов за кадр → отбрасываем оставшийся "долг".
+                    // Без этого долг переходит на следующий кадр (lag echo / mini spiral).
+                    mTime.clearAccumulatedTime();
+                    break;
+                }
             }
 
             // Отрисовываем текущее состояние мира.
