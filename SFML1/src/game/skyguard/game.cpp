@@ -3,7 +3,6 @@
 #include "game/skyguard/game.h"
 
 #include <cassert>
-#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
@@ -70,22 +69,21 @@ namespace game::skyguard {
         mEngineSettings = cfg::loadEngineSettings(skycfg_paths::ENGINE_SETTINGS);
 
         // Политика применения:
-        //  - VSync ON  => frameLimit должен быть выключен (0), чтобы не было двойного ограничения.
+        //  - VSync ON  => frameLimit выключен (0), избегаем двойного ограничения.
         //  - VSync OFF => применяем frameLimit из конфига.
         mWindow.setVerticalSyncEnabled(mEngineSettings.vsyncEnabled);
         if (!mEngineSettings.vsyncEnabled) {
             mWindow.setFramerateLimit(mEngineSettings.frameLimit);
         } else {
-            // Frame limiter — это CPU pacing fallback. 
-            // В Win11/DWM vsync может не блокировать CPU каждый кадр.
-            // Поэтому НЕ отключаем frameLimit автоматически.
-            mWindow.setFramerateLimit(mEngineSettings.frameLimit);
+            mWindow.setFramerateLimit(0);
         }
 
         // Логируем итоговые настройки рендеринга один раз при запуске игры.
-        LOG_INFO(core::log::cat::Gameplay, "[EngineSettings] VSync: {}, frameLimit: {}",
+        LOG_INFO(core::log::cat::Gameplay, "[EngineSettings] VSync: {}, frameLimit: {}{}",
                  (mEngineSettings.vsyncEnabled ? "enabled" : "disabled"),
-                 mEngineSettings.frameLimit);
+                  mEngineSettings.frameLimit,
+                  (mEngineSettings.vsyncEnabled ? " (VSync enabled, frameLimit ignored)."
+                  : " (VSync disabled, frameLimit applied)."));
 
         // ----------------------------------------------------------------------------------------
         // Инициализация ресурсного слоя (реестр ресурсов + fallback-ресурсы)
@@ -302,16 +300,7 @@ namespace game::skyguard {
     void Game::render() {
         mWindow.clear();
         mWorld.render(mWindow); // отрисовываем ECS-мир
-#if defined(SFML1_PROFILE)
-        const auto t0 = std::chrono::steady_clock::now();
         mWindow.display();
-        const auto t1 = std::chrono::steady_clock::now();
-        const auto us = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count());
-        mTime.setLastPresentUs(us);
-#else
-        mWindow.display();
-#endif
     }
 
 } // namespace game::skyguard
