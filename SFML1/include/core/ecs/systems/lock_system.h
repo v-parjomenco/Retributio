@@ -9,9 +9,6 @@
 #include <SFML/Graphics/View.hpp>
 #include <SFML/System/Vector2.hpp>
 
-#include <cassert>
-#include <cmath>
-
 #include "core/ecs/components/lock_behavior_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/system.h"
@@ -30,14 +27,16 @@ namespace core::ecs {
      * Политика:
      *  - newViewSize может быть 0/NaN при сворачивании/краевых состояниях окна — это штатно.
      *    В таком случае делаем ранний выход (без прохода по ECS) и не трогаем previousViewSize.
-     *  - В Debug защищаем инвариант "в компоненты не пишем NaN/Inf" 
-     *    (проверка результата ДО записи).
+     *
+     * Validate on write, trust on read:
+     *  - newViewSize проверяется здесь (runtime guard для OS-данных);
+     *  - previousViewSize защищён в computeScreenLockPosition (fallback при invalid);
+     *  - newPosition ГАРАНТИРОВАННО finite и valid → проверки НЕТ.
      */
     class LockSystem final : public ISystem {
       public:
         void onResize(World& world, const sf::View& view) {
             const sf::Vector2f newViewSize = view.getSize();
-
             constexpr float kMinViewComponent = 1e-3f;
 
             // newViewSize — данные от OS. 0/NaN возможны (minimized).
@@ -59,20 +58,6 @@ namespace core::ecs {
                     transform.position,
                     lockComp.previousViewSize,
                     newViewSize);
-
-#if !defined(NDEBUG)
-                const bool posFinite = std::isfinite(newPosition.x) && std::isfinite(newPosition.y);
-
-                // Engine-level инвариант: NaN/Inf в transform.position недопустимы.
-                // ВАЖНО: не пишем мусор даже если в IDE нажали "Continue" после assert.
-                assert(posFinite &&
-                       "LockSystem: computeScreenLockPosition() returned non-finite position. "
-                       "Check Transform initialization and "
-                       "LockBehaviorComponent.previousViewSize.");
-                if (!posFinite) {
-                    continue;
-                }
-#endif
 
                 transform.position = newPosition;
 

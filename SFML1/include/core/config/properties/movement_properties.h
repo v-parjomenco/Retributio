@@ -24,13 +24,13 @@ namespace core::config::properties {
      */
     struct MovementProperties {
         /// @brief Максимальная скорость (единиц в секунду).
-        float maxSpeed = 700.f;
+        float maxSpeed = 400.f;
 
         /// @brief Ускорение (насколько быстро сущность разгоняется до скорости).
         float acceleration = 800.f;
 
         /// @brief Коэффициент трения (демпфирования скорости).
-        float friction = 6.f;
+        float friction = 100.f;
     };
 
 } // namespace core::config::properties

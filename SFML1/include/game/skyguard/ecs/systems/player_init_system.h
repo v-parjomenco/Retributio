@@ -46,6 +46,26 @@ namespace game::skyguard::ecs {
             , mPlayers(std::move(players))
             , mHasRun(false) {
 
+            // ------------------------------------------------------------------------------------
+            // Validate on write: baseViewSize — критичное значение для ScalingSystem.
+            // Используем !(x > 0) для NaN-safe проверки.
+            // ------------------------------------------------------------------------------------
+            if (!(mBaseViewSize.x > 0.0f) || !(mBaseViewSize.y > 0.0f)) {
+                LOG_PANIC(core::log::cat::Gameplay,
+                          "PlayerInitSystem: baseViewSize must be > 0.0 (got x={}, y={})",
+                          mBaseViewSize.x,
+                          mBaseViewSize.y);
+            }
+
+            // initialViewSize может быть некорректным (например, при тестировании).
+            // Не падаем, но логируем предупреждение (будет fallback в update()).
+            if (!(mInitialViewSize.x > 0.0f) || !(mInitialViewSize.y > 0.0f)) {
+                LOG_WARN(core::log::cat::Gameplay,
+                         "PlayerInitSystem: initialViewSize invalid (x={}, y={}), "
+                         "will use fallback (1.0, 1.0)",
+                         mInitialViewSize.x,
+                         mInitialViewSize.y);
+            }
         }
 
         void update(core::ecs::World& world, float) override {
@@ -62,6 +82,8 @@ namespace game::skyguard::ecs {
                 return;
             }
 
+            // Fallback для initialViewSize, если он был некорректен.
+            // Предупреждение уже логировалось в конструкторе.
             const sf::Vector2f safeInitialSize{
                 (mInitialViewSize.x > 0.f) ? mInitialViewSize.x : 1.f,
                 (mInitialViewSize.y > 0.f) ? mInitialViewSize.y : 1.f

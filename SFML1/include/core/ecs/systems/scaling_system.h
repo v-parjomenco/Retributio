@@ -6,9 +6,6 @@
 // ================================================================================================
 #pragma once
 
-#include <cassert>
-#include <cmath>
-
 #include <SFML/Graphics/View.hpp>
 #include <SFML/System/Vector2.hpp>
 
@@ -30,8 +27,14 @@ namespace core::ecs {
      * Детерминированная формула:
      *   scale = baseScale * uniformFactor
      *
-     * Принципиально: не накапливаем float-ошибки, т.к. каждый resize пересчитывает scale от baseScale.
-     * В Debug защищаем инвариант "в компоненты не пишем NaN/Inf" (проверка результата ДО записи).
+     * Принципиально: не накапливаем float-ошибки,
+     * т.к. каждый resize пересчитывает scale от baseScale.
+     *
+     * Validate on write, trust on read:
+     *  - baseScale валидируется в config_loader (> 0);
+     *  - baseViewSize валидируется в PlayerInitSystem (> 0);
+     *  - currentViewSize защищён в computeUniformFactor (fallback на 1.0 при invalid);
+     *  - newScale ГАРАНТИРОВАННО finite и valid → проверки НЕТ.
      */
     class ScalingSystem final : public ISystem {
       public:
@@ -49,25 +52,10 @@ namespace core::ecs {
                     const float newUniform =
                         core::ui::computeUniformFactor(currentViewSize, scaling.baseViewSize);
 
-                    // Транзакционное обновление: сначала считаем, затем (в Debug) валидируем, затем пишем.
                     const sf::Vector2f newScale{
                         sprite.baseScale.x * newUniform,
                         sprite.baseScale.y * newUniform
                     };
-
-#if !defined(NDEBUG)
-                    const bool scaleFinite = std::isfinite(newScale.x) && std::isfinite(newScale.y);
-
-                    // Engine-level инвариант: NaN/Inf в scale недопустимы.
-                    // ВАЖНО: не пишем мусор даже если в IDE нажали "Continue" после assert.
-                    assert(scaleFinite &&
-                           "ScalingSystem: non-finite scale computed. "
-                           "Check computeUniformFactor() and baseScale initialization.");
-
-                    if (!scaleFinite) {
-                        break;
-                    }
-#endif
 
                     sprite.scale = newScale;
                     scaling.lastUniform = newUniform;

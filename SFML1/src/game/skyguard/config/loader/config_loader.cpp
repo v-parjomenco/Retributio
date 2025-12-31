@@ -117,6 +117,126 @@ namespace {
         }
     }
 
+    // Вынесенная логика парсинга controls-блока.
+    // Template используется для независимости от конкретной структуры ControlsT
+    // (выводится из типа defaults).
+    template <typename ControlsT>
+    [[nodiscard]] ControlsT parseControlsBlock(const Json& rootData,
+                                               const ControlsT& defaults,
+                                               std::string_view path)
+    {
+        const auto controlsIt = rootData.find(keys::Player::CONTROLS);
+        if (controlsIt == rootData.end()) {
+            return defaults;
+        }
+
+        if (!controlsIt->is_object()) {
+            LOG_WARN(core::log::cat::Config,
+                     "[ConfigLoader] Некорректный блок '{}': ожидался объект. "
+                     "Controls не применены, используются значения по умолчанию. file={}",
+                     keys::Player::CONTROLS,
+                     path);
+            return defaults;
+        }
+
+        const auto& c = *controlsIt;
+        auto parsed = defaults;
+        bool hasHardError = false;
+
+        auto applyKeyOptional = [&](std::string_view controlKey, sf::Keyboard::Key& dst) {
+            const auto res = json_utils::parseKeyWithIssue(c, controlKey, dst);
+
+            using Kind = json_utils::KeyParseIssue::Kind;
+            switch (res.issue.kind) {
+            case Kind::None:
+                dst = res.value;
+                return;
+
+            case Kind::MissingKey:
+                return;
+
+            case Kind::WrongType:
+                hasHardError = true;
+                LOG_DEBUG(core::log::cat::Config,
+                          "[ConfigLoader] controls.'{}': ожидалась строка. file={}",
+                          controlKey,
+                          path);
+                return;
+
+            case Kind::UnknownName:
+                hasHardError = true;
+                LOG_DEBUG(core::log::cat::Config,
+                          "[ConfigLoader] controls.'{}': неизвестная клавиша '{}'. file={}",
+                          controlKey,
+                          res.rawName,
+                          path);
+                return;
+
+            default:
+                hasHardError = true;
+                LOG_DEBUG(core::log::cat::Config,
+                          "[ConfigLoader] controls.'{}': неизвестная ошибка. file={}",
+                          controlKey,
+                          path);
+                return;
+            }
+        };
+
+        applyKeyOptional(keys::Player::CONTROL_THRUST_FORWARD, parsed.thrustForward);
+        applyKeyOptional(keys::Player::CONTROL_THRUST_BACKWARD, parsed.thrustBackward);
+        applyKeyOptional(keys::Player::CONTROL_TURN_LEFT, parsed.turnLeft);
+        applyKeyOptional(keys::Player::CONTROL_TURN_RIGHT, parsed.turnRight);
+
+        const auto layoutIssue = validateControlsLayout(parsed.thrustForward,
+                                                        parsed.thrustBackward,
+                                                        parsed.turnLeft,
+                                                        parsed.turnRight);
+
+        if (hasHardError || layoutIssue.kind != ControlsLayoutIssue::Kind::None) {
+            const char* reason = "неизвестная причина";
+
+            switch (layoutIssue.kind) {
+            case ControlsLayoutIssue::Kind::None:
+                reason = hasHardError ? "некорректные значения/типы" : "неизвестная причина";
+                break;
+            case ControlsLayoutIssue::Kind::Unknown:
+                reason = "обнаружен Unknown";
+                break;
+            case ControlsLayoutIssue::Kind::Duplicate:
+                reason = "обнаружены дубли";
+                break;
+            default:
+                break;
+            }
+
+            LOG_WARN(core::log::cat::Config,
+                     "[ConfigLoader] Некорректный блок '{}': {}. "
+                     "Controls не применены, используются значения по умолчанию. file={}",
+                     keys::Player::CONTROLS,
+                     reason,
+                     path);
+
+            LOG_DEBUG(core::log::cat::Config,
+                      "[ConfigLoader] controls defaults/applied: "
+                      "(thrust_forward={}, thrust_backward={}, turn_left={}, turn_right={}) -> "
+                      "(thrust_forward={}, thrust_backward={}, turn_left={}, turn_right={}). "
+                      "file={}",
+                      static_cast<int>(defaults.thrustForward),
+                      static_cast<int>(defaults.thrustBackward),
+                      static_cast<int>(defaults.turnLeft),
+                      static_cast<int>(defaults.turnRight),
+                      static_cast<int>(parsed.thrustForward),
+                      static_cast<int>(parsed.thrustBackward),
+                      static_cast<int>(parsed.turnLeft),
+                      static_cast<int>(parsed.turnRight),
+                      path);
+
+            return defaults;
+        }
+
+        return parsed;
+    }
+
 } // namespace
 
 namespace game::skyguard::config {
@@ -206,6 +326,7 @@ namespace game::skyguard::config {
 
         // ----------------------------------------------------------------------------------------
         // Масштаб (строго, Type A)
+        // Семантическая валидация: scale должен быть строго > 0, иначе invisible/degenerate.
         // ----------------------------------------------------------------------------------------
         {
             const auto scaleRes =
@@ -221,12 +342,29 @@ namespace game::skyguard::config {
             }
 
             cfg.sprite.scale = scaleRes.value;
+
+            // Семантическая валидация: scale.x и scale.y должны быть строго > 0.
+            // Используем !(x > 0) для NaN-safe проверки.
+            if (!(cfg.sprite.scale.x > 0.0f) || !(cfg.sprite.scale.y > 0.0f)) {
+                LOG_PANIC(core::log::cat::Config,
+                          "[ConfigLoader] Некорректное поле '{}': "
+                          "значения должны быть > 0.0 (x={}, y={}). file={}",
+                          keys::Player::SCALE,
+                          cfg.sprite.scale.x,
+                          cfg.sprite.scale.y,
+                          path);
+            }
         }
 
         // ----------------------------------------------------------------------------------------
         // Движение (строго, Type A)
+        // Атомарная операция: парсинг + семантическая валидация.
+        // Используем !(x >= 0.0f) для NaN-safe проверки: IEEE 754 гарантирует, что любое
+        // сравнение с NaN возвращает false, поэтому !(NaN >= 0.0f) == true.
+        // Validate on write, trust on read — проверка только на границе загрузки.
         // ----------------------------------------------------------------------------------------
-        auto readRequiredFloat = [&](std::string_view key, float& dst) {
+        auto readRequiredNonNegativeFloat = [&](std::string_view key, float& dst) {
+            // 1. Парсинг JSON
             const auto res = json_utils::parseFloatWithIssue(data, key, dst);
 
             using Kind = json_utils::FloatParseIssue::Kind;
@@ -239,12 +377,25 @@ namespace game::skyguard::config {
             }
 
             dst = res.value;
+
+            // 2. Семантическая валидация (NaN-safe, >= 0.0)
+            if (!(dst >= 0.0f)) {
+                LOG_PANIC(core::log::cat::Config,
+                          "[ConfigLoader] Некорректное поле '{}': "
+                          "значение должно быть >= 0.0. file={}",
+                          key,
+                          path);
+            }
         };
 
-        readRequiredFloat(keys::Player::SPEED, cfg.movement.maxSpeed);
-        readRequiredFloat(keys::Player::ACCELERATION, cfg.movement.acceleration);
-        readRequiredFloat(keys::Player::FRICTION, cfg.movement.friction);
-        readRequiredFloat(keys::Player::TURN_RATE, cfg.aircraftControl.turnRateDegreesPerSec);
+        readRequiredNonNegativeFloat(
+            keys::Player::SPEED, cfg.movement.maxSpeed);
+        readRequiredNonNegativeFloat(
+            keys::Player::ACCELERATION, cfg.movement.acceleration);
+        readRequiredNonNegativeFloat(
+            keys::Player::FRICTION, cfg.movement.friction);
+        readRequiredNonNegativeFloat(
+            keys::Player::TURN_RATE, cfg.aircraftControl.turnRateDegreesPerSec);
 
         // Начальный поворот (опциональное поле, если битое -> WARN + default)
         {
@@ -310,119 +461,9 @@ namespace game::skyguard::config {
                                  path);
 
         // ----------------------------------------------------------------------------------------
-        // Управляющие клавиши
-        //
-        // Правило:
-        //  - если ключ отсутствует -> остаётся дефолт (из cfg.controls);
-        //  - если тип неверный / имя клавиши неизвестно / дубли -> 1x WARN
+        // Управляющие клавиши (через вынесенный helper)
         // ----------------------------------------------------------------------------------------
-        if (const auto controlsIt = data.find(keys::Player::CONTROLS); controlsIt != data.end()) {
-            if (!controlsIt->is_object()) {
-                LOG_WARN(core::log::cat::Config,
-                         "[ConfigLoader] Некорректный блок '{}': ожидался объект. "
-                         "Controls не применены, используются значения по умолчанию. file={}",
-                         keys::Player::CONTROLS, path);
-            } else {
-                const auto& c = *controlsIt;
-
-                const auto defaults = cfg.controls;
-                auto parsed = defaults;
-
-                bool hasHardError = false;
-
-                auto applyKeyOptional = [&](std::string_view controlKey,
-                                            sf::Keyboard::Key& dst) {
-                    const auto res = json_utils::parseKeyWithIssue(c, controlKey, dst);
-
-                    using Kind = json_utils::KeyParseIssue::Kind;
-                    switch (res.issue.kind) {
-                    case Kind::None:
-                        dst = res.value;
-                        return;
-
-                    case Kind::MissingKey:
-                        return;
-
-                    case Kind::WrongType:
-                        hasHardError = true;
-                        LOG_DEBUG(core::log::cat::Config,
-                                  "[ConfigLoader] controls.'{}': ожидалась строка. file={}",
-                                  controlKey,
-                                  path);
-                        return;
-
-                    case Kind::UnknownName:
-                        hasHardError = true;
-                        LOG_DEBUG(core::log::cat::Config,
-                                  "[ConfigLoader] controls.'{}': неизвестная клавиша '{}'. file={}",
-                                  controlKey,
-                                  res.rawName,
-                                  path);
-                        return;
-
-                    default:
-                        hasHardError = true;
-                        LOG_DEBUG(core::log::cat::Config,
-                                  "[ConfigLoader] controls.'{}': неизвестная ошибка. file={}",
-                                  controlKey,
-                                  path);
-                        return;
-                    }
-                };
-
-                applyKeyOptional(keys::Player::CONTROL_THRUST_FORWARD, parsed.thrustForward);
-                applyKeyOptional(keys::Player::CONTROL_THRUST_BACKWARD, parsed.thrustBackward);
-                applyKeyOptional(keys::Player::CONTROL_TURN_LEFT, parsed.turnLeft);
-                applyKeyOptional(keys::Player::CONTROL_TURN_RIGHT, parsed.turnRight);
-
-                const auto layoutIssue = validateControlsLayout(parsed.thrustForward,
-                                                                parsed.thrustBackward,
-                                                                parsed.turnLeft,
-                                                                parsed.turnRight);
-
-                if (hasHardError || layoutIssue.kind != ControlsLayoutIssue::Kind::None) {
-                    const char* reason = "неизвестная причина";
-
-                    switch (layoutIssue.kind) {
-                    case ControlsLayoutIssue::Kind::None:
-                        reason = hasHardError ? "некорректные значения/типы" : "неизвестная причина";
-                        break;
-                    case ControlsLayoutIssue::Kind::Unknown:
-                        reason = "обнаружен Unknown";
-                        break;
-                    case ControlsLayoutIssue::Kind::Duplicate:
-                        reason = "обнаружены дубли";
-                        break;
-                    default:
-                        break;
-                    }
-
-                    LOG_WARN(core::log::cat::Config,
-                             "[ConfigLoader] Некорректный блок '{}': {}. "
-                             "Controls не применены, используются значения по умолчанию. file={}",
-                             keys::Player::CONTROLS,
-                             reason,
-                             path);
-
-                    LOG_DEBUG(core::log::cat::Config,
-                              "[ConfigLoader] controls defaults/applied: "
-                              "(thrust_forward={}, thrust_backward={}, turn_left={}, turn_right={}) -> "
-                              "(thrust_forward={}, thrust_backward={}, turn_left={}, turn_right={}). "
-                              "file={}",
-                              static_cast<int>(defaults.thrustForward),
-                              static_cast<int>(defaults.thrustBackward),
-                              static_cast<int>(defaults.turnLeft),
-                              static_cast<int>(defaults.turnRight),
-                              static_cast<int>(parsed.thrustForward),
-                              static_cast<int>(parsed.thrustBackward),
-                              static_cast<int>(parsed.turnLeft),
-                              static_cast<int>(parsed.turnRight),
-                              path);
-                } else {
-                    cfg.controls = parsed;
-                }
-            }
-        }
+        cfg.controls = parseControlsBlock(data, cfg.controls, path);
 
         return cfg;
     }
