@@ -2,6 +2,7 @@
 
 #include "core/resources/resource_manager.h"
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <cstdint>
@@ -11,6 +12,7 @@
 #include <string_view>
 #include <system_error>
 #include <type_traits>
+#include <vector>
 
 #include "core/log/log_macros.h"
 #include "core/resources/paths/resource_paths.h"
@@ -51,6 +53,41 @@ namespace core::resources {
             return std::string(buf.data(), ptr);
         }
 #endif
+
+        // --------------------------------------------------------------------------------------------
+        // Generic helper для детерминированной предзагрузки ресурсов.
+        // 
+        // Назначение:
+        //  - Извлекает все ID из конфигурационной мапы
+        //  - Сортирует их по underlying enum value (детерминированный порядок)
+        //  - Вызывает loadFunc для каждого ID в отсортированном порядке
+        //
+        // Плюсы детерминизма:
+        //  - Стабильные логи загрузки (упрощает сравнение между запусками)
+        //  - Воспроизводимые баги (одинаковый порядок аллокаций памяти)
+        //  - Предсказуемое поведение loading screen
+        //
+        // Performance:
+        //  - Вызывается 1 раз при старте (не hot path)
+        //  - Overhead: allocate + sort — микросекунды даже на 1000 ресурсов
+        //  - Runtime lookup остаётся O(1) через unordered_map
+        // --------------------------------------------------------------------------------------------
+        template <typename EnumID, typename ConfigMap, typename LoadFunc>
+        void preloadAllSorted(const ConfigMap& configs, LoadFunc&& loadFunc) {
+            std::vector<EnumID> sortedIds;
+            sortedIds.reserve(configs.size());
+            
+            for (const auto& [id, _] : configs) {
+                sortedIds.push_back(id);
+            }
+            
+            // Сортировка по underlying enum value гарантирует детерминированный порядок.
+            std::sort(sortedIds.begin(), sortedIds.end());
+            
+            for (const auto id : sortedIds) {
+                loadFunc(id);
+            }
+        }
 
     } // namespace
 
@@ -363,21 +400,24 @@ namespace core::resources {
     void ResourceManager::preloadSound(ids::SoundID id) { (void)getSound(id); }
 
     void ResourceManager::preloadAllTextures() {
-        for (const auto& [id, cfg] : paths::ResourcePaths::getAllTextureConfigs()) {
-            (void)getTexture(id);
-        }
+        preloadAllSorted<ids::TextureID>(
+            paths::ResourcePaths::getAllTextureConfigs(),
+            [this](auto id) { (void)getTexture(id); }
+        );
     }
 
     void ResourceManager::preloadAllFonts() {
-        for (const auto& [id, cfg] : paths::ResourcePaths::getAllFontConfigs()) {
-            (void)getFont(id);
-        }
+        preloadAllSorted<ids::FontID>(
+            paths::ResourcePaths::getAllFontConfigs(),
+            [this](auto id) { (void)getFont(id); }
+        );
     }
 
     void ResourceManager::preloadAllSounds() {
-        for (const auto& [id, cfg] : paths::ResourcePaths::getAllSoundConfigs()) {
-            (void)getSound(id);
-        }
+        preloadAllSorted<ids::SoundID>(
+            paths::ResourcePaths::getAllSoundConfigs(),
+            [this](auto id) { (void)getSound(id); }
+        );
     }
 
     // --------------------------------------------------------------------------------------------
