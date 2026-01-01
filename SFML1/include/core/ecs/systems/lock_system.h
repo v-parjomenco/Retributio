@@ -35,7 +35,7 @@ namespace core::ecs {
      */
     class LockSystem final : public ISystem {
       public:
-        void onResize(World& world, const sf::View& view) {
+        void onResize(World& world, const sf::View& view) noexcept {
             const sf::Vector2f newViewSize = view.getSize();
             constexpr float kMinViewComponent = 1e-3f;
 

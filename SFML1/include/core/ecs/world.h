@@ -121,8 +121,8 @@ namespace core::ecs {
             requires std::constructible_from<T, Args...>
         T& addComponent(Entity e, Args&&... args) {
             static_assert(sizeof...(Args) > 0 || std::is_empty_v<T>,
-                          "World::addComponent<T>: non-empty components must be explicitly initialized. "
-                          "Use addComponent<T>(e, T{}) for default initialization.");
+                          "World::addComponent<T>: non-empty components must be explicitly "
+                          "initialized. Use addComponent<T>(e, T{}) for default initialization.");
 
             assert(isAlive(e) && "addComponent: entity must be alive");
             return mRegistry.emplace_or_replace<T>(e, std::forward<Args>(args)...);
@@ -226,6 +226,28 @@ namespace core::ecs {
             mRegistry.remove<T>(e);
         }
 
+        /**
+         * @brief Пометить сущность компонентом-тегом (hot-path для dirty tracking).
+         *
+         * Назначение:
+         *  - Узкий паттерн для массовых операций внутри view.each().
+         *  - T должен быть пустым tag-компонентом (например, SpatialDirtyTag).
+         *
+         * Ограничения:
+         *  - Это исключение, не правило. НЕ добавлять `markFoo()` для каждого workflow.
+         *  - Для data-компонентов использовать addComponent<T>(e, data).
+         *
+         * Сложность: O(1) amortized.
+         * Thread-safety: Небезопасно.
+         */
+        template <Component T>
+        void markDirty(Entity e) {
+            static_assert(std::is_empty_v<T>,
+                          "World::markDirty<T>: T must be an empty tag component");
+            assert(isAlive(e) && "markDirty: entity must be alive");
+            mRegistry.emplace_or_replace<T>(e);
+        }
+
         // ----------------------------------------------------------------------------------------
         // Запросы (view / group)
         // ----------------------------------------------------------------------------------------
@@ -306,17 +328,29 @@ namespace core::ecs {
             mSystems.renderAll(*this, window);
         }
 
+      private:
+        entt::registry mRegistry{};
+        SystemManager mSystems{};
+
         // ----------------------------------------------------------------------------------------
-        // Escape hatch
+        // Прямой доступ к EnTT (только для observers/signals)
         // ----------------------------------------------------------------------------------------
 
         /**
-         * @brief Прямой доступ к entt::registry для продвинутых случаев.
+         * @brief Прямой доступ к entt::registry для специальных механизмов EnTT.
          *
-         * ИСПОЛЬЗУЙ С ОСТОРОЖНОСТЬЮ:
-         *  - Обходит все проверки World;
-         *  - Нужен только для сложных EnTT-фич (observers, signals и т.п.);
-         *  - В обычном коде используй методы World.
+         * DESIGN NOTE:
+         *  - registry() намеренно private и доступен ТОЛЬКО избранным core-системам (через friend).
+         *  - Game-уровень НИКОГДА не должен напрямую работать с EnTT — только через World API
+         *    (createEntity, addComponent, view(), group()).
+         *  - Это контролируемый escape hatch для случаев, которые невозможно выразить
+         *    через чистый World API без потери производительности или детерминизма.
+         *
+         * Допустимые примеры использования:
+         *  - entt::observer / on_destroy<> (реакция на удаление компонентов);
+         *  - bulk-операции и hot-path tag-мутации (clear<Tag>(), snapshot).
+         *
+         * Расширение списка friend-классов — архитектурное решение и требует обоснования.
          */
         [[nodiscard]] entt::registry& registry() noexcept {
             return mRegistry;
@@ -326,9 +360,8 @@ namespace core::ecs {
             return mRegistry;
         }
 
-      private:
-        entt::registry mRegistry{};
-        SystemManager mSystems{};
+        // Движковые системы, требующие доступ к registry:
+        friend class SpatialIndexSystem;  // Требуется on_destroy<> observer
     };
 
 } // namespace core::ecs

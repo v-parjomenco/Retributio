@@ -20,16 +20,13 @@ namespace {
         if (rotationDegrees == 0.f) {
             return core::ecs::render::computeSpriteAabbNoRotation(tr.position, sp.origin,
                                                                    sp.scale, sp.textureRect);
-            
         }
         const float radians = rotationDegrees * core::utils::kDegToRad;
         const float cachedSin = std::sin(radians);
         const float cachedCos = std::cos(radians);
         return core::ecs::render::computeSpriteAabbRotated(tr.position, sp.origin, sp.scale,
                                                             sp.textureRect, cachedSin, cachedCos);
-        
     }
-    
 } // namespace
 
 namespace core::ecs {
@@ -46,10 +43,7 @@ namespace core::ecs {
         auto newView = registry.view<TransformComponent, SpriteComponent>(
             entt::exclude<SpatialHandleComponent>);
 
-        for (const Entity entity : newView) {
-            const auto& transform = newView.get<TransformComponent>(entity);
-            const auto& sprite = newView.get<SpriteComponent>(entity);
-
+        for (auto [entity, transform, sprite] : newView.each()) {
 #if !defined(NDEBUG)
             assert(core::ecs::render::hasExplicitRect(sprite.textureRect) &&
                    "SpatialIndexSystem: SpriteComponent.textureRect must be explicit");
@@ -70,11 +64,9 @@ namespace core::ecs {
                                        SpriteComponent>();
 
         bool hadDirty = false;
-        for (const Entity entity : dirtyView) {
+        for (auto [entity, handleComp, transform, sprite] : dirtyView.each()) {
+            (void)entity;
             hadDirty = true;
-            auto& handleComp = dirtyView.get<SpatialHandleComponent>(entity);
-            const auto& transform = dirtyView.get<TransformComponent>(entity);
-            const auto& sprite = dirtyView.get<SpriteComponent>(entity);
 
 #if !defined(NDEBUG)
             assert(core::ecs::render::hasExplicitRect(sprite.textureRect) &&

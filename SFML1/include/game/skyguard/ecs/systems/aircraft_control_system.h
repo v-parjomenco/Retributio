@@ -48,7 +48,7 @@ namespace game::skyguard::ecs {
             mKeyDown[index] = pressed;
         }
 
-        void update(core::ecs::World& world, float dt) override {
+        void update(core::ecs::World& world, float dt) noexcept override {
             if (dt == 0.f) {
                 return;
             }

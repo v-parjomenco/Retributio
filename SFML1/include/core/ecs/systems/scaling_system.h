@@ -38,7 +38,7 @@ namespace core::ecs {
      */
     class ScalingSystem final : public ISystem {
       public:
-        void onResize(World& world, const sf::View& newView) {
+        void onResize(World& world, const sf::View& newView) noexcept {
             auto view = world.view<ScalingBehaviorComponent, SpriteComponent>();
 
             // Loop-invariant: размер view одинаков для всех сущностей в рамках одного resize.

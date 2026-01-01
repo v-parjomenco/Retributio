@@ -57,7 +57,7 @@ namespace core::ecs {
             mKeyDown[index] = pressed;
         }
 
-        void update(World& world, float) override {
+        void update(World& world, float) noexcept override {
             auto view =
                 world.view<KeyboardControlComponent, MovementStatsComponent, VelocityComponent>();
 

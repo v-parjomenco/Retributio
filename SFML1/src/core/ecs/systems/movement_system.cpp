@@ -14,10 +14,10 @@ namespace core::ecs {
         // EnTT view: итерируем только сущности с Transform + Velocity.
         // Внутри view.each() оба компонента гарантированно присутствуют.
         auto view = world.view<TransformComponent, VelocityComponent>();
-        auto& registry = world.registry();
 
-        view.each([dt, &registry](Entity entity, TransformComponent& transform,
-                                  const VelocityComponent& velocity) {
+        view.each([dt, &world]([[maybe_unused]] Entity entity,
+                               TransformComponent& transform,
+                               const VelocityComponent& velocity) {
             const bool hasLinear = (velocity.linear.x != 0.f) || (velocity.linear.y != 0.f);
             const bool hasAngular = (velocity.angularDegreesPerSec != 0.f);
 
@@ -27,7 +27,7 @@ namespace core::ecs {
 
             transform.position += velocity.linear * dt;
             transform.rotationDegrees += velocity.angularDegreesPerSec * dt;
-            registry.emplace_or_replace<SpatialDirtyTag>(entity);
+            world.markDirty<SpatialDirtyTag>(entity);
         });
     }
 
