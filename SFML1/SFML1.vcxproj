@@ -367,6 +367,7 @@
     <ClInclude Include="include\core\ecs\components\spatial_dirty_tag.h" />
     <ClInclude Include="include\core\ecs\components\spatial_handle_component.h" />
     <ClInclude Include="include\core\ecs\components\sprite_component.h" />
+    <ClInclude Include="include\core\ecs\components\sprite_scaling_data_component.h" />
     <ClInclude Include="include\core\ecs\components\transform_component.h" />
     <ClInclude Include="include\core\ecs\components\velocity_component.h" />
     <ClInclude Include="include\core\ecs\entity.h" />

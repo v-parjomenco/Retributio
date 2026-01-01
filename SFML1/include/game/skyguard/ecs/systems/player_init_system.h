@@ -2,7 +2,8 @@
 // File: game/skyguard/ecs/systems/player_init_system.h
 // Purpose: One-shot system converting PlayerBlueprint -> runtime ECS components (ID-based)
 // Used by: Game (systems wiring), World/SystemManager
-// Related headers: sprite_component.h, resource_manager.h, anchor_utils.h, scaling_behavior.h
+// Related headers: sprite_component.h, sprite_scaling_data_component.h, resource_manager.h, 
+//                  anchor_utils.h, scaling_behavior.h
 // ================================================================================================
 #pragma once
 
@@ -19,6 +20,7 @@
 #include "core/ecs/components/movement_stats_component.h"
 #include "core/ecs/components/scaling_behavior_component.h"
 #include "core/ecs/components/sprite_component.h"
+#include "core/ecs/components/sprite_scaling_data_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/components/velocity_component.h"
 #include "core/ecs/system.h"
@@ -131,16 +133,24 @@ namespace game::skyguard::ecs {
                     anchoredPos = computedPosition;
                 }
 
+                // --------------------------------------------------------------------------------
+                // HOT COMPONENT: SpriteComponent (40 bytes, читается каждый кадр)
+                // --------------------------------------------------------------------------------
                 core::ecs::SpriteComponent spriteComp{};
                 spriteComp.textureId = cfg.sprite.textureId;
                 spriteComp.textureRect =
                     sf::IntRect(sf::Vector2i{0, 0},
                                 sf::Vector2i{static_cast<int>(textureSize.x),
                                              static_cast<int>(textureSize.y)});
-                spriteComp.baseScale = cfg.sprite.scale;
-                spriteComp.scale = effectiveScale;
+                spriteComp.scale = effectiveScale;  // текущий масштаб (mutable)
                 spriteComp.origin = origin;
                 spriteComp.zOrder = 0.f;
+
+                // --------------------------------------------------------------------------------
+                // COLD COMPONENT: SpriteScalingDataComponent (8 bytes, только при resize)
+                // --------------------------------------------------------------------------------
+                core::ecs::SpriteScalingDataComponent scalingDataComp{};
+                scalingDataComp.baseScale = cfg.sprite.scale;  // IMMUTABLE конфиг
 
                 core::ecs::ScalingBehaviorComponent scalingComp{};
                 scalingComp.kind = cfg.anchor.scalingBehavior;
@@ -160,6 +170,7 @@ namespace game::skyguard::ecs {
                 vel.angularDegreesPerSec = 0.f;
 
                 world.addComponent<core::ecs::SpriteComponent>(entity, spriteComp);
+                world.addComponent<core::ecs::SpriteScalingDataComponent>(entity, scalingDataComp);
                 world.addComponent<core::ecs::TransformComponent>(entity, tr);
                 world.addComponent<core::ecs::VelocityComponent>(entity, vel);
                 world.addComponent<game::skyguard::ecs::AircraftControlComponent>(

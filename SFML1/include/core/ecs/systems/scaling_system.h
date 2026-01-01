@@ -2,15 +2,16 @@
 // File: core/ecs/systems/scaling_system.h
 // Purpose: Apply per-entity scaling behavior on window/view resize (deterministic, absolute-based)
 // Used by: Game resize handling, World/SystemManager
-// Related headers: scaling_behavior_component.h, sprite_component.h, core/ui/scaling_behavior.h
+// Related headers: scaling_behavior_component.h, sprite_component.h, 
+//                  sprite_scaling_data_component.h, core/ui/scaling_behavior.h
 // ================================================================================================
 #pragma once
-
 #include <SFML/Graphics/View.hpp>
 #include <SFML/System/Vector2.hpp>
 
 #include "core/ecs/components/scaling_behavior_component.h"
 #include "core/ecs/components/sprite_component.h"
+#include "core/ecs/components/sprite_scaling_data_component.h"
 #include "core/ecs/system.h"
 #include "core/ecs/world.h"
 #include "core/ui/scaling_behavior.h"
@@ -20,7 +21,6 @@ namespace sf {
 }
 
 namespace core::ecs {
-
     /**
      * @brief Система масштабирования сущностей при resize.
      *
@@ -29,6 +29,10 @@ namespace core::ecs {
      *
      * Принципиально: не накапливаем float-ошибки,
      * т.к. каждый resize пересчитывает scale от baseScale.
+     *
+     * HOT/COLD SPLIT:
+     *  - baseScale (cold) → SpriteScalingDataComponent (читается только здесь)
+     *  - scale (hot) → SpriteComponent (пишется здесь, читается в RenderSystem)
      *
      * Validate on write, trust on read:
      *  - baseScale валидируется в config_loader (> 0);
@@ -39,12 +43,14 @@ namespace core::ecs {
     class ScalingSystem final : public ISystem {
       public:
         void onResize(World& world, const sf::View& newView) noexcept {
-            auto view = world.view<ScalingBehaviorComponent, SpriteComponent>();
+            auto view = world.view<ScalingBehaviorComponent, 
+                                   SpriteComponent, 
+                                   SpriteScalingDataComponent>();
 
             // Loop-invariant: размер view одинаков для всех сущностей в рамках одного resize.
             const sf::Vector2f currentViewSize = newView.getSize();
 
-            for (auto [entity, scaling, sprite] : view.each()) {
+            for (auto [entity, scaling, sprite, scalingData] : view.each()) {
                 (void)entity;
 
                 switch (scaling.kind) {
@@ -53,15 +59,14 @@ namespace core::ecs {
                         core::ui::computeUniformFactor(currentViewSize, scaling.baseViewSize);
 
                     const sf::Vector2f newScale{
-                        sprite.baseScale.x * newUniform,
-                        sprite.baseScale.y * newUniform
+                        scalingData.baseScale.x * newUniform,
+                        scalingData.baseScale.y * newUniform
                     };
 
                     sprite.scale = newScale;
                     scaling.lastUniform = newUniform;
                     break;
                 }
-
                 case core::ui::ScalingBehaviorKind::None:
                     break;
                 }

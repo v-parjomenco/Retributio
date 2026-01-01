@@ -23,6 +23,7 @@
 #include <SFML/System/Vector2.hpp>
 
 #include "core/ecs/components/sprite_component.h"
+#include "core/ecs/components/sprite_scaling_data_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/world.h"
 #include "core/log/log_macros.h"
@@ -325,14 +326,16 @@ namespace {
                              sf::Vector2i{d.rectSizePx, d.rectSizePx});
 
             const float s = kTargetWorldSize / static_cast<float>(d.rectSizePx);
-            sp.baseScale = {s, s};
-            sp.scale = sp.baseScale;
+            sp.scale = {s, s};
+            core::ecs::SpriteScalingDataComponent scalingData{};
+            scalingData.baseScale = {s, s};
 
             sp.origin = {0.f, 0.f};
             sp.zOrder = d.zOrder;
 
             world.addComponent<core::ecs::TransformComponent>(e, tr);
             world.addComponent<core::ecs::SpriteComponent>(e, sp);
+            world.addComponent<core::ecs::SpriteScalingDataComponent>(e, scalingData);
         }
     }
 

@@ -617,6 +617,9 @@
     <ClInclude Include="include\game\skyguard\ecs\components\aircraft_control_bindings_component.h">
       <Filter>include\game\skyguard\ecs\components</Filter>
     </ClInclude>
+    <ClInclude Include="include\core\ecs\components\sprite_scaling_data_component.h">
+      <Filter>include\core\ecs\components</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="include\core\resources\holders\resource_holder.inl">
