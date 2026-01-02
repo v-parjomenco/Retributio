@@ -52,9 +52,25 @@ namespace core::ecs {
 
         // Связать с сервисом времени и шрифтом (полученным через ResourceManager)
         void bind(core::time::TimeService& timeService, const sf::Font& font);
+
+        /**
+         * @brief Привязать RenderSystem для отображения render stats.
+         *
+         * УСЛОВНАЯ КОМПИЛЯЦИЯ:
+         *  - Debug/Profile: сохраняет указатель, render() показывает stats
+         *  - Release: no-op (stats не собираются, показывать нечего)
+         *
+         * Метод существует во всех сборках для совместимости вызывающего кода.
+         */
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
         void setRenderSystem(const RenderSystem* renderSystem) noexcept {
             mRenderSystem = renderSystem;
         }
+#else
+        void setRenderSystem(const RenderSystem*) noexcept {
+            // Release: no-op. RenderSystem stats не собираются, показывать нечего.
+        }
+#endif
 
         void setEnabled(bool enabled) noexcept {
             mEnabled = enabled;
@@ -79,7 +95,6 @@ namespace core::ecs {
 
       private:
         core::time::TimeService* mTime{nullptr}; // не владеем
-        const RenderSystem* mRenderSystem{nullptr}; // не владеем
         std::optional<sf::Text> mFpsText;
         std::string mTextBuffer; // scratch buffer (no per-frame allocations)
         bool mEnabled{true};
@@ -89,6 +104,14 @@ namespace core::ecs {
         sf::Time  mAccumulatedTime{};
         sf::Time  mUpdateInterval{}; // 0 => каждый кадр (no throttle)
         std::uint8_t mSmoothingShift = 3;
+
+        // ----------------------------------------------------------------------------------------
+        // Только для Debug/Profile: render stats от RenderSystem
+        // ----------------------------------------------------------------------------------------
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        const RenderSystem* mRenderSystem{nullptr}; // не владеем
+#endif
+
 #if defined(SFML1_PROFILE)
         // Сглаженные значения времени (EMA), чтобы цифры не "прыгали".
         std::uint64_t mSmoothedCpuTotalUs = 0;

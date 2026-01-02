@@ -159,10 +159,18 @@ namespace game::skyguard {
         auto& spatialSystem =
             mWorld.addSystem<core::ecs::SpatialIndexSystem>(mEngineSettings.spatialCellSize);
 
+        // 1. Создаем систему рендеринга конструктором по умолчанию (без аргументов)
+        auto& renderSys = mWorld.addSystem<core::ecs::RenderSystem>();
+        // 2. Привязываем зависимости через bind()
+        // Передаем адреса (&), так как bind принимает указатели
+        renderSys.bind(&spatialSystem.index(), &mResources);
+        // 3. Сохраняем указатель
+        mRenderSystem = &renderSys;
+
         // Эти системы требуют прямого доступа (onResize, onKeyEvent),
         // поэтому сохраняем указатели.
-        mRenderSystem =
-            &mWorld.addSystem<core::ecs::RenderSystem>(mResources, spatialSystem.index());
+        //mRenderSystem =
+        //    &mWorld.addSystem<core::ecs::RenderSystem>(mResources, spatialSystem.index());
         mScalingSystem  = &mWorld.addSystem<core::ecs::ScalingSystem>();
         mLockSystem     = &mWorld.addSystem<core::ecs::LockSystem>();
         mDebugOverlay   = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();

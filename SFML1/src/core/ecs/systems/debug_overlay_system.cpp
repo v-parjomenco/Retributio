@@ -12,8 +12,13 @@
 
 #include "core/config/properties/debug_overlay_runtime_properties.h"
 #include "core/config/properties/text_properties.h"
-#include "core/ecs/systems/render_system.h"
+#include "core/ecs/world.h"
 #include "core/time/time_service.h"
+
+// RenderSystem нужен только для Debug/Profile (render stats).
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+    #include "core/ecs/systems/render_system.h"
+#endif
 
 namespace {
 
@@ -139,7 +144,7 @@ namespace core::ecs {
         (void)dt;
     }
 
-    void DebugOverlaySystem::render(World&, sf::RenderWindow& window) {
+    void DebugOverlaySystem::render(World& world, sf::RenderWindow& window) {
         if (!mEnabled || !mFpsText) {
             return;
         }
@@ -155,7 +160,9 @@ namespace core::ecs {
 
         mTextBuffer.clear();
 
-        // FPS
+        // ----------------------------------------------------------------------------------------
+        // FPS — показываем ВСЕГДА (Debug/Profile/Release)
+        // ----------------------------------------------------------------------------------------
         if (mTime) {
             const int fpsRounded = static_cast<int>(mTime->getSmoothedFps());
             mTextBuffer.append("FPS: ");
@@ -171,11 +178,20 @@ namespace core::ecs {
             mTextBuffer.append("FPS: ?");
         }
 
-        // Render stats (если привязали RenderSystem)
+        // ----------------------------------------------------------------------------------------
+        // Entity count — показываем ВСЕГДА (O(1) read, полезен для диагностики/analytics)
+        // ----------------------------------------------------------------------------------------
+        mTextBuffer.append("\nEntities: ");
+        appendU64(mTextBuffer, static_cast<std::uint64_t>(world.aliveEntityCount()));
+
+        // ----------------------------------------------------------------------------------------
+        // Render stats — только Debug/Profile.
+        // ----------------------------------------------------------------------------------------
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
         if (mRenderSystem) {
             const auto stats = mRenderSystem->getLastFrameStats();
 
-            mTextBuffer.append("\nSprites: ");
+            mTextBuffer.append("  Sprites: ");
             appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.spriteCount));
 
             mTextBuffer.append("  Vertices: ");
@@ -203,8 +219,8 @@ namespace core::ecs {
             mTextBuffer.push_back('/');
             appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.culledSpriteCount));
 
-#if defined(SFML1_PROFILE)
-            // Сглаживаем времена, чтобы не прыгали от тика к тику.
+    #if defined(SFML1_PROFILE)
+            // CPU timings — только Profile (Debug не имеет таймингов).
             mSmoothedCpuTotalUs = emaPow2(mSmoothedCpuTotalUs, stats.cpuTotalUs, mSmoothingShift);
             mSmoothedCpuDrawUs  = emaPow2(mSmoothedCpuDrawUs,  stats.cpuDrawUs,  mSmoothingShift);
 
@@ -214,7 +230,7 @@ namespace core::ecs {
             appendMs1DecimalFromUs(mTextBuffer, mSmoothedCpuDrawUs);
             mTextBuffer.append(" ms)");
 
-            // RenderSystem breakdown: raw/sm (в миллисекундах, 1 знак, без float).
+            // RenderSystem breakdown: gather/sort/build/draw (в миллисекундах).
             mSmoothedRSGatherUs = emaPow2(mSmoothedRSGatherUs, stats.cpuGatherUs, mSmoothingShift);
             mSmoothedRSSortUs = emaPow2(mSmoothedRSSortUs, stats.cpuSortUs, mSmoothingShift);
             mSmoothedRSBuildUs = emaPow2(mSmoothedRSBuildUs, stats.cpuBuildUs, mSmoothingShift);
@@ -228,8 +244,9 @@ namespace core::ecs {
             appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSBuildUs);
             mTextBuffer.append(" | draw ");
             appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSDrawUs);
-#endif
+    #endif
         }
+#endif // !defined(NDEBUG) || defined(SFML1_PROFILE)
 
         mFpsText->setString(mTextBuffer);
         window.draw(*mFpsText);

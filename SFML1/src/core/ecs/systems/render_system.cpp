@@ -7,15 +7,19 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <limits>
+#include <memory>
 
 #include <SFML/System/Angle.hpp>
 
-#include "core/ecs/components/sprite_component.h"
 #include "core/ecs/components/spatial_handle_component.h"
+#include "core/ecs/components/sprite_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/world.h"
 #include "core/log/log_macros.h"
+#include "core/resources/resource_manager.h"  // mResources->getTexture()
 #include "core/spatial/aabb2.h"
+#include "core/spatial/spatial_index.h"       // mSpatialIndex->query()
 #include "core/utils/math_constants.h"
 
 namespace {
@@ -27,9 +31,8 @@ namespace {
 #endif
 
     [[nodiscard]] core::spatial::Aabb2 makeViewAabb(const sf::View& view) noexcept {
-        // ПРИМЕЧАНИЕ: Culling работает только для неповернутого view (view.getRotation() == 0).
-        // При повороте view AABB в world-space больше не описывает видимую область корректно,
-        // понадобится более общий тест (OBB/матрица вида).
+        // Culling работает только для неповернутого view (getRotation() == 0).
+        // При повороте AABB не описывает видимую область корректно.
         const sf::Vector2f size = view.getSize();
         const sf::Vector2f center = view.getCenter();
         const sf::Vector2f topLeft{center.x - size.x * 0.5f, center.y - size.y * 0.5f};
@@ -43,8 +46,8 @@ namespace {
     }
 
     [[nodiscard]] bool floatNotEqual(const float a, const float b) noexcept {
-        // Строго соответствует логике сортировки: "не равны" == (a<b || b<a)
-        // (заодно не полагаемся на != для float).
+        // ВАЖНО: должно строго соответствовать strict weak ordering в sort (без epsilon!).
+        // "Не равны" означает, что один строго меньше другого (a < b || b < a).
         return (a < b) || (b < a);
     }
 
@@ -67,10 +70,10 @@ namespace {
 
         // Локальные точки как у sf::Sprite (без rotation):
         // (-origin) .. (w-origin, h-origin), затем scale, затем translate.
-        const sf::Vector2f p0{((-ox)     * sx) + px, ((-oy)     * sy) + py};
-        const sf::Vector2f p1{((w - ox)  * sx) + px, ((-oy)     * sy) + py};
-        const sf::Vector2f p2{((w - ox)  * sx) + px, ((h - oy)  * sy) + py};
-        const sf::Vector2f p3{((-ox)     * sx) + px, ((h - oy)  * sy) + py};
+        const sf::Vector2f p0{((-ox) * sx) + px, ((-oy) * sy) + py};
+        const sf::Vector2f p1{((w - ox) * sx) + px, ((-oy) * sy) + py};
+        const sf::Vector2f p2{((w - ox) * sx) + px, ((h - oy) * sy) + py};
+        const sf::Vector2f p3{((-ox) * sx) + px, ((h - oy) * sy) + py};
 
         const float u0 = static_cast<float>(rect.position.x);
         const float v0 = static_cast<float>(rect.position.y);
@@ -84,12 +87,24 @@ namespace {
 
         const sf::Color color = sf::Color::White;
 
-        out[0].position = p0; out[0].color = color; out[0].texCoords = t0;
-        out[1].position = p1; out[1].color = color; out[1].texCoords = t1;
-        out[2].position = p2; out[2].color = color; out[2].texCoords = t2;
-        out[3].position = p0; out[3].color = color; out[3].texCoords = t0;
-        out[4].position = p2; out[4].color = color; out[4].texCoords = t2;
-        out[5].position = p3; out[5].color = color; out[5].texCoords = t3;
+        out[0].position = p0;
+        out[0].color = color;
+        out[0].texCoords = t0;
+        out[1].position = p1;
+        out[1].color = color;
+        out[1].texCoords = t1;
+        out[2].position = p2;
+        out[2].color = color;
+        out[2].texCoords = t2;
+        out[3].position = p0;
+        out[3].color = color;
+        out[3].texCoords = t0;
+        out[4].position = p2;
+        out[4].color = color;
+        out[4].texCoords = t2;
+        out[5].position = p3;
+        out[5].color = color;
+        out[5].texCoords = t3;
     }
 
     void writeSpriteTrianglesRotated(sf::Vertex* out,
@@ -108,16 +123,14 @@ namespace {
         const float sx = scale.x;
         const float sy = scale.y;
 
-        const sf::Vector2f l0{(-ox)    * sx, (-oy)    * sy};
-        const sf::Vector2f l1{(w - ox) * sx, (-oy)    * sy};
+        const sf::Vector2f l0{(-ox) * sx, (-oy) * sy};
+        const sf::Vector2f l1{(w - ox) * sx, (-oy) * sy};
         const sf::Vector2f l2{(w - ox) * sx, (h - oy) * sy};
-        const sf::Vector2f l3{(-ox)    * sx, (h - oy) * sy};
+        const sf::Vector2f l3{(-ox) * sx, (h - oy) * sy};
 
         const auto rotate = [&](const sf::Vector2f& v) noexcept -> sf::Vector2f {
-            return {
-                (v.x * cachedCos) - (v.y * cachedSin),
-                (v.x * cachedSin) + (v.y * cachedCos)
-            };
+            return {(v.x * cachedCos) - (v.y * cachedSin),
+                    (v.x * cachedSin) + (v.y * cachedCos)};
         };
 
         const sf::Vector2f p0 = rotate(l0) + position;
@@ -137,12 +150,24 @@ namespace {
 
         const sf::Color color = sf::Color::White;
 
-        out[0].position = p0; out[0].color = color; out[0].texCoords = t0;
-        out[1].position = p1; out[1].color = color; out[1].texCoords = t1;
-        out[2].position = p2; out[2].color = color; out[2].texCoords = t2;
-        out[3].position = p0; out[3].color = color; out[3].texCoords = t0;
-        out[4].position = p2; out[4].color = color; out[4].texCoords = t2;
-        out[5].position = p3; out[5].color = color; out[5].texCoords = t3;
+        out[0].position = p0;
+        out[0].color = color;
+        out[0].texCoords = t0;
+        out[1].position = p1;
+        out[1].color = color;
+        out[1].texCoords = t1;
+        out[2].position = p2;
+        out[2].color = color;
+        out[2].texCoords = t2;
+        out[3].position = p0;
+        out[3].color = color;
+        out[3].texCoords = t0;
+        out[4].position = p2;
+        out[4].color = color;
+        out[4].texCoords = t2;
+        out[5].position = p3;
+        out[5].color = color;
+        out[5].texCoords = t3;
     }
 
 } // namespace
@@ -157,14 +182,21 @@ namespace core::ecs {
 #endif
     }
 
+    // --------------------------------------------------------------------------------------------
+    // КРИТИЧНО: render() намеренно НЕ noexcept.
+    // sf::RenderWindow::draw() может выбросить исключение (GPU errors, driver issues).
+    // Исключения пробрасываются в Game layer для корректной обработки.
+    // --------------------------------------------------------------------------------------------
+
     void RenderSystem::render(World& world, sf::RenderWindow& window) {
 #if !defined(NDEBUG)
         assert(window.getView().getRotation() == sf::Angle::Zero &&
                "RenderSystem: view rotation is not supported (view.getRotation() must be 0).");
-        assert(mSpatialIndex != nullptr && "RenderSystem: SpatialIndex pointer must be valid.");
+        assert(mSpatialIndex != nullptr && "RenderSystem: bind() не вызван — mSpatialIndex null");
+        assert(mResources != nullptr && "RenderSystem: bind() не вызван — mResources null");
 #endif
 
-        // view-culling работаем в world-space координатах текущего view.
+        // View-culling в world-space координатах текущего view.
         const core::spatial::Aabb2 viewAabb = makeViewAabb(window.getView());
 
 #if defined(SFML1_PROFILE)
@@ -187,10 +219,12 @@ namespace core::ecs {
         const auto gatherStart = std::chrono::steady_clock::now();
 #endif
 
-        // ----------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------
         // Шаг 1: Gather + Culling — собираем ключи только для видимых спрайтов.
-        // ----------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------
 
+        // Amortized growth: reserve(count + max(count/2, 256)).
+        // Избегаем повторных реаллокаций при постепенном увеличении visible count.
         const auto ensureCapacity = [](auto& vec, std::size_t count) {
             const std::size_t current = vec.capacity();
             if (count > current) {
@@ -213,24 +247,45 @@ namespace core::ecs {
 
         ensureCapacity(mKeys, visibleCount);
         ensureCapacity(mPackets, visibleCount);
-        ensureCapacity(mVertices, visibleCount * 6);
 
-        // Per-frame cache: TextureID -> sf::Texture*.
-        const auto findTextureEntry = [&](core::resources::ids::TextureID id)
-            -> TextureCacheEntry* {
-            for (auto& e : mTextureCache) {
-                if (core::resources::ids::toUnderlying(e.id) ==
-                    core::resources::ids::toUnderlying(id)) {
-                    return &e;
-                }
+        // ------------------------------------------------------------------------------------
+        // КРИТИЧНАЯ ОПТИМИЗАЦИЯ: Vertex buffer без инициализации.
+        // std::vector<sf::Vertex>::resize(N) зануляет ~7MB при 50k sprites.
+        // std::make_unique_for_overwrite<sf::Vertex[]> (C++20) = zero init cost.
+        // ------------------------------------------------------------------------------------
+        const std::size_t maxVertices = visibleCount * 6;
+        if (maxVertices > mVertexBufferCapacity) {
+            const std::size_t grow = std::max(maxVertices / 2, std::size_t{1536});
+            const std::size_t newCapacity = maxVertices + grow;
+            mVertexBuffer = std::make_unique_for_overwrite<sf::Vertex[]>(newCapacity);
+            mVertexBufferCapacity = newCapacity;
+        }
+
+        // Per-frame cache: TextureID → sf::Texture*.
+        // Fast-path: после сортировки по textureId большинство sprites имеют одинаковую текстуру.
+        // Храним TextureID + индекс вместо указателя (указатели инвалидируются при реаллокации).
+        core::resources::ids::TextureID lastTextureId = core::resources::ids::TextureID::Unknown;
+        std::size_t lastTextureIndex = 0;
+
+        const auto getTextureEntryCached =
+            [&](core::resources::ids::TextureID id) -> const TextureCacheEntry& {
+            // Fast-path: проверка последней текстуры за O(1).
+            // ВАЖНО: проверка !mTextureCache.empty() нужна для защиты от UB, 
+            // если id совпадает с начальным lastTextureId до первого добавления.
+            if (!mTextureCache.empty() && 
+                core::resources::ids::toUnderlying(id) ==
+                core::resources::ids::toUnderlying(lastTextureId)) {
+                return mTextureCache[lastTextureIndex];
             }
-            return nullptr;
-        };
 
-        const auto getTextureEntryCached = [&](core::resources::ids::TextureID id)
-            -> const TextureCacheEntry& {
-            if (TextureCacheEntry* existing = findTextureEntry(id)) {
-                return *existing;
+            // Поиск в существующем кэше.
+            for (std::size_t i = 0; i < mTextureCache.size(); ++i) {
+                if (core::resources::ids::toUnderlying(mTextureCache[i].id) ==
+                    core::resources::ids::toUnderlying(id)) {
+                    lastTextureId = id;
+                    lastTextureIndex = i;
+                    return mTextureCache[i];
+                }
             }
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
@@ -242,15 +297,23 @@ namespace core::ecs {
             entry.id = id;
             entry.texture = &tex;
             mTextureCache.push_back(entry);
+
+            lastTextureId = id;
+            lastTextureIndex = mTextureCache.size() - 1;
+
             return mTextureCache.back();
         };
 
         auto ecsView = world.view<TransformComponent, SpriteComponent, SpatialHandleComponent>();
 
+        // Итерация по mVisibleEntities (уже отфильтровано SpatialIndex).
+        // Если число видимых сущностей будет постоянно превышать 50k, поменять на: 
+        //  packed iteration через view.each() + inline culling.
+
         for (const Entity entity : mVisibleEntities) {
 #if !defined(NDEBUG)
             assert(ecsView.contains(entity) &&
-                   "RenderSystem: SpatialIndex returned entity without (Transform, Sprite, SpatialHandle).");
+                   "RenderSystem: SpatialIndex вернул entity без (Transform, Sprite, SpatialHandle)");
 #endif
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
             ++totalCandidates;
@@ -260,15 +323,11 @@ namespace core::ecs {
             const auto& sh = ecsView.get<SpatialHandleComponent>(entity);
 
 #if !defined(NDEBUG)
-            const bool dataFinite =
-                isFiniteVec2(tr.position) &&
-                std::isfinite(tr.rotationDegrees) &&
-                isFiniteVec2(spr.origin) &&
-                isFiniteVec2(spr.scale) &&
-                std::isfinite(spr.zOrder);
-
+            const bool dataFinite = isFiniteVec2(tr.position) &&
+                                    std::isfinite(tr.rotationDegrees) && isFiniteVec2(spr.origin) &&
+                                    isFiniteVec2(spr.scale) && std::isfinite(spr.zOrder);
             // Это engine-level инвариант: NaN/Inf сюда попадать не должны.
-            assert(dataFinite && "RenderSystem: non-finite Transform/Sprite data detected.");
+            assert(dataFinite && "RenderSystem: NaN/Inf в Transform/Sprite данных");
             if (!dataFinite) {
                 ++culled;
                 continue;
@@ -278,10 +337,12 @@ namespace core::ecs {
             const sf::IntRect rect = spr.textureRect;
 #if !defined(NDEBUG)
             assert((rect.size.x > 0 && rect.size.y > 0) &&
-                   "RenderSystem: SpriteComponent.textureRect must be explicit with positive size.");
+                   "RenderSystem: textureRect должен иметь положительный размер");
 #endif
 
-            // Точный culling по AABB, которая поддерживается SpatialIndexSystem (dirty-on-write).
+            // SpatialIndex возвращает cell-level кандидатов.
+            // Fine AABB culling обязателен для pixel-accurate visibility.
+            // Entity в ячейке может НЕ пересекаться с viewAabb, даже если ячейка пересекается.
             if (!core::spatial::intersectsInclusive(sh.lastAabb, viewAabb)) {
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
                 ++culled;
@@ -300,30 +361,31 @@ namespace core::ecs {
                 cachedCos = std::cos(radians);
             }
 
-            const std::size_t packetIndex = mPackets.size();
-            mPackets.push_back(RenderPacket{
-                .position = tr.position,
-                .origin = spr.origin,
-                .scale = spr.scale,
-                .rect = rect,
-                .cachedSin = cachedSin,
-                .cachedCos = cachedCos,
-                .isRotated = isRotated
-            });
+            const std::size_t packetIdx = mPackets.size();
+            mPackets.push_back(RenderPacket{.position = tr.position,
+                                            .origin = spr.origin,
+                                            .scale = spr.scale,
+                                            .rect = rect,
+                                            .cachedSin = cachedSin,
+                                            .cachedCos = cachedCos,
+                                            .isRotated = isRotated});
 
-            mKeys.push_back(RenderKey{
-                .zOrder = spr.zOrder,
-                .textureId = spr.textureId,
-                .tieBreak = core::ecs::toUint(entity),
-                .packetIndex = packetIndex
-            });
+            // packetIdx должен умещаться в uint32_t (max ~4 млрд).
+            assert(packetIdx <= std::numeric_limits<std::uint32_t>::max() &&
+                   "RenderSystem: packetIndex overflow");
+
+            mKeys.push_back(RenderKey{.zOrder = spr.zOrder,
+                                      .textureId = spr.textureId,
+                                      .tieBreak = core::ecs::toUint(entity),
+                                      .packetIndex = static_cast<std::uint32_t>(packetIdx)});
         }
 
 #if defined(SFML1_PROFILE)
         {
             const auto gatherEnd = std::chrono::steady_clock::now();
-            gatherUs = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
-                gatherEnd - gatherStart).count());
+            gatherUs = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::microseconds>(gatherEnd - gatherStart)
+                    .count());
         }
 #endif
 
@@ -348,63 +410,57 @@ namespace core::ecs {
             return;
         }
 
-        // ----------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------
         // Шаг 2: Sort — детерминированно и batching-friendly.
-        // ----------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------
 
 #if defined(SFML1_PROFILE)
         const auto sortStart = std::chrono::steady_clock::now();
 #endif
 
-        std::sort(mKeys.begin(), mKeys.end(),
-                  [](const RenderKey& a, const RenderKey& b) {
-                      if (a.zOrder < b.zOrder) {
-                          return true;
-                      }
-                      if (b.zOrder < a.zOrder) {
-                          return false;
-                      }
+        std::sort(mKeys.begin(), mKeys.end(), [](const RenderKey& a, const RenderKey& b) {
+            if (a.zOrder < b.zOrder) {
+                return true;
+            }
+            if (b.zOrder < a.zOrder) {
+                return false;
+            }
 
-                      const auto aTex = core::resources::ids::toUnderlying(a.textureId);
-                      const auto bTex = core::resources::ids::toUnderlying(b.textureId);
-                      if (aTex < bTex) {
-                          return true;
-                      }
-                      if (bTex < aTex) {
-                          return false;
-                      }
+            const auto aTex = core::resources::ids::toUnderlying(a.textureId);
+            const auto bTex = core::resources::ids::toUnderlying(b.textureId);
+            if (aTex < bTex) {
+                return true;
+            }
+            if (bTex < aTex) {
+                return false;
+            }
 
-                      return a.tieBreak < b.tieBreak;
-                  });
+            return a.tieBreak < b.tieBreak;
+        });
 
 #if defined(SFML1_PROFILE)
         {
             const auto sortEnd = std::chrono::steady_clock::now();
-            sortUs = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
-                sortEnd - sortStart).count());
+            sortUs = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::microseconds>(sortEnd - sortStart).count());
         }
 #endif
 
-        // ----------------------------------------------------------------------------------------
-        // Шаг 3: Draw — Vertex batching (CPU). Flush на смене zOrder или textureId.
-        // ----------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------
+        // Шаг 3: Draw — Vertex batching. Flush на смене zOrder или textureId.
+        // ------------------------------------------------------------------------------------
 
 #if defined(SFML1_PROFILE)
         const auto drawPhaseStart = std::chrono::steady_clock::now();
 #endif
 
-        const std::size_t maxVertices = mKeys.size() * 6;
-        if (mVertices.size() < maxVertices) {
-            mVertices.resize(maxVertices);
-        }
         std::size_t vertexWrite = 0;
 
         sf::RenderStates states;
 
         core::resources::ids::TextureID currentTextureId = mKeys.front().textureId;
         float currentZ = mKeys.front().zOrder;
-
-        // Lazy per-frame cache: резолв только при первой встрече textureId (обычно десятки/кадр).
+        // Lazy per-frame cache
         const TextureCacheEntry& firstEntry = getTextureEntryCached(currentTextureId);
         const sf::Texture* currentTexture = firstEntry.texture;
         states.texture = currentTexture;
@@ -413,7 +469,6 @@ namespace core::ecs {
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         const auto trackUniqueTexturePtr = [&](const sf::Texture* tex) {
-            // Линейный поиск: ожидаемо маленькое число уникальных текстур (десятки), overhead минимальный.
             for (const sf::Texture* existing : mUniqueTexturePointers) {
                 if (existing == tex) {
                     return;
@@ -433,16 +488,12 @@ namespace core::ecs {
             const auto drawStart = std::chrono::steady_clock::now();
 #endif
 
-            window.draw(mVertices.data(),
-                        vertexWrite,
-                        sf::PrimitiveType::Triangles,
-                        states);
+            window.draw(mVertexBuffer.get(), vertexWrite, sf::PrimitiveType::Triangles, states);
 
 #if defined(SFML1_PROFILE)
             const auto drawEnd = std::chrono::steady_clock::now();
             drawUs += static_cast<std::uint64_t>(
-                std::chrono::duration_cast<std::chrono::microseconds>(
-                drawEnd - drawStart).count());
+                std::chrono::duration_cast<std::chrono::microseconds>(drawEnd - drawStart).count());
 #endif
 
             vertexWrite = 0;
@@ -478,28 +529,21 @@ namespace core::ecs {
             const sf::IntRect rect = packet.rect;
 
             if (packet.isRotated) {
-                writeSpriteTrianglesRotated(mVertices.data() + vertexWrite,
-                                            packet.position,
-                                            packet.origin,
-                                            packet.scale,
-                                            rect,
-                                            packet.cachedSin,
+                writeSpriteTrianglesRotated(mVertexBuffer.get() + vertexWrite, packet.position,
+                                            packet.origin, packet.scale, rect, packet.cachedSin,
                                             packet.cachedCos);
             } else {
-                writeSpriteTriangles(mVertices.data() + vertexWrite,
-                                     packet.position,
-                                     packet.origin,
-                                     packet.scale,
-                                     rect);
+                writeSpriteTriangles(mVertexBuffer.get() + vertexWrite, packet.position,
+                                     packet.origin, packet.scale, rect);
             }
             vertexWrite += 6;
         }
 
         flush();
 
-        // ----------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------
         // Диагностика (метрики) — Debug/Profile. Тайминги — только Profile.
-        // ----------------------------------------------------------------------------------------
+        // ------------------------------------------------------------------------------------
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         FrameStats stats{};
@@ -517,7 +561,8 @@ namespace core::ecs {
         {
             const auto drawPhaseEnd = std::chrono::steady_clock::now();
             const std::uint64_t drawPhaseTotalUs = static_cast<std::uint64_t>(
-                std::chrono::duration_cast<std::chrono::microseconds>(drawPhaseEnd - drawPhaseStart).count());
+                std::chrono::duration_cast<std::chrono::microseconds>(drawPhaseEnd - drawPhaseStart)
+                    .count());
             buildUs = (drawPhaseTotalUs > drawUs) ? (drawPhaseTotalUs - drawUs) : 0;
         }
 
@@ -542,19 +587,18 @@ namespace core::ecs {
 #endif
 
 #if !defined(NDEBUG)
-        // Редкий лог (DEV-only): не спамим, только раз в ~60 кадров и только при изменении count.
-        static int frameCount = 0;
-        static std::size_t lastLoggedCount = static_cast<std::size_t>(-1);
+        // Редкий лог (DEV-only): раз в 60 кадров, только при изменении visible count.
+        ++mDebugFrameCount;
 
-        ++frameCount;
-
-        if (frameCount == 1 || frameCount % 60 == 0) {
-            const std::size_t entityCount = mKeys.size();
-            if (entityCount != lastLoggedCount) {
+        if (mDebugFrameCount == 1 || mDebugFrameCount % 60 == 0) {
+            const std::size_t visibleEntityCount = mKeys.size();
+            if (visibleEntityCount != mDebugLastLoggedCount) {
                 LOG_DEBUG(core::log::cat::ECS,
-                          "RenderSystem: {} visible, {} draw-calls (batched), frame {}",
-                          entityCount, batchDrawCalls, frameCount);
-                lastLoggedCount = entityCount;
+                          "RenderSystem: {} total entities, {} visible, {} draw-calls (batched), "
+                          "frame {}",
+                          world.aliveEntityCount(), visibleEntityCount, batchDrawCalls,
+                          mDebugFrameCount);
+                mDebugLastLoggedCount = visibleEntityCount;
             }
         }
 #endif
