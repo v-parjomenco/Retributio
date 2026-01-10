@@ -4,8 +4,8 @@
 // Used by: Game, PlayerInitSystem
 // Related headers: game/skyguard/config/config_keys.h,
 //                  core/utils/file_loader.h,
-//                  core/utils/json/json_document.h, core/utils/json/json_parsers.h,                  
-//                  core/resources/ids/resource_id_utils.h, core/ui/ids/ui_id_utils.h,
+//                  core/utils/json/json_document.h, core/utils/json/json_parsers.h,
+//                  core/resources/ids/resource_id_utils.h,
 //                  game/skyguard/config/blueprints/player_blueprint.h
 // ================================================================================================
 #pragma once

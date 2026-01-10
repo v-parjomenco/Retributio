@@ -20,6 +20,7 @@ namespace core::resources::ids {
     enum class TextureID : std::uint16_t {
         Unknown = 0,
         Player,
+        BackgroundDesert,
         // TODO: add more texture IDs here (e.g. UIFrame, BackgroundMain, etc.)
     };
 

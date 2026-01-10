@@ -49,6 +49,9 @@ namespace core::resources::ids {
         if (name == "Player") {
             return TextureID::Player;
         }
+        if (name == "BackgroundDesert") {
+            return TextureID::BackgroundDesert;
+        }
         // TODO: extend as you add more TextureID values
         return std::nullopt;
     }

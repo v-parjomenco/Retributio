@@ -6,7 +6,8 @@
 // ================================================================================================
 #pragma once
 
-#include "core/config/properties/anchor_properties.h"
+#include <SFML/System/Vector2.hpp>
+
 #include "core/config/properties/movement_properties.h"
 #include "core/config/properties/sprite_properties.h"
 #include "game/skyguard/config/properties/aircraft_control_bindings_properties.h"
@@ -22,7 +23,7 @@ namespace game::skyguard::config::blueprints {
      *
      *  - какой спрайт использовать и с каким масштабом;
      *  - как быстро и с каким трением игрок двигается;
-     *  - как он привязан к экрану/миру и что происходит при resize;
+     *  - стартовую позицию в мире (в world space);
      *  - какими клавишами управляется.
      *
      * Важно: этот blueprint относится к конкретной игре (Skyguard),
@@ -31,9 +32,9 @@ namespace game::skyguard::config::blueprints {
     struct PlayerBlueprint {
         core::config::properties::SpriteProperties sprite;
         core::config::properties::MovementProperties movement;
-        core::config::properties::AnchorProperties anchor;
         game::skyguard::config::properties::AircraftControlBindingsProperties controls;
         game::skyguard::config::properties::AircraftControlProperties aircraftControl;
+        sf::Vector2f startPosition{0.f, 0.f};
     };
 
 } // namespace game::skyguard::config::blueprints

@@ -19,8 +19,8 @@ namespace game::skyguard::config {
      *  - поверх них накрывается skyguard_game.json.
      */
     struct WindowConfig {
-        std::uint32_t width = 1024;
-        std::uint32_t height = 768;
+        std::uint32_t width = 1920;
+        std::uint32_t height = 1080;
         std::string title = "SkyGuard (name subject to change)";
     };
 

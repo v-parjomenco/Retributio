@@ -79,7 +79,20 @@ namespace core::ecs {
         }
 
         void update(World&, float) override;
-        void render(World&, sf::RenderWindow& window) override;
+        /**
+         * @brief Подготовить текст оверлея для текущего кадра.
+         *
+         * Вызывается один раз за кадр из игрового слоя.
+         * Не рисует — только обновляет внутренний sf::Text.
+         */
+        void prepareFrame(World& world);
+
+        /**
+         * @brief Нарисовать оверлей.
+         *
+         * Вызывается в UI pass, когда уже выставлен нужный view.
+         */
+        void draw(sf::RenderWindow& window) const;
 
         /**
          * @brief Применить визуальные свойства текста (позиция, размер, цвет).

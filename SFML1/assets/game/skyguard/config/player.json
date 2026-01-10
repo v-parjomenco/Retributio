@@ -11,13 +11,9 @@
   "turn_rate": 80.0,
   "initial_rotation_degrees": 270.0,
 
-  "resize_scaling": "Uniform",
-  "lock_behavior": "ScreenLock",
-
-  "anchor": "BottomCenter",
   "start_position": {
-    "x": 0,
-    "y": 0
+    "x": 960,
+    "y": 1080
   },
 
   "controls": {

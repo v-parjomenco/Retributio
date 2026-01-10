@@ -1,5 +1,13 @@
 {
-  "windowWidth": 1024,
-  "windowHeight": 768,
-  "windowTitle": "SkyGuard (name subject to change)"
+  "window": {
+    "width": 1920,
+    "height": 1080,
+    "title": "SkyGuard (name subject to change)"
+  },
+  "view": {
+    "world_logical_size": [ 1920, 1080 ],
+    "ui_logical_size": [ 1920, 1080 ],
+    "camera_offset": [ 0, -100 ],
+    "camera_min_y": 540
+  }
 }

@@ -16,10 +16,10 @@
 #include "core/ecs/world.h"
 #include "core/resources/resource_manager.h"
 #include "core/time/time_service.h"
+#include "game/skyguard/presentation/background_renderer.h"
+#include "game/skyguard/presentation/view_manager.h"
 
 namespace core::ecs {
-    class ScalingSystem;
-    class LockSystem;
     class DebugOverlaySystem;
     class RenderSystem;
 } // namespace core::ecs
@@ -46,6 +46,9 @@ namespace game::skyguard {
         void processEvents();
         void update(const sf::Time& dt);
         void render();
+        void updateCamera();
+        void renderWorldPass();
+        void renderUiPass();
 
         /// Инициализация ресурсного слоя (ResourcePaths + fallback-ресурсы ResourceManager).
         void initResources();
@@ -60,6 +63,8 @@ namespace game::skyguard {
 
         core::time::TimeService mTime; // сервис времени (вне ECS)
         core::ecs::World mWorld;       // ECS-мир
+        presentation::ViewManager mViewManager;
+        presentation::BackgroundRenderer mBackgroundRenderer;
 
         // Пока не используется:
         //  после перевода на one-shot PlayerInitSystem игрок создаётся внутри системы.
@@ -76,8 +81,6 @@ namespace game::skyguard {
         //  - Сейчас SystemManager хранит системы через std::unique_ptr -> объекты живут в куче.
         //  - Реаллокации std::vector двигают unique_ptr, но НЕ двигают сами объекты систем.
         //  - Поэтому эти raw pointers стабильны по адресу, пока живёт World/SystemManager.
-        core::ecs::ScalingSystem* mScalingSystem{nullptr};
-        core::ecs::LockSystem* mLockSystem{nullptr};
         game::skyguard::ecs::AircraftControlSystem* mAircraftControlSystem{nullptr};
         core::ecs::DebugOverlaySystem* mDebugOverlay{nullptr};
         core::ecs::RenderSystem* mRenderSystem{nullptr};

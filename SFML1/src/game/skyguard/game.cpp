@@ -11,21 +11,25 @@
 #include "core/config/loader/debug_overlay_loader.h"
 #include "core/config/loader/engine_settings_loader.h"
 #include "core/debug/debug_config.h"
+#include "core/ecs/components/transform_component.h"
+#include "core/ecs/components/sprite_component.h"
 #include "core/ecs/systems/debug_overlay_system.h"
-#include "core/ecs/systems/lock_system.h"
 #include "core/ecs/systems/movement_system.h"
 #include "core/ecs/systems/render_system.h"
-#include "core/ecs/systems/scaling_system.h"
 #include "core/ecs/systems/spatial_index_system.h"
 #include "core/log/log_macros.h"
 #include "core/time/time_config.h"
 
 #include "game/skyguard/config/config_paths.h"
 #include "game/skyguard/config/loader/config_loader.h"
+#include "game/skyguard/config/loader/view_config_loader.h"
 #include "game/skyguard/config/loader/window_config_loader.h"
 #include "game/skyguard/config/window_config.h"
+#include "game/skyguard/ecs/components/player_tag_component.h"
 #include "game/skyguard/ecs/systems/player_init_system.h"
 #include "game/skyguard/ecs/systems/aircraft_control_system.h"
+#include "game/skyguard/ecs/systems/player_bounds_system.h"
+#include "game/skyguard/presentation/view_manager.h"
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
     #include "game/skyguard/dev/stress_scene.h"
@@ -46,10 +50,12 @@ namespace game::skyguard {
 
     Game::Game() {
         // ----------------------------------------------------------------------------------------
-        // Загружаем конфиг окна SkyGuard из JSON (skyguard_game.json)
+        // Загружаем конфиг окна и view SkyGuard из JSON (skyguard_game.json)
         // ----------------------------------------------------------------------------------------
         const skycfg::WindowConfig windowCfg =
             skycfg::loadWindowConfig(skycfg_paths::SKYGUARD_GAME);
+        const skycfg::ViewConfig viewCfg =
+            skycfg::loadViewConfig(skycfg_paths::SKYGUARD_GAME);
 
         // Создаём окно с настройками из JSON.
         mWindow.create(sf::VideoMode({windowCfg.width, windowCfg.height}), windowCfg.title);
@@ -84,6 +90,11 @@ namespace game::skyguard {
                   mEngineSettings.frameLimit,
                   (mEngineSettings.vsyncEnabled ? " (VSync enabled, frameLimit ignored)."
                   : " (VSync disabled, frameLimit applied)."));
+
+        // ----------------------------------------------------------------------------------------
+        // Инициализация view (letterbox + UI separation)
+        // ----------------------------------------------------------------------------------------
+        mViewManager.init(viewCfg, mWindow.getSize());
 
         // ----------------------------------------------------------------------------------------
         // Инициализация ресурсного слоя (реестр ресурсов + fallback-ресурсы)
@@ -128,18 +139,7 @@ namespace game::skyguard {
     void Game::initWorld() {
         // Загружаем blueprint игрока (data-driven).
         auto playerCfg = skycfg::ConfigLoader::loadPlayerConfig(skycfg_paths::PLAYER);
-
-        // Базовый размер (design/reference) и фактический стартовый размер окна сейчас совпадают.
-        // Если позже захочешь "design resolution" отдельно — прокинем baseViewSize из конфига.
-        const sf::Vector2f baseViewSize = mWindow.getView().getSize();
-
-        // Инвариант: после успешного create() view всегда валиден (ненулевой размер).
-        // Проверка нужна только для отлова багов в SFML или memory corruption.
-        assert((baseViewSize.x > 0.f) && (baseViewSize.y > 0.f) &&
-               "Game::initWorld: window view has invalid size after create(). "
-               "This indicates SFML bug or memory corruption.");
-
-        const sf::Vector2f initialViewSize = baseViewSize;
+        const float playerFloorY = mViewManager.getWorldLogicalSize().y;
 
         std::vector<game::skyguard::config::blueprints::PlayerBlueprint> players;
         players.emplace_back(std::move(playerCfg));
@@ -150,12 +150,15 @@ namespace game::skyguard {
 
         // PlayerInitSystem сам создаёт сущности на первом тике и больше не работает.
         mWorld.addSystem<game::skyguard::ecs::PlayerInitSystem>(
-            mResources, baseViewSize, initialViewSize, std::move(players));
+            mResources, std::move(players));
 
         // ВАЖНО: AircraftControl должен обновляться ДО Movement, т.к. пишет VelocityComponent,
         // а Movement читает VelocityComponent в этом же тике.
         mAircraftControlSystem = &mWorld.addSystem<game::skyguard::ecs::AircraftControlSystem>();
         mWorld.addSystem<core::ecs::MovementSystem>();
+        mWorld.addSystem<game::skyguard::ecs::PlayerBoundsSystem>(
+            mViewManager.getWorldLogicalSize(),
+            playerFloorY);
         auto& spatialSystem =
             mWorld.addSystem<core::ecs::SpatialIndexSystem>(mEngineSettings.spatialCellSize);
 
@@ -169,10 +172,6 @@ namespace game::skyguard {
 
         // Эти системы требуют прямого доступа (onResize, onKeyEvent),
         // поэтому сохраняем указатели.
-        //mRenderSystem =
-        //    &mWorld.addSystem<core::ecs::RenderSystem>(mResources, spatialSystem.index());
-        mScalingSystem  = &mWorld.addSystem<core::ecs::ScalingSystem>();
-        mLockSystem     = &mWorld.addSystem<core::ecs::LockSystem>();
         mDebugOverlay   = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
 
         // Привязываем overlay к сервису времени и шрифту (через ResourceManager).
@@ -199,6 +198,8 @@ namespace game::skyguard {
             // всё равно позволяет включить overlay в рантайме в любой сборке.
             mDebugOverlay->setEnabled(overlayCfg.enabled && dbg::SHOW_FPS_OVERLAY);
         }
+
+        mBackgroundRenderer.init(mResources, core::resources::ids::TextureID::BackgroundDesert);
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         // DEV/PROFILE-only: стресс-сцена через ENV.
@@ -294,23 +295,14 @@ namespace game::skyguard {
 
             // Изменение размера окна.
             else if (const auto* resized = event->getIf<sf::Event::Resized>()) {
-                const sf::Vector2f newSize(static_cast<float>(resized->size.x),
-                                           static_cast<float>(resized->size.y));
+                const sf::Vector2u newSize{resized->size.x, resized->size.y};
 
                 // При минимизации окно может сообщить 0x0. Не создаём/не применяем invalid view.
-                if (newSize.x <= 0.0f || newSize.y <= 0.0f) {
+                if (newSize.x == 0u || newSize.y == 0u) {
                     continue;
                 }
 
-                const sf::View newView({newSize.x * 0.5f, newSize.y * 0.5f},
-                                       {newSize.x, newSize.y});
-
-                // Обновляем View окна, чтобы другие поведения и отрисовка видели актуальный вид.
-                mWindow.setView(newView);
-
-                // Пересчёт UI/привязок.
-                mScalingSystem->onResize(mWorld, newView);
-                mLockSystem->onResize(mWorld, newView);
+                mViewManager.onResize(newSize);
             }
         }
     }
@@ -323,12 +315,75 @@ namespace game::skyguard {
         assert(dtSeconds > 0.0f); // фиксированный шаг должен быть положительным
 
         mWorld.update(dtSeconds); // обновляем все ECS-системы
+        updateCamera();
+
+        if (mDebugOverlay) {
+            mDebugOverlay->prepareFrame(mWorld);
+        }
+    }
+
+    void Game::updateCamera() {
+        auto view = mWorld.view<
+            game::skyguard::ecs::LocalPlayerTagComponent,
+            core::ecs::TransformComponent
+        >();
+
+        const auto it = view.begin();
+        const bool foundPlayer = (it != view.end());
+        if (foundPlayer) {
+            const core::ecs::Entity entity = *it;
+            auto& transform = view.get<core::ecs::TransformComponent>(entity);
+            mViewManager.updateCamera(transform.position);
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            static std::uint32_t logCounter = 0;
+            if (++logCounter % 60u == 0u) {
+                const auto& viewRef = mViewManager.getWorldView();
+                (void)viewRef;
+                const sf::Vector2f cameraOffset = mViewManager.getCameraOffset();
+                LOG_DEBUG(core::log::cat::Gameplay,
+                          "CamDebug: playerY={:.2f} viewCenterY={:.2f} viewSizeY={:.2f} "
+                          "cameraOffsetY={:.2f} cameraMinY={:.2f}",
+                          transform.position.y,
+                          viewRef.getCenter().y,
+                          viewRef.getSize().y,
+                          cameraOffset.y,
+                          mViewManager.getCameraMinY());
+            }
+#endif
+        }
+
+#if !defined(NDEBUG)
+        static bool warnedOnce = false;
+        if (!foundPlayer && !warnedOnce) {
+            LOG_DEBUG(core::log::cat::Gameplay,
+                      "Game::updateCamera: no LocalPlayerTagComponent found");
+            warnedOnce = true;
+        }
+#endif
     }
 
     void Game::render() {
-        mWindow.clear();
-        mWorld.render(mWindow); // отрисовываем ECS-мир
+        mWindow.clear(sf::Color::Black);
+        renderWorldPass();
+        renderUiPass();
         mWindow.display();
+    }
+
+    void Game::renderWorldPass() {
+        mWindow.setView(mViewManager.getWorldView());
+        mBackgroundRenderer.update(mViewManager.getWorldView());
+        mBackgroundRenderer.draw(mWindow);
+        if (mRenderSystem) {
+            mRenderSystem->render(mWorld, mWindow);
+        }
+    }
+
+    void Game::renderUiPass() {
+        mWindow.setView(mViewManager.getUiView());
+        if (mDebugOverlay) {
+            mDebugOverlay->draw(mWindow);
+        }
     }
 
 } // namespace game::skyguard

@@ -326,9 +326,12 @@
     <ClCompile Include="src\core\utils\json\json_document.cpp" />
     <ClCompile Include="src\core\utils\json\json_parsers.cpp" />
     <ClCompile Include="src\game\skyguard\config\loader\config_loader.cpp" />
+    <ClCompile Include="src\game\skyguard\config\loader\view_config_loader.cpp" />
     <ClCompile Include="src\game\skyguard\config\loader\window_config_loader.cpp" />
     <ClCompile Include="src\game\skyguard\dev\stress_scene.cpp" />
     <ClCompile Include="src\game\skyguard\game.cpp" />
+    <ClCompile Include="src\game\skyguard\presentation\background_renderer.cpp" />
+    <ClCompile Include="src\game\skyguard\presentation\view_manager.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">pch.h</PrecompiledHeaderFile>
@@ -407,6 +410,7 @@
     <ClInclude Include="include\core\ui\ids\ui_id_utils.h" />
     <ClInclude Include="include\core\ui\lock_behavior.h" />
     <ClInclude Include="include\core\ui\scaling_behavior.h" />
+    <ClInclude Include="include\core\ui\viewport_utils.h" />
     <ClInclude Include="include\core\utils\file_loader.h" />
     <ClInclude Include="include\core\utils\json\json_common.h" />
     <ClInclude Include="include\core\utils\json\json_document.h" />
@@ -417,16 +421,22 @@
     <ClInclude Include="include\game\skyguard\config\config_keys.h" />
     <ClInclude Include="include\game\skyguard\config\config_paths.h" />
     <ClInclude Include="include\game\skyguard\config\loader\config_loader.h" />
+    <ClInclude Include="include\game\skyguard\config\loader\view_config_loader.h" />
     <ClInclude Include="include\game\skyguard\config\loader\window_config_loader.h" />
     <ClInclude Include="include\game\skyguard\config\properties\aircraft_control_bindings_properties.h" />
     <ClInclude Include="include\game\skyguard\config\properties\aircraft_control_properties.h" />
+    <ClInclude Include="include\game\skyguard\config\view_config.h" />
     <ClInclude Include="include\game\skyguard\config\window_config.h" />
     <ClInclude Include="include\game\skyguard\dev\stress_scene.h" />
     <ClInclude Include="include\game\skyguard\ecs\components\aircraft_control_bindings_component.h" />
     <ClInclude Include="include\game\skyguard\ecs\components\aircraft_control_component.h" />
+    <ClInclude Include="include\game\skyguard\ecs\components\player_tag_component.h" />
+    <ClInclude Include="include\game\skyguard\ecs\systems\player_bounds_system.h" />
     <ClInclude Include="include\game\skyguard\ecs\systems\player_init_system.h" />
     <ClInclude Include="include\game\skyguard\ecs\systems\aircraft_control_system.h" />
     <ClInclude Include="include\game\skyguard\game.h" />
+    <ClInclude Include="include\game\skyguard\presentation\background_renderer.h" />
+    <ClInclude Include="include\game\skyguard\presentation\view_manager.h" />
     <ClInclude Include="include\pch.h" />
     <ClInclude Include="include\third_party\entt\entt_fwd.hpp" />
     <ClInclude Include="include\third_party\entt\entt_registry.hpp" />

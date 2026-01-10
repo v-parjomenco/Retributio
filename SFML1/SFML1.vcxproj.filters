@@ -280,6 +280,12 @@
     <Filter Include="src\core\spatial">
       <UniqueIdentifier>{2b9be747-12e4-49ce-8d47-469614cb7403}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\game\skyguard\presentation">
+      <UniqueIdentifier>{a8341c02-5202-48b0-a71e-acf663ba23b2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\presentation">
+      <UniqueIdentifier>{78c0c48e-d0f3-488a-8269-f83cf2796a5e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -356,6 +362,15 @@
     </ClCompile>
     <ClCompile Include="src\core\spatial\spatial_index.cpp">
       <Filter>src\core\spatial</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\skyguard\config\loader\view_config_loader.cpp">
+      <Filter>src\game\skyguard\config\loader</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\skyguard\presentation\view_manager.cpp">
+      <Filter>src\game\skyguard\presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\skyguard\presentation\background_renderer.cpp">
+      <Filter>src\game\skyguard\presentation</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -619,6 +634,27 @@
     </ClInclude>
     <ClInclude Include="include\core\ecs\components\sprite_scaling_data_component.h">
       <Filter>include\core\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ui\viewport_utils.h">
+      <Filter>include\core\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\loader\view_config_loader.h">
+      <Filter>include\game\skyguard\config\loader</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\view_config.h">
+      <Filter>include\game\skyguard\config</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\ecs\components\player_tag_component.h">
+      <Filter>include\game\skyguard\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\presentation\view_manager.h">
+      <Filter>include\game\skyguard\presentation</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\ecs\systems\player_bounds_system.h">
+      <Filter>include\game\skyguard\ecs\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\presentation\background_renderer.h">
+      <Filter>include\game\skyguard\presentation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

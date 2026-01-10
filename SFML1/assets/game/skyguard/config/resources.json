@@ -5,6 +5,12 @@
       "smooth": true,
       "repeated": false,
       "mipmap": false
+    },
+    "BackgroundDesert": {
+      "path": "assets/game/skyguard/images/backgrounds/desert.png",
+      "smooth": true,
+      "repeated": true,
+      "mipmap": false
     }
   },
   "fonts": {

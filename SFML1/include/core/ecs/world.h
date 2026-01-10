@@ -394,6 +394,19 @@ namespace core::ecs {
         }
 
         /**
+         * @brief Добавить или заменить tag-компонент (empty type).
+         *
+         * Используется, когда addComponent<T>() возвращает void для empty типов в EnTT.
+         *
+         * Сложность: O(1) amortized.
+         * Thread-safety: Небезопасно.
+         */
+        template <TagComponent T> void addTagComponent(Entity e) {
+            assert(isAlive(e) && "addTagComponent: entity must be alive");
+            mRegistry.emplace_or_replace<T>(e);
+        }
+
+        /**
          * @brief Проверить наличие компонента у сущности.
          *
          * КОНТРАКТ (TRUST ON READ):

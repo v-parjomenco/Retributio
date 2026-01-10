@@ -139,21 +139,19 @@ namespace core::ecs {
     void DebugOverlaySystem::update(World& world, float dt) {
         // Render-only система.
         // Важно: update() может вызываться 0..N раз за кадр (fixed timestep),
-        // поэтому любые "per-frame" метрики/строки обновляем в render() ровно один раз за кадр.
+        // поэтому любые "per-frame" метрики/строки обновляем в prepareFrame() ровно один раз.
         (void)world;
         (void)dt;
     }
 
-    void DebugOverlaySystem::render(World& world, sf::RenderWindow& window) {
+    void DebugOverlaySystem::prepareFrame(World& world) {
         if (!mEnabled || !mFpsText) {
             return;
         }
 
-        // Ровно 1 раз за кадр, но строку обновляем реже (убираем дрожь).
         const sf::Time dt = mRenderClock.restart();
         mAccumulatedTime += dt;
         if (mUpdateInterval != sf::Time::Zero && mAccumulatedTime < mUpdateInterval) {
-            window.draw(*mFpsText);
             return;
         }
         mAccumulatedTime = sf::Time::Zero;
@@ -249,6 +247,12 @@ namespace core::ecs {
 #endif // !defined(NDEBUG) || defined(SFML1_PROFILE)
 
         mFpsText->setString(mTextBuffer);
+    }
+
+    void DebugOverlaySystem::draw(sf::RenderWindow& window) const {
+        if (!mEnabled || !mFpsText) {
+            return;
+        }
         window.draw(*mFpsText);
     }
 

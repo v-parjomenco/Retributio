@@ -14,10 +14,22 @@ namespace game::skyguard::config::keys {
     // Ключи для игрового конфига SkyGuard (assets/game/skyguard/config/skyguard_game.json)
     // --------------------------------------------------------------------------------------------
     namespace Game {
-        inline constexpr const char* WINDOW_WIDTH = "windowWidth";
-        inline constexpr const char* WINDOW_HEIGHT = "windowHeight";
-        inline constexpr const char* WINDOW_TITLE = "windowTitle";
+        inline constexpr const char* WINDOW = "window";
+        inline constexpr const char* VIEW = "view";
     } // namespace Game
+
+    namespace Window {
+        inline constexpr const char* WIDTH = "width";
+        inline constexpr const char* HEIGHT = "height";
+        inline constexpr const char* TITLE = "title";
+    } // namespace Window
+
+    namespace View {
+        inline constexpr const char* WORLD_LOGICAL_SIZE = "world_logical_size";
+        inline constexpr const char* UI_LOGICAL_SIZE = "ui_logical_size";
+        inline constexpr const char* CAMERA_OFFSET = "camera_offset";
+        inline constexpr const char* CAMERA_MIN_Y = "camera_min_y";
+    } // namespace View
 
     // --------------------------------------------------------------------------------------------
     // Ключи для конфигурации игрока (assets/game/skyguard/config/player.json)
@@ -29,10 +41,7 @@ namespace game::skyguard::config::keys {
         inline constexpr const char* SPEED = core::config::keys::Common::SPEED;
         inline constexpr const char* ACCELERATION = core::config::keys::Common::ACCELERATION;
         inline constexpr const char* FRICTION = core::config::keys::Common::FRICTION;
-        inline constexpr const char* ANCHOR = core::config::keys::Common::ANCHOR;
         inline constexpr const char* START_POSITION = core::config::keys::Common::START_POSITION;
-        inline constexpr const char* RESIZE_SCALING = core::config::keys::Common::RESIZE_SCALING;
-        inline constexpr const char* LOCK_BEHAVIOR = core::config::keys::Common::LOCK_BEHAVIOR;
 
         inline constexpr const char* CONTROLS = "controls";
         inline constexpr const char* CONTROL_THRUST_FORWARD = "thrust_forward";

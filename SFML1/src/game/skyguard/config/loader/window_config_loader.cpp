@@ -21,14 +21,15 @@ namespace {
 
     namespace json_utils = core::utils::json;
     namespace gk = game::skyguard::config::keys::Game;
+    namespace wk = game::skyguard::config::keys::Window;
 
     using Json = json_utils::json;
     using Report = core::config::loader::detail::NonCriticalConfigReport;
 
     static constexpr std::string_view kLoaderTag = "SkyGuard::WindowConfigLoader";
-    static constexpr std::string_view kKnownKeysHint = "windowWidth/windowHeight/windowTitle";
+    static constexpr std::string_view kKnownKeysHint = "window.width/window.height/window.title";
 
-    static constexpr std::array kKnownKeys{gk::WINDOW_WIDTH, gk::WINDOW_HEIGHT, gk::WINDOW_TITLE};
+    static constexpr std::array kKnownKeys{wk::WIDTH, wk::HEIGHT, wk::TITLE};
 
     static_assert(kKnownKeys.size() <= Report::kMaxFields,
                   "NonCriticalConfigReport buffer too small for WindowConfigLoader");
@@ -96,9 +97,38 @@ namespace game::skyguard::config {
             return cfg;
         }
 
+        const auto windowIt = data.find(gk::WINDOW);
+        if (windowIt == data.end()) {
+            LOG_WARN(core::log::cat::Config,
+                     "[{}] Отсутствует блок '{}' в '{}'. "
+                     "Используются значения по умолчанию (width={}, height={}, title='{}').",
+                     kLoaderTag,
+                     gk::WINDOW,
+                     path,
+                     cfg.width,
+                     cfg.height,
+                     cfg.title);
+            return cfg;
+        }
+
+        if (!windowIt->is_object()) {
+            LOG_WARN(core::log::cat::Config,
+                     "[{}] Блок '{}' в '{}' должен быть object. "
+                     "Используются значения по умолчанию (width={}, height={}, title='{}').",
+                     kLoaderTag,
+                     gk::WINDOW,
+                     path,
+                     cfg.width,
+                     cfg.height,
+                     cfg.title);
+            return cfg;
+        }
+
+        const Json& windowData = *windowIt;
+
         Report report{};
 
-        if (!hasAnyKnownKey(data)) {
+        if (!hasAnyKnownKey(windowData)) {
             report.emitWarnNoKnownKeys(kLoaderTag, path, kKnownKeysHint);
             return cfg;
         }
@@ -108,16 +138,18 @@ namespace game::skyguard::config {
             const std::uint32_t defaultWidth = cfg.width;
 
             const auto res =
-                json_utils::parseUIntWithIssue<std::uint32_t>(data, gk::WINDOW_WIDTH, defaultWidth);
+                json_utils::parseUIntWithIssue<std::uint32_t>(windowData,
+                                                              wk::WIDTH,
+                                                              defaultWidth);
 
             cfg.width = res.value;
-            core::config::loader::detail::noteUIntIssue(report, gk::WINDOW_WIDTH, res);
+            core::config::loader::detail::noteUIntIssue(report, wk::WIDTH, res);
 
             // validate-on-write: 0 недопустим
-            const bool hasKey = (data.find(gk::WINDOW_WIDTH) != data.end());
+            const bool hasKey = (windowData.find(wk::WIDTH) != windowData.end());
             using Kind = json_utils::UnsignedParseIssue::Kind;
             if (hasKey && res.issue.kind == Kind::None && cfg.width == 0u) {
-                report.addSemanticInvalidField(gk::WINDOW_WIDTH);
+                report.addSemanticInvalidField(wk::WIDTH);
                 cfg.width = defaultWidth;
             }
         }
@@ -127,28 +159,30 @@ namespace game::skyguard::config {
             const std::uint32_t defaultHeight = cfg.height;
 
             const auto res =
-                json_utils::parseUIntWithIssue<std::uint32_t>(data, gk::WINDOW_HEIGHT, defaultHeight);
+                json_utils::parseUIntWithIssue<std::uint32_t>(windowData,
+                                                              wk::HEIGHT,
+                                                              defaultHeight);
 
             cfg.height = res.value;
-            core::config::loader::detail::noteUIntIssue(report, gk::WINDOW_HEIGHT, res);
+            core::config::loader::detail::noteUIntIssue(report, wk::HEIGHT, res);
 
             // validate-on-write: 0 недопустим
-            const bool hasKey = (data.find(gk::WINDOW_HEIGHT) != data.end());
+            const bool hasKey = (windowData.find(wk::HEIGHT) != windowData.end());
             using Kind = json_utils::UnsignedParseIssue::Kind;
             if (hasKey && res.issue.kind == Kind::None && cfg.height == 0u) {
-                report.addSemanticInvalidField(gk::WINDOW_HEIGHT);
+                report.addSemanticInvalidField(wk::HEIGHT);
                 cfg.height = defaultHeight;
             }
         }
 
         // title
         {
-            const auto it = data.find(gk::WINDOW_TITLE);
-            if (it != data.end()) {
+            const auto it = windowData.find(wk::TITLE);
+            if (it != windowData.end()) {
                 if (it->is_string()) {
                     cfg.title = it->get_ref<const std::string&>();
                 } else {
-                    report.addInvalidField(gk::WINDOW_TITLE);
+                    report.addInvalidField(wk::TITLE);
                 }
             }
         }

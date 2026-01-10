@@ -10,6 +10,8 @@ namespace core::resources::ids {
         switch (id) {
         case TextureID::Player:
             return "Player";
+        case TextureID::BackgroundDesert:
+            return "BackgroundDesert";
         case TextureID::Unknown:
             return "UnknownTexture";
         }

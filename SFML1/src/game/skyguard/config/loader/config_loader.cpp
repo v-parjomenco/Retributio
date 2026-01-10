@@ -11,7 +11,6 @@
 
 #include "core/log/log_macros.h"
 #include "core/resources/ids/resource_id_utils.h"
-#include "core/ui/ids/ui_id_utils.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_document.h"
 #include "core/utils/json/json_parsers.h"
@@ -25,7 +24,6 @@ namespace {
     namespace keys       = game::skyguard::config::keys;
     namespace json_utils = core::utils::json;
     namespace rids       = core::resources::ids;
-    namespace ui_ids     = core::ui::ids;
 
     using Json = json_utils::json;
 
@@ -65,56 +63,6 @@ namespace {
         }
 
         return {};
-    }
-
-    template <typename Enum, typename TryParseFn>
-    void applyOptionalEnumWithWarn(const Json& data,
-                                   std::string_view key,
-                                   Enum& dst,
-                                   TryParseFn tryParse,
-                                   std::string_view path)
-    {
-        const auto res = json_utils::parseEnumWithIssue(data, key, dst, tryParse);
-
-        using Kind = json_utils::EnumParseIssue::Kind;
-        switch (res.issue.kind) {
-        case Kind::None:
-            dst = res.value;
-            return;
-
-        case Kind::MissingKey:
-            return;
-
-        case Kind::WrongType:
-            LOG_WARN(core::log::cat::Config,
-                     "[ConfigLoader] Некорректное поле '{}': {}. "
-                     "Применено значение по умолчанию ({}). file={}",
-                     key,
-                     json_utils::describe(res.issue),
-                     ui_ids::toString(dst),
-                     path);
-            return;
-
-        case Kind::UnknownValue:
-            LOG_WARN(core::log::cat::Config,
-                     "[ConfigLoader] Некорректное поле '{}': {} ('{}'). "
-                     "Применено значение по умолчанию ({}). file={}",
-                     key,
-                     json_utils::describe(res.issue),
-                     res.issue.raw,
-                     ui_ids::toString(dst),
-                     path);
-            return;
-
-        default:
-            LOG_WARN(core::log::cat::Config,
-                     "[ConfigLoader] Некорректное поле '{}': неизвестная ошибка. "
-                     "Применено значение по умолчанию ({}). file={}",
-                     key,
-                     ui_ids::toString(dst),
-                     path);
-            return;
-        }
     }
 
     // Вынесенная логика парсинга controls-блока.
@@ -419,25 +367,17 @@ namespace game::skyguard::config {
         }
 
         // ----------------------------------------------------------------------------------------
-        // Anchor / resize / lock (мягко: missing -> default; 
-        //                         неверный или неизвестный типа -> WARN + default)
-        // ----------------------------------------------------------------------------------------
-        applyOptionalEnumWithWarn(data,
-                                 keys::Player::ANCHOR,
-                                 cfg.anchor.anchorType,
-                                 ui_ids::tryParseAnchor,
-                                 path);
-
         // start_position: поле опциональное. Если задано и битое -> WARN + default.
+        // ----------------------------------------------------------------------------------------
         {
             const auto posRes = json_utils::parseVec2fWithIssue(
                 data,
                 keys::Player::START_POSITION,
-                cfg.anchor.startPosition);
+                cfg.startPosition);
 
             using Kind = json_utils::Vec2ParseIssue::Kind;
             if (posRes.issue.kind == Kind::None) {
-                cfg.anchor.startPosition = posRes.value;
+                cfg.startPosition = posRes.value;
             } else if (posRes.issue.kind != Kind::MissingKey) {
                 LOG_WARN(core::log::cat::Config,
                          "[ConfigLoader] Некорректное поле '{}': {}. "
@@ -447,18 +387,6 @@ namespace game::skyguard::config {
                          path);
             }
         }
-
-        applyOptionalEnumWithWarn(data,
-                                 keys::Player::RESIZE_SCALING,
-                                 cfg.anchor.scalingBehavior,
-                                 ui_ids::tryParseScaling,
-                                 path);
-
-        applyOptionalEnumWithWarn(data,
-                                 keys::Player::LOCK_BEHAVIOR,
-                                 cfg.anchor.lockBehavior,
-                                 ui_ids::tryParseLock,
-                                 path);
 
         // ----------------------------------------------------------------------------------------
         // Управляющие клавиши (через вынесенный helper)

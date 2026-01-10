@@ -2,72 +2,42 @@
 // File: game/skyguard/ecs/systems/player_init_system.h
 // Purpose: One-shot system converting PlayerBlueprint -> runtime ECS components (ID-based)
 // Used by: Game (systems wiring), World/SystemManager
-// Related headers: sprite_component.h, sprite_scaling_data_component.h, resource_manager.h, 
-//                  anchor_utils.h, scaling_behavior.h
+// Related headers: sprite_component.h, resource_manager.h
 // ================================================================================================
 #pragma once
 
+#include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <utility>
 #include <vector>
 
-#include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Graphics/Texture.hpp>
-#include <SFML/Graphics/View.hpp>
 #include <SFML/System/Vector2.hpp>
 
-#include "core/ecs/components/lock_behavior_component.h"
 #include "core/ecs/components/movement_stats_component.h"
-#include "core/ecs/components/scaling_behavior_component.h"
 #include "core/ecs/components/sprite_component.h"
-#include "core/ecs/components/sprite_scaling_data_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/components/velocity_component.h"
 #include "core/ecs/system.h"
 #include "core/ecs/world.h"
 #include "core/log/log_macros.h"
 #include "core/resources/resource_manager.h"
-#include "core/ui/anchor_utils.h"
-#include "core/ui/scaling_behavior.h"
 
 #include "game/skyguard/config/blueprints/player_blueprint.h"
 #include "game/skyguard/ecs/components/aircraft_control_component.h"
 #include "game/skyguard/ecs/components/aircraft_control_bindings_component.h"
+#include "game/skyguard/ecs/components/player_tag_component.h"
 
 namespace game::skyguard::ecs {
 
     class PlayerInitSystem final : public core::ecs::ISystem {
       public:
         PlayerInitSystem(core::resources::ResourceManager& resources,
-                         const sf::Vector2f baseViewSize,
-                         const sf::Vector2f initialViewSize,
                          std::vector<game::skyguard::config::blueprints::PlayerBlueprint> players)
             : mResources(resources)
-            , mBaseViewSize(baseViewSize)
-            , mInitialViewSize(initialViewSize)
             , mPlayers(std::move(players))
             , mHasRun(false) {
-
-            // ------------------------------------------------------------------------------------
-            // Validate on write: baseViewSize — критичное значение для ScalingSystem.
-            // Используем !(x > 0) для NaN-safe проверки.
-            // ------------------------------------------------------------------------------------
-            if (!(mBaseViewSize.x > 0.0f) || !(mBaseViewSize.y > 0.0f)) {
-                LOG_PANIC(core::log::cat::Gameplay,
-                          "PlayerInitSystem: baseViewSize must be > 0.0 (got x={}, y={})",
-                          mBaseViewSize.x,
-                          mBaseViewSize.y);
-            }
-
-            // initialViewSize может быть некорректным (например, при тестировании).
-            // Не падаем, но логируем предупреждение (будет fallback в update()).
-            if (!(mInitialViewSize.x > 0.0f) || !(mInitialViewSize.y > 0.0f)) {
-                LOG_WARN(core::log::cat::Gameplay,
-                         "PlayerInitSystem: initialViewSize invalid (x={}, y={}), "
-                         "will use fallback (1.0, 1.0)",
-                         mInitialViewSize.x,
-                         mInitialViewSize.y);
-            }
         }
 
         void update(core::ecs::World& world, float) override {
@@ -84,21 +54,12 @@ namespace game::skyguard::ecs {
                 return;
             }
 
-            // Fallback для initialViewSize, если он был некорректен.
-            // Предупреждение уже логировалось в конструкторе.
-            const sf::Vector2f safeInitialSize{
-                (mInitialViewSize.x > 0.f) ? mInitialViewSize.x : 1.f,
-                (mInitialViewSize.y > 0.f) ? mInitialViewSize.y : 1.f
-            };
-            const sf::View initialView(
-                sf::FloatRect({0.f, 0.f}, {safeInitialSize.x, safeInitialSize.y}));
-
-            // Loop-invariant: одинаковый для всех сущностей при первичной инициализации.
-            const float initialUniform =
-                core::ui::computeUniformFactor(safeInitialSize, mBaseViewSize);
-
             // Сейчас спавним ровно по числу blueprint'ов.
             const std::size_t spawnedCount = mPlayers.size();
+
+#if !defined(NDEBUG)
+            assert(mPlayers.size() <= 2 && "SkyGuard supports max 2 players");
+#endif
 
             for (std::size_t i = 0; i < mPlayers.size(); ++i) {
                 const auto& cfg = mPlayers[i];
@@ -111,27 +72,12 @@ namespace game::skyguard::ecs {
                           core::ecs::toUint(entity), i);
 #endif
 
-                const sf::Vector2f effectiveScale{
-                    cfg.sprite.scale.x * initialUniform,
-                    cfg.sprite.scale.y * initialUniform
-                };
-
                 const auto& textureResource = mResources.getTexture(cfg.sprite.textureId);
                 const sf::Texture& texture = textureResource.get();
                 const sf::Vector2u textureSize = texture.getSize();
 
-                sf::Vector2f origin{0.f, 0.f};
-                sf::Vector2f anchoredPos = cfg.anchor.startPosition;
-
-                if (cfg.anchor.anchorType != core::ui::AnchorType::None) {
-                    auto [computedOrigin, computedPosition] =
-                        core::ui::anchors::computeAnchorData(textureSize,
-                                                             effectiveScale,
-                                                             cfg.anchor.anchorType,
-                                                             initialView);
-                    origin = computedOrigin;
-                    anchoredPos = computedPosition;
-                }
+                const sf::Vector2f origin{static_cast<float>(textureSize.x) * 0.5f,
+                                          static_cast<float>(textureSize.y) * 0.5f};
 
                 // --------------------------------------------------------------------------------
                 // HOT COMPONENT: SpriteComponent (40 bytes, читается каждый кадр)
@@ -142,27 +88,12 @@ namespace game::skyguard::ecs {
                     sf::IntRect(sf::Vector2i{0, 0},
                                 sf::Vector2i{static_cast<int>(textureSize.x),
                                              static_cast<int>(textureSize.y)});
-                spriteComp.scale = effectiveScale;  // текущий масштаб (mutable)
+                spriteComp.scale = cfg.sprite.scale; // artist scale (immutable при runtime)
                 spriteComp.origin = origin;
                 spriteComp.zOrder = 0.f;
 
-                // --------------------------------------------------------------------------------
-                // COLD COMPONENT: SpriteScalingDataComponent (8 bytes, только при resize)
-                // --------------------------------------------------------------------------------
-                core::ecs::SpriteScalingDataComponent scalingDataComp{};
-                scalingDataComp.baseScale = cfg.sprite.scale;  // IMMUTABLE конфиг
-
-                core::ecs::ScalingBehaviorComponent scalingComp{};
-                scalingComp.kind = cfg.anchor.scalingBehavior;
-                scalingComp.baseViewSize = mBaseViewSize;
-                scalingComp.lastUniform = initialUniform;
-
-                core::ecs::LockBehaviorComponent lockComp{};
-                lockComp.kind = cfg.anchor.lockBehavior;
-                lockComp.previousViewSize = safeInitialSize;
-
                 core::ecs::TransformComponent tr{};
-                tr.position = anchoredPos;
+                tr.position = cfg.startPosition;
                 tr.rotationDegrees = cfg.aircraftControl.initialRotationDegrees;
 
                 core::ecs::VelocityComponent vel{};
@@ -170,7 +101,6 @@ namespace game::skyguard::ecs {
                 vel.angularDegreesPerSec = 0.f;
 
                 world.addComponent<core::ecs::SpriteComponent>(entity, spriteComp);
-                world.addComponent<core::ecs::SpriteScalingDataComponent>(entity, scalingDataComp);
                 world.addComponent<core::ecs::TransformComponent>(entity, tr);
                 world.addComponent<core::ecs::VelocityComponent>(entity, vel);
                 world.addComponent<game::skyguard::ecs::AircraftControlComponent>(
@@ -178,9 +108,14 @@ namespace game::skyguard::ecs {
                     game::skyguard::ecs::AircraftControlComponent{
                         cfg.aircraftControl.turnRateDegreesPerSec
                     });
-                world.addComponent<core::ecs::ScalingBehaviorComponent>(entity, scalingComp);
-                world.addComponent<core::ecs::LockBehaviorComponent>(entity, lockComp);
-
+                world.addComponent<game::skyguard::ecs::PlayerTagComponent>(
+                    entity,
+                    game::skyguard::ecs::PlayerTagComponent{
+                        static_cast<std::uint8_t>(i)
+                    });
+                if (i == 0) {
+                    world.addTagComponent<game::skyguard::ecs::LocalPlayerTagComponent>(entity);
+                }
                 world.addComponent<core::ecs::MovementStatsComponent>(
                     entity,
                     core::ecs::MovementStatsComponent{
@@ -212,13 +147,8 @@ namespace game::skyguard::ecs {
             mHasRun = true;
         }
 
-        void render(core::ecs::World&, sf::RenderWindow&) override {
-        }
-
       private:
         core::resources::ResourceManager& mResources;
-        sf::Vector2f mBaseViewSize;
-        sf::Vector2f mInitialViewSize;
 
         std::vector<game::skyguard::config::blueprints::PlayerBlueprint> mPlayers;
 
