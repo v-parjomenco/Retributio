@@ -47,6 +47,13 @@ namespace game::skyguard::ecs {
 
             LOG_DEBUG(core::log::cat::Gameplay, "PlayerInitSystem: one-shot spawn starting");
 
+            if (mPlayers.size() > 2) {
+                LOG_PANIC(core::log::cat::Gameplay,
+                          "PlayerInitSystem: too many player blueprints ({}). "
+                          "SkyGuard supports max 2 players.",
+                          mPlayers.size());
+            }
+
             if (mPlayers.empty()) {
                 LOG_WARN(core::log::cat::Gameplay,
                          "PlayerInitSystem: no player blueprints provided (nothing to spawn)");
@@ -56,10 +63,6 @@ namespace game::skyguard::ecs {
 
             // Сейчас спавним ровно по числу blueprint'ов.
             const std::size_t spawnedCount = mPlayers.size();
-
-#if !defined(NDEBUG)
-            assert(mPlayers.size() <= 2 && "SkyGuard supports max 2 players");
-#endif
 
             for (std::size_t i = 0; i < mPlayers.size(); ++i) {
                 const auto& cfg = mPlayers[i];
@@ -88,7 +91,8 @@ namespace game::skyguard::ecs {
                     sf::IntRect(sf::Vector2i{0, 0},
                                 sf::Vector2i{static_cast<int>(textureSize.x),
                                              static_cast<int>(textureSize.y)});
-                spriteComp.scale = cfg.sprite.scale; // artist scale (immutable при runtime)
+                // масштаб задаётся художником (не меняется в рантайме)
+                spriteComp.scale = cfg.sprite.scale;
                 spriteComp.origin = origin;
                 spriteComp.zOrder = 0.f;
 

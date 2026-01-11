@@ -21,7 +21,7 @@
 namespace game::skyguard::config {
 
     /**
-     * @brief Загружает конфигурацию View (world/ui logical sizes, camera) из JSON.
+     * @brief Загружает конфигурацию View (логические размеры мира/UI, параметры камеры) из JSON.
      *
      * Поведение:
      *  - Если файл отсутствует или не читается:

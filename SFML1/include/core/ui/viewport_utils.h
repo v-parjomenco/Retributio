@@ -12,24 +12,24 @@
 namespace core::ui {
 
     /**
-     * @brief Compute letterbox/pillarbox viewport for a fixed logical size.
+     * @brief Вычислить letterbox/pillarbox viewport для фиксированного логического размера.
      *
-     * Maintains aspect ratio of logicalSize within windowSize.
-     * Returns viewport rect in normalized coordinates [0, 1].
+     * Сохраняет соотношение сторон logicalSize внутри windowSize.
+     * Возвращает viewport в нормализованных координатах [0, 1].
      *
-     * @param windowSize Current window size in pixels
-     * @param logicalSize Fixed logical size (world or UI units)
-     * @return Viewport rect for sf::View::setViewport()
+     * @param windowSize Текущий размер окна в пикселях
+     * @param logicalSize Фиксированный логический размер (world or UI units)
+     * @return Viewport rect для sf::View::setViewport()
      *
-     * @note Fallback {0,0,1,1} does NOT preserve aspect ratio.
-     *       Caller must ensure window size validity before relying on result.
+     * @note Fallback {0,0,1,1} НЕ сохраняет соотношение сторон.
+     *       Вызывающая сторона должна гарантировать валидность размеров окна.
      */
     [[nodiscard]] inline sf::FloatRect computeLetterboxViewport(
         const sf::Vector2u& windowSize,
         const sf::Vector2f& logicalSize) noexcept {
 
-        // NOTE: Fallback does NOT preserve aspect ratio.
-        // This is a defensive measure for invalid input, not normal operation.
+        // ВАЖНО: фолбэк НЕ сохраняет соотношение сторон.
+        // Это защитная мера для невалидного ввода, не штатный режим.
         if (windowSize.x == 0 || windowSize.y == 0 ||
             logicalSize.x <= 0.f || logicalSize.y <= 0.f) {
             return sf::FloatRect({0.f, 0.f},
@@ -46,11 +46,11 @@ namespace core::ui {
         float viewportY = 0.f;
 
         if (windowAspect > logicalAspect) {
-            // Window wider than logical → pillarbox (black bars on sides)
+            // Если окно шире логического → pillarbox (black bars on sides)
             viewportWidth = logicalAspect / windowAspect;
             viewportX = (1.f - viewportWidth) * 0.5f;
         } else {
-            // Window taller than logical → letterbox (black bars top/bottom)
+            // Если окно выше логического → letterbox (black bars top/bottom)
             viewportHeight = windowAspect / logicalAspect;
             viewportY = (1.f - viewportHeight) * 0.5f;
         }

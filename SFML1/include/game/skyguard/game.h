@@ -66,13 +66,12 @@ namespace game::skyguard {
         presentation::ViewManager mViewManager;
         presentation::BackgroundRenderer mBackgroundRenderer;
 
-        // Пока не используется:
-        //  после перевода на one-shot PlayerInitSystem игрок создаётся внутри системы.
-        // Если понадобится доступ к player entity (камера/фокус/мультиплеер),
+        // После перевода на одноразовый PlayerInitSystem игрок создаётся внутри системы,
+        //  а доступ к локальному игроку уже обеспечен через LocalPlayerTagComponent.
+        // Если понадобится прямой доступ к сущностям игроков (камера/фокус/мультиплеер),
         //  добавим явный канал:
         //  - либо возвращаем список созданных Entity из PlayerInitSystem,
-        //  - либо заводим отдельный runtime-компонент "PlayerTag"/"LocalPlayerIndex"
-        //  и ищем через view().
+        //  - либо используем PlayerTagComponent/LocalPlayerTagComponent и ищем через view()
         core::ecs::Entity mPlayerEntity{core::ecs::NullEntity};
 
         // Системы, к которым нужен прямой доступ.

@@ -2,10 +2,13 @@
 
 #include "game/skyguard/game.h"
 
+#include <array>
 #include <cassert>
+#include <charconv>
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
+#include <string>
 
 #include "core/config/engine_settings.h"
 #include "core/config/loader/debug_overlay_loader.h"
@@ -35,16 +38,40 @@
     #include "game/skyguard/dev/stress_scene.h"
 #endif
 
-// Движковые конфиги (vsync, frame limit и т.п.).
+// Движковые конфиги (Vsync, frame limit и т.п.).
 namespace cfg = ::core::config;
-// Движковые настройки времени (fixed timestep и т.п.).
+// Движковые настройки времени (фиксированный timestep и т.п.).
 namespace timecfg = ::core::time;
-// Debug-флаги и хоткеи (overlay, hold on exit и т.п.).
+// Debug-флаги и хоткеи (оверлей, удержание при выходе и т.п.).
 namespace dbg = ::core::debug;
 // Специфические игровые конфиги/blueprints для SkyGuard (player.json, window и т.п.).
 namespace skycfg = ::game::skyguard::config;
 // Централизованное хранилище путей к JSON-конфигам
 namespace skycfg_paths = ::game::skyguard::config::paths;
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+namespace {
+    void appendU32(std::string& out, const std::uint32_t value) {
+        std::array<char, 32> buf{};
+        auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + buf.size(), value);
+        if (ec == std::errc{}) {
+            out.append(buf.data(), static_cast<std::size_t>(ptr - buf.data()));
+        } else {
+            out.append("?");
+        }
+    }
+
+    void appendI32(std::string& out, const std::int32_t value) {
+        std::array<char, 32> buf{};
+        auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + buf.size(), value);
+        if (ec == std::errc{}) {
+            out.append(buf.data(), static_cast<std::size_t>(ptr - buf.data()));
+        } else {
+            out.append("?");
+        }
+    }
+} // namespace
+#endif
 
 namespace game::skyguard {
 
@@ -174,7 +201,7 @@ namespace game::skyguard {
         // поэтому сохраняем указатели.
         mDebugOverlay   = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
 
-        // Привязываем overlay к сервису времени и шрифту (через ResourceManager).
+        // Привязываем оверлей к сервису времени и шрифту (через ResourceManager).
         // Важно: ресурсы резолвим один раз при старте, не в hot-path.
         {
             const sf::Font& font = mResources.getFont(core::resources::ids::FontID::Default).get();
@@ -189,20 +216,20 @@ namespace game::skyguard {
             mDebugOverlay->applyTextProperties(overlayCfg.text);
             mDebugOverlay->applyRuntimeProperties(overlayCfg.runtime);
 
-            // Политика дефолтного состояния overlay при старте:
-            //  - overlayCfg.enabled может ОТКЛЮЧИТЬ overlay по умолчанию;
+            // Политика дефолтного состояния оверлея при старте:
+            //  - overlayCfg.enabled может ОТКЛЮЧИТЬ оверлей по умолчанию;
             //  - dbg::SHOW_FPS_OVERLAY — compile-time флаг (Debug/Profile: true, Release: false).
             //
-            // ВАЖНО: при формуле ниже JSON не может "включить overlay в Release на старте",
+            // ВАЖНО: при формуле ниже JSON не может "включить оверлей в Release на старте",
             // потому что compile-time флаг сильнее. Но хоткей F3 (dbg::HOTKEY_TOGGLE_OVERLAY)
-            // всё равно позволяет включить overlay в рантайме в любой сборке.
+            // всё равно позволяет включить оверлей в рантайме в любой сборке.
             mDebugOverlay->setEnabled(overlayCfg.enabled && dbg::SHOW_FPS_OVERLAY);
         }
 
         mBackgroundRenderer.init(mResources, core::resources::ids::TextureID::BackgroundDesert);
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
-        // DEV/PROFILE-only: стресс-сцена через ENV.
+        // Только DEV/PROFILE: стресс-сцена через ENV.
         game::skyguard::dev::trySpawnStressSpritesFromEnv(
             mWorld, mResources, core::resources::ids::TextureID::Player);
 #endif
@@ -216,7 +243,7 @@ namespace game::skyguard {
         // ----------------------------------------------------------------------------------------
         // Spiral of death prevention: вычисляем max апдейтов за кадр из инварианта TimeService.
         // Формула выводится из константы TimeService::kMaxAccumulatedSeconds и fixed timestep.
-        // При текущих значениях (0.5s / (1/60)) ≈ 30 апдейтов максимум.
+        // При значениях (0.5s / (1/60)) ≈ 30 апдейтов максимум.
         // ----------------------------------------------------------------------------------------
         const int maxUpdatesPerFrame =
             static_cast<int>(core::time::TimeService::kMaxAccumulatedSeconds /
@@ -237,7 +264,7 @@ namespace game::skyguard {
 
             // ----------------------------------------------------------------------------------------
             // Выполняем один или несколько фиксированных шагов логики.
-            // Cap на количество апдейтов за кадр предотвращает spiral of death при лагах.
+            // Ограничение на количество апдейтов за кадр предотвращает спираль смерти при лагах.
             // ----------------------------------------------------------------------------------------
             int updateCount = 0;
             while (mTime.shouldUpdate(fixedTimeStep)) {
@@ -255,7 +282,7 @@ namespace game::skyguard {
             render();
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
-            // Rate-limited debug: не спамим логом.
+            // Ограничение частоты вывода отладочной информации, чтобы избежать спама логом.
             if (++frameCount % 600ULL == 0ULL) {
                 LOG_DEBUG(core::log::cat::Performance,
                           "FPS: {:.1f} (frame {})",
@@ -297,7 +324,7 @@ namespace game::skyguard {
             else if (const auto* resized = event->getIf<sf::Event::Resized>()) {
                 const sf::Vector2u newSize{resized->size.x, resized->size.y};
 
-                // При минимизации окно может сообщить 0x0. Не создаём/не применяем invalid view.
+                // При минимизации окно может сообщить 0x0. Не создаём/не применяем невалидный view.
                 if (newSize.x == 0u || newSize.y == 0u) {
                     continue;
                 }
@@ -318,7 +345,33 @@ namespace game::skyguard {
         updateCamera();
 
         if (mDebugOverlay) {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            std::string extraText;
+            extraText.reserve(160);
+
+            const auto& bgStats = mBackgroundRenderer.getLastFrameStats();
+
+            extraText.append("Background: tiles ");
+            appendU32(extraText, bgStats.tilesDrawn);
+            extraText.append("  draws ");
+            appendU32(extraText, bgStats.drawCalls);
+            extraText.append("  tile ");
+            appendU32(extraText, bgStats.tileSize.x);
+            extraText.push_back('x');
+            appendU32(extraText, bgStats.tileSize.y);
+            extraText.append("  view ");
+            appendU32(extraText, static_cast<std::uint32_t>(bgStats.visibleRect.size.x));
+            extraText.push_back('x');
+            appendU32(extraText, static_cast<std::uint32_t>(bgStats.visibleRect.size.y));
+            extraText.append("  pos ");
+            appendI32(extraText, static_cast<std::int32_t>(bgStats.visibleRect.position.x));
+            extraText.push_back(',');
+            appendI32(extraText, static_cast<std::int32_t>(bgStats.visibleRect.position.y));
+
+            mDebugOverlay->prepareFrame(mWorld, extraText);
+#else
             mDebugOverlay->prepareFrame(mWorld);
+#endif
         }
     }
 

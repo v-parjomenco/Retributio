@@ -133,7 +133,7 @@ namespace game::skyguard::config {
             return cfg;
         }
 
-        // width
+        // Ширина
         {
             const std::uint32_t defaultWidth = cfg.width;
 
@@ -154,7 +154,7 @@ namespace game::skyguard::config {
             }
         }
 
-        // height
+        // Высота
         {
             const std::uint32_t defaultHeight = cfg.height;
 
@@ -175,7 +175,7 @@ namespace game::skyguard::config {
             }
         }
 
-        // title
+        // Заголовок окна
         {
             const auto it = windowData.find(wk::TITLE);
             if (it != windowData.end()) {

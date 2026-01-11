@@ -52,7 +52,7 @@ namespace core::resources::ids {
         if (name == "BackgroundDesert") {
             return TextureID::BackgroundDesert;
         }
-        // TODO: extend as you add more TextureID values
+        // TODO: расширять при добавлении новых TextureID
         return std::nullopt;
     }
 
@@ -60,7 +60,7 @@ namespace core::resources::ids {
         if (name == "Default") {
             return FontID::Default;
         }
-        // TODO: extend as you add more FontID values
+        // TODO: расширять при добавлении новых FontID
         return std::nullopt;
     }
 

@@ -17,6 +17,9 @@ namespace game::skyguard::presentation {
 
     void BackgroundRenderer::update(const sf::View& worldView) noexcept {
         if (!mTexture || mTextureSize.x == 0u || mTextureSize.y == 0u) {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            mStats = {};
+#endif
             return;
         }
 
@@ -52,6 +55,18 @@ namespace game::skyguard::presentation {
         mQuad[3].texCoords = {u0, v0};
         mQuad[4].texCoords = {u1, v1};
         mQuad[5].texCoords = {u0, v1};
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        const std::uint32_t tilesX = static_cast<std::uint32_t>(std::ceil(size.x / texW));
+        const std::uint32_t tilesY = static_cast<std::uint32_t>(std::ceil(size.y / texH));
+
+        mStats.tilesDrawn = tilesX * tilesY;
+        mStats.drawCalls = 1;
+        mStats.tileSize = mTextureSize;
+        mStats.visibleRect = sf::FloatRect({topLeft.x, topLeft.y}, 
+                                           {size.x, size.y});
+        mStats.parallaxFactor = 1.0f;
+#endif
     }
 
     void BackgroundRenderer::draw(sf::RenderWindow& window) const {

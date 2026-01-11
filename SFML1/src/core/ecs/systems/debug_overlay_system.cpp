@@ -15,7 +15,7 @@
 #include "core/ecs/world.h"
 #include "core/time/time_service.h"
 
-// RenderSystem нужен только для Debug/Profile (render stats).
+// RenderSystem нужен только для Debug/Profile (статистика рендера).
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
     #include "core/ecs/systems/render_system.h"
 #endif
@@ -89,7 +89,7 @@ namespace core::ecs {
         mTextBuffer.reserve(512);
 
         mRenderClock.restart();
-        mAccumulatedTime = mUpdateInterval; // чтобы первый render сразу обновил текст
+        mAccumulatedTime = mUpdateInterval; // чтобы первая отрисовка сразу обновила текст
     }
 
     void DebugOverlaySystem::applyRuntimeProperties(
@@ -138,13 +138,13 @@ namespace core::ecs {
 
     void DebugOverlaySystem::update(World& world, float dt) {
         // Render-only система.
-        // Важно: update() может вызываться 0..N раз за кадр (fixed timestep),
+        // Важно: update() может вызываться 0..N раз за кадр (фиксированный timestep),
         // поэтому любые "per-frame" метрики/строки обновляем в prepareFrame() ровно один раз.
         (void)world;
         (void)dt;
     }
 
-    void DebugOverlaySystem::prepareFrame(World& world) {
+    void DebugOverlaySystem::prepareFrame(World& world, const std::string_view extraText) {
         if (!mEnabled || !mFpsText) {
             return;
         }
@@ -177,13 +177,13 @@ namespace core::ecs {
         }
 
         // ----------------------------------------------------------------------------------------
-        // Entity count — показываем ВСЕГДА (O(1) read, полезен для диагностики/analytics)
+        // Entity count — показываем ВСЕГДА (O(1) чтение, полезно для диагностики/аналитики)
         // ----------------------------------------------------------------------------------------
         mTextBuffer.append("\nEntities: ");
         appendU64(mTextBuffer, static_cast<std::uint64_t>(world.aliveEntityCount()));
 
         // ----------------------------------------------------------------------------------------
-        // Render stats — только Debug/Profile.
+        // Статистика рендера — только Debug/Profile.
         // ----------------------------------------------------------------------------------------
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         if (mRenderSystem) {
@@ -218,7 +218,7 @@ namespace core::ecs {
             appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.culledSpriteCount));
 
     #if defined(SFML1_PROFILE)
-            // CPU timings — только Profile (Debug не имеет таймингов).
+            // Тайминги CPU — только Profile (Debug не имеет таймингов).
             mSmoothedCpuTotalUs = emaPow2(mSmoothedCpuTotalUs, stats.cpuTotalUs, mSmoothingShift);
             mSmoothedCpuDrawUs  = emaPow2(mSmoothedCpuDrawUs,  stats.cpuDrawUs,  mSmoothingShift);
 
@@ -228,7 +228,7 @@ namespace core::ecs {
             appendMs1DecimalFromUs(mTextBuffer, mSmoothedCpuDrawUs);
             mTextBuffer.append(" ms)");
 
-            // RenderSystem breakdown: gather/sort/build/draw (в миллисекундах).
+            // Разбивка статистики RenderSystem: gather/sort/build/draw (в миллисекундах).
             mSmoothedRSGatherUs = emaPow2(mSmoothedRSGatherUs, stats.cpuGatherUs, mSmoothingShift);
             mSmoothedRSSortUs = emaPow2(mSmoothedRSSortUs, stats.cpuSortUs, mSmoothingShift);
             mSmoothedRSBuildUs = emaPow2(mSmoothedRSBuildUs, stats.cpuBuildUs, mSmoothingShift);
@@ -245,6 +245,11 @@ namespace core::ecs {
     #endif
         }
 #endif // !defined(NDEBUG) || defined(SFML1_PROFILE)
+
+        if (!extraText.empty()) {
+            mTextBuffer.append("\n");
+            mTextBuffer.append(extraText);
+        }
 
         mFpsText->setString(mTextBuffer);
     }

@@ -21,7 +21,7 @@ namespace core::resources::ids {
         Unknown = 0,
         Player,
         BackgroundDesert,
-        // TODO: add more texture IDs here (e.g. UIFrame, BackgroundMain, etc.)
+        // TODO: добавлять другие ID текстур здесь (н-р, UIFrame, BackgroundMain и т.д.)
     };
 
     // --------------------------------------------------------------------------------------------
@@ -30,7 +30,7 @@ namespace core::resources::ids {
     enum class FontID : std::uint16_t {
         Unknown = 0,
         Default,
-        // TODO: add more font IDs here (e.g. DebugMono, TitleFont, etc.)
+        // TODO: добавлять другие ID шрифтов здесь (н-р, DebugMono, TitleFont и т.д.)
     };
 
     // --------------------------------------------------------------------------------------------
@@ -38,7 +38,7 @@ namespace core::resources::ids {
     // --------------------------------------------------------------------------------------------
     enum class SoundID : std::uint16_t {
         Unknown = 0,
-        // TODO: add sound IDs when you start using sounds in resources.json
+        // TODO: добавлять ID звуков, когда звуки появятся в resources.json
     };
 
     // --------------------------------------------------------------------------------------------

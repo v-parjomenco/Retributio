@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include <SFML/Graphics/Font.hpp>
 #include <SFML/Graphics/RenderWindow.hpp>
@@ -49,15 +50,15 @@ namespace core::ecs {
       public:
         DebugOverlaySystem() = default;
 
-        // Связать с сервисом времени и шрифтом (полученным через ResourceManager)
+        // Связать с сервисом времени и шрифтом (полученным через ResourceManager).
         void bind(core::time::TimeService& timeService, const sf::Font& font);
 
         /**
-         * @brief Привязать RenderSystem для отображения render stats.
+         * @brief Привязать RenderSystem для отображения статистики рендера.
          *
          * УСЛОВНАЯ КОМПИЛЯЦИЯ:
-         *  - Debug/Profile: сохраняет указатель, render() показывает stats
-         *  - Release: no-op (stats не собираются, показывать нечего)
+         *  - Debug/Profile: сохраняет указатель, render() показывает статистику
+         *  - Release: no-op (статистика не собирается, показывать нечего)
          *
          * Метод существует во всех сборках для совместимости вызывающего кода.
          */
@@ -67,7 +68,7 @@ namespace core::ecs {
         }
 #else
         void setRenderSystem(const RenderSystem*) noexcept {
-            // Release: no-op. RenderSystem stats не собираются, показывать нечего.
+            // Release: без действия. Статистика RenderSystem не собирается, показывать нечего.
         }
 #endif
 
@@ -85,12 +86,12 @@ namespace core::ecs {
          * Вызывается один раз за кадр из игрового слоя.
          * Не рисует — только обновляет внутренний sf::Text.
          */
-        void prepareFrame(World& world);
+        void prepareFrame(World& world, std::string_view extraText = {});
 
         /**
          * @brief Нарисовать оверлей.
          *
-         * Вызывается в UI pass, когда уже выставлен нужный view.
+         * Вызывается в UI-проходе, когда уже выставлен нужный view.
          */
         void draw(sf::RenderWindow& window) const;
 
@@ -108,17 +109,17 @@ namespace core::ecs {
       private:
         core::time::TimeService* mTime{nullptr}; // не владеем
         std::optional<sf::Text> mFpsText;
-        std::string mTextBuffer; // scratch buffer (no per-frame allocations)
+        std::string mTextBuffer; // scratch buffer (без аллокаций в каждом кадре)
         bool mEnabled{true};
 
         // Обновляем строку не каждый кадр, чтобы не было дрожи и лишней работы.
         sf::Clock mRenderClock;
         sf::Time  mAccumulatedTime{};
-        sf::Time  mUpdateInterval{}; // 0 => каждый кадр (no throttle)
+        sf::Time  mUpdateInterval{}; // 0 => каждый кадр (без троттлинга)
         std::uint8_t mSmoothingShift = 3;
 
         // ----------------------------------------------------------------------------------------
-        // Только для Debug/Profile: render stats от RenderSystem
+        // Только для Debug/Profile: статистика рендера из RenderSystem
         // ----------------------------------------------------------------------------------------
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         const RenderSystem* mRenderSystem{nullptr}; // не владеем
@@ -129,7 +130,7 @@ namespace core::ecs {
         std::uint64_t mSmoothedCpuTotalUs = 0;
         std::uint64_t mSmoothedCpuDrawUs  = 0;
 
-        // Сглаженный breakdown RenderSystem (raw/sm), только для Profile.
+        // Сглаженная разбивка RenderSystem (raw/sm), только для Profile.
         std::uint64_t mSmoothedRSGatherUs = 0;
         std::uint64_t mSmoothedRSSortUs   = 0;
         std::uint64_t mSmoothedRSBuildUs  = 0;

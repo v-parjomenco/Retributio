@@ -19,12 +19,12 @@
 namespace game::skyguard::ecs {
 
     /**
-     * @brief Clamp player to fixed logical world bounds.
+     * @brief Ограничение игрока в фиксированных логических мировых границах.
      *
-     * Rules:
-     *  - X: sprite bounds must stay within [0, worldWidth]
-     *  - Y (downwards): sprite bottom must not go below floorY
-     *  - No clamp upwards (endless vertical scrolling)
+     * Правила:
+     *  - X: границы спрайта должны оставаться в [0, ширина мира];
+     *  - Y (вниз): нижняя граница спрайта не должна быть ниже floorY;
+     *  - Нет клампа вверх (бесконечный вертикальный скролл).
      */
     class PlayerBoundsSystem final : public core::ecs::ISystem {
       public:

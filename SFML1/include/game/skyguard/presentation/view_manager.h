@@ -14,40 +14,42 @@
 namespace game::skyguard::presentation {
 
     /**
-     * @brief Manages WorldView and UiView for SkyGuard.
+     * @brief Управляет WorldView и UiView для SkyGuard.
      *
-     * Responsibilities:
-     *  - Initialize views from config
-     *  - Handle resize (update viewport, not size)
-     *  - Provide views for render passes
+     * Ответственность:
+     *  - Инициализация view из конфига
+     *  - Обработка ресайза (обновление вьюпорта, без изменения размера view)
+     *  - Предоставление view для рендер-проходов
      *
-     * NOT an ECS system. Owned by Game.
+     * НЕ ECS-система. Владелец — Game.
      */
     class ViewManager {
       public:
         /**
-         * @brief Initialize views from configuration.
+         * @brief Инициализировать view из конфигурации.
          *
-         * @param config View configuration
-         * @param initialWindowSize Window size at startup
+         * @param config Конфигурация view
+         * @param initialWindowSize Размер окна при старте
          */
         void init(const config::ViewConfig& config,
                   const sf::Vector2u& initialWindowSize) noexcept;
 
         /**
-         * @brief Handle window resize.
+         * @brief Обработка изменения размера окна.
          *
-         * Updates viewport (letterbox) for WORLD view only.
-         * Neither view size changes — only viewport.
+         * Обновляет viewport (letterbox) только для WORLD view.
+         * Размеры view не меняются — меняется только viewport.
          *
-         * @param newWindowSize New window size in pixels
+         * @param newWindowSize Новый размер окна в пикселях
          */
         void onResize(const sf::Vector2u& newWindowSize) noexcept;
 
         /**
-         * @brief Update camera center (call after player movement).
+         * @brief Обновить центр камеры (вызывать после движения игрока).
+         * 
+         * X зафиксирован по центру мира (вертикальный скроллер). По Y камера следует за игроком.
          *
-         * @param targetPosition Player position in world space (bottom-center).
+         * @param targetPosition Позиция игрока в world space (bottom-center).
          */
         void updateCamera(const sf::Vector2f& targetPosition) noexcept;
 

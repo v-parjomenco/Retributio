@@ -11,42 +11,42 @@
 namespace game::skyguard::config {
 
     /**
-     * @brief View configuration for SkyGuard.
+     * @brief Конфигурация view для SkyGuard.
      *
-     * Source of truth: skyguard_game.json
-     * Fallback: compile-time defaults below
+     * Источник истины: skyguard_game.json;
+     * Fallback: compile-time defaults ниже.
      *
-     * CRITICAL: These values define the gameplay area.
-     * Changing them affects game balance, level design, enemy patterns.
+     * КРИТИЧНО: Эти значения определяют игровую область.
+     * Изменение влияет на баланс, левел-дизайн, паттерны врагов.
      */
     struct ViewConfig {
         // ----------------------------------------------------------------------------------------
-        // WORLD VIEW (fixed logical size — NEVER changes at runtime)
+        // ВИД МИРА (фиксированный логический размер — НИКОГДА не меняется в рантайме)
         // ----------------------------------------------------------------------------------------
 
-        /// Logical world size in world units.
-        /// This is the canonical gameplay area visible to player.
-        /// All level design, spawn positions, boundaries use these units.
+        /// Логический размер мира в world units.
+        /// Это каноническая игровая область, видимая игроку.
+        /// В этих мировых единицах задаются уровни, точки спавна, границы.
         sf::Vector2f worldLogicalSize{1920.f, 1080.f};
 
         // ----------------------------------------------------------------------------------------
-        // CAMERA
+        // КАМЕРА
         // ----------------------------------------------------------------------------------------
 
-        /// Camera offset from player position (world units).
-        /// Negative Y = camera looks ahead of player (player at bottom).
+        /// Offset (смещение) камеры относительно позиции игрока (в world units).
+        /// Отрицательный Y = камера "смотрит вперёд" (игрок внизу экрана).
         sf::Vector2f cameraOffset{0.f, -100.f};
 
-        /// Minimum camera Y to avoid showing invalid world content.
-        /// This is a PRESENTATION clamp, not part of simulation.
+        /// Минимальный Y камеры, чтобы не показывать невалидный контент мира.
+        /// Это ограничение презентации (presentation clamp), а не часть симуляции.
         float cameraMinY{540.f};
 
         // ----------------------------------------------------------------------------------------
-        // UI VIEW (fixed logical size — uniform scaling)
+        // UI VIEW (фиксированный логический размер — равномерное масштабирование)
         // ----------------------------------------------------------------------------------------
 
-        /// Logical UI size in UI units.
-        /// UI scales uniformly with window size using fixed logical UI size.
+        /// Логический размер UI в UI-единицах.
+        /// UI масштабируется равномерно вместе с окном, используя фиксированный логический размер.
         sf::Vector2f uiLogicalSize{1920.f, 1080.f};
     };
 

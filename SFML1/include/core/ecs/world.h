@@ -31,38 +31,38 @@ namespace sf {
 namespace core::ecs {
 
     /**
-     * @brief Политика допустимого ECS-компонента (compile-time фильтр).
+     * @brief Политика допустимого ECS-компонента (фильтр на этапе компиляции).
      *
      * Требования проекта:
-     *  - POD-like: trivially copyable (SoA-friendly, быстрая сериализация);
+     *  - POD-подобный: trivially copyable (SoA-friendly, быстрая сериализация);
      *  - "Голый" тип: без const/volatile и без ссылок (EnTT хранит не-cvref типы);
      *  - Без владения ресурсами: trivially destructible (никаких нетривиальных деструкторов).
      *
-     * DESIGN NOTE (strictness):
+     * Примечание по строгости дизайна:
      *  - Этот концепт намеренно СТРОГИЙ для core ECS компонентов.
-     *  - Для save/load могут потребоваться relaxed компоненты с custom ctor.
-     *  - Такие случаи должны использовать отдельный SaveComponent concept.
+     *  - Для save/load могут потребоваться relaxed компоненты с кастомным конструктором.
+     *  - Такие случаи должны использовать отдельный концепт SaveComponent.
      */
     template <typename T>
     concept Component = std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T> &&
                         !std::is_const_v<T> && !std::is_volatile_v<T> && !std::is_reference_v<T>;
 
     /**
-     * @brief Политика tag-компонента (пустой маркер для dirty tracking).
+     * @brief Политика tag-компонента (пустой маркер для отслеживания dirty).
      *
-     * DESIGN NOTE:
+     * Примечание по дизайну:
      *  - std::is_empty_v<T> недостаточно строго: любой пустой struct пройдёт.
      *  - TagComponent явно указывает семантику: это маркер, не data.
-     *  - Используется для ограничения World::markDirty<T> (защита от misuse).
+     *  - Используется для ограничения World::markDirty<T> (защита от неправильного использования).
      *
      * Требования:
-     *  - Базовый компонент (trivially copyable etc.)
-     *  - Пустой тип (no data fields)
+     *  - Базовый компонент (trivially copyable и т.п.)
+     *  - Пустой тип (без полей данных)
      *
      * Примеры:
      *  ✅ struct SpatialDirtyTag {};
-     *  ❌ struct Health { int value; };  // Не пустой
-     *  ❌ struct NetworkDirty {};         // Пустой, но не intended как tag (нужен explicit opt-in)
+     *  ❌ struct Health { int value; };   // Не пустой
+     *  ❌ struct NetworkDirty {};         // Пустой, но не задуман как tag (нужен явный opt-in)
      */
     template <typename T> concept TagComponent = Component<T> && std::is_empty_v<T>;
 
@@ -71,14 +71,14 @@ namespace core::ecs {
      *
      * Цели дизайна:
      *  - Zero overhead: всё инлайнится и сводится к прямым вызовам EnTT;
-     *  - Fail-fast в Debug: assert на инварианты, нулевой cost в Release;
+     *  - Fail-fast в Debug: assert на инварианты, нулевая стоимость в Release;
      *  - Жёсткая политика компонентов: концепт Component режет неподходящие типы на компиляции.
      *
-     * КРИТИЧНЫЕ ИНВАРИАНТЫ (entity lifecycle):
+     * КРИТИЧНЫЕ ИНВАРИАНТЫ (жизненный цикл сущностей):
      *  1. createEntity() — единственный способ создания сущностей
      *  2. destroyEntity() — единственный способ уничтожения сущностей
      *  3. mAliveEntityCount синхронизирован с registry (Debug: validateEntityCount)
-     *  4. registry() доступен ТОЛЬКО через friend (escape hatch)
+     *  4. registry() доступен ТОЛЬКО через friend (контролируемый escape hatch)
      *  5. Friend-классы НЕ должны вызывать registry.create/destroy напрямую
      */
     class World {
@@ -91,46 +91,46 @@ namespace core::ecs {
         World& operator=(const World&) = delete;
 
         // ----------------------------------------------------------------------------------------
-        // Move semantics (CRITICAL: manual implementation required)
+        // Семантика перемещения (КРИТИЧНО: требуется ручная реализация)
         // ----------------------------------------------------------------------------------------
 
         /**
-         * @brief Move constructor (ручная реализация для корректного переноса счётчика).
+         * @brief Move-конструктор (ручная реализация для корректного переноса счётчика).
          *
          * CRITICAL BUG FIX:
-         *  - Default move копирует примитивные типы (mAliveEntityCount)
-         *  - После std::move(w1) старый объект w1 остаётся с mAliveEntityCount > 0
+         *  - Default move копирует примитивные типы (mAliveEntityCount);
+         *  - После std::move(w1) старый объект w1 остаётся с mAliveEntityCount > 0;
          *  - Но registry пуст → рассинхронизация!
          *
          * РЕШЕНИЕ:
-         *  - Ручная реализация с обнулением счётчика у источника
-         *  - Источник после move остаётся в валидном moved-from состоянии (count=0)
+         *  - Ручная реализация с обнулением счётчика у источника;
+         *  - Источник после move остаётся в валидном moved-from состоянии (count=0).
          *
-         * INVARIANT:
-         *  - После move: source.aliveEntityCount() == 0
-         *  - После move: dest.aliveEntityCount() == old(source.aliveEntityCount())
+         * ИНВАРИАНТ:
+         *  - После move: source.aliveEntityCount() == 0;
+         *  - После move: dest.aliveEntityCount() == old(source.aliveEntityCount()).
          *
          * @param other Источник перемещения (будет обнулён)
          */
         World(World&& other) noexcept
             : mRegistry(std::move(other.mRegistry)), mSystems(std::move(other.mSystems)),
               mAliveEntityCount(other.mAliveEntityCount) {
-            other.mAliveEntityCount = 0; // CRITICAL: обнуляем источник
+            other.mAliveEntityCount = 0; // КРИТИЧНО: обнуляем источник
         }
 
         /**
-         * @brief Move assignment (ручная реализация для корректного переноса счётчика).
+         * @brief Move-оператор присваивания (ручная реализация для корректного переноса счётчика).
          *
          * CRITICAL BUG FIX:
-         *  - Default move-assign копирует примитивы → рассинхронизация
+         *  - Default move-assign копирует примитивы → рассинхронизация.
          *
          * РЕШЕНИЕ:
-         *  - Ручная реализация с обнулением счётчика у источника
-         *  - Self-assignment защита (if this != &other)
+         *  - Ручная реализация с обнулением счётчика у источника;
+         *  - Self-assignment защита (if this != &other).
          *
-         * INVARIANT:
-         *  - После move: source.aliveEntityCount() == 0
-         *  - После move: this->aliveEntityCount() == old(source.aliveEntityCount())
+         * ИНВАРИАНТ:
+         *  - После move: source.aliveEntityCount() == 0;
+         *  - После move: this->aliveEntityCount() == old(source.aliveEntityCount()).
          *
          * @param other Источник перемещения (будет обнулён)
          * @return *this
@@ -140,7 +140,7 @@ namespace core::ecs {
                 mRegistry = std::move(other.mRegistry);
                 mSystems = std::move(other.mSystems);
                 mAliveEntityCount = other.mAliveEntityCount;
-                other.mAliveEntityCount = 0; // CRITICAL: обнуляем источник
+                other.mAliveEntityCount = 0; // КРИТИЧНО: обнуляем источник
             }
             return *this;
         }
@@ -152,10 +152,10 @@ namespace core::ecs {
         /**
          * @brief Создать новую сущность.
          *
-         * INVARIANT: Increment mAliveEntityCount (для O(1) diagnostics).
+         * ИНВАРИАНТ: Increment mAliveEntityCount (для O(1) диагностики).
          *
          * Сложность: O(1)
-         * Thread-safety: Небезопасно.
+         * Потокобезопасность: Небезопасно.
          */
         [[nodiscard]] Entity createEntity() {
             ++mAliveEntityCount;
@@ -165,10 +165,10 @@ namespace core::ecs {
         /**
          * @brief Уничтожить сущность и все её компоненты.
          *
-         * INVARIANT: Decrement mAliveEntityCount (поддерживаем синхронизацию).
+         * ИНВАРИАНТ: Decrement mAliveEntityCount (поддерживаем синхронизацию).
          *
          * Сложность: O(N), где N — количество типов компонентов у сущности.
-         * Thread-safety: Небезопасно.
+         * Потокобезопасность: Небезопасно.
          */
         void destroyEntity(Entity e) {
             assert(isAlive(e) && "destroyEntity: entity must be alive");
@@ -185,9 +185,9 @@ namespace core::ecs {
          * КРИТИЧНО ДЛЯ ПРОИЗВОДИТЕЛЬНОСТИ:
          *  - Для 500k+ entities удаление 50k сущностей в цикле destroyEntity() медленно
          *  - Batch destroy использует EnTT оптимизацию (одна операция вместо N)
-         *  - Типичный use case: удаление всех юнитов фракции после поражения
+         *  - Типичный сценарий использования: удаление всех юнитов фракции после поражения
          *
-         * INVARIANT: Decrement mAliveEntityCount на count сущностей.
+         * ИНВАРИАНТ: Decrement mAliveEntityCount на count сущностей.
          *
          * ТРЕБОВАНИЯ:
          *  - Все сущности в диапазоне должны быть валидны (isAlive)
@@ -209,10 +209,10 @@ namespace core::ecs {
          *
          * Сложность: O(N × M), где N — количество сущностей, M — средние компоненты.
          *            Но быстрее чем N вызовов destroyEntity() из-за EnTT batch optimization.
-         * Thread-safety: Небезопасно.
+         * Потокобезопасность: Небезопасно.
          */
         template <typename Iterator> void destroyEntities(Iterator first, Iterator last) {
-            // FIX: std::distance может вернуть отрицательное значение при некорректных итераторах.
+            // ВАЖНО: std::distance может вернуть отрицательное значение при некорректных итераторах.
             // static_cast<std::size_t> от отрицательного числа = огромное положительное → underflow
             // в mAliveEntityCount.
             const auto signedDist = std::distance(first, last);
@@ -236,13 +236,13 @@ namespace core::ecs {
         }
 
         /**
-         * @brief Уничтожить несколько сущностей из контейнера (convenience overload).
+         * @brief Уничтожить несколько сущностей из контейнера (удобная перегрузка).
          *
          * КРИТИЧНО ДЛЯ ПРОИЗВОДИТЕЛЬНОСТИ:
          *  - std::span/vector → batch destroy
          *  - Contiguous memory = cache-friendly iteration
          *
-         * ОГРАНИЧЕНИЕ (compile-time):
+         * ОГРАНИЧЕНИЕ (на этапе компиляции):
          *  - Требует contiguous_range (vector, array, span)
          *  - std::list, lazy ranges и т.п. НЕ компилируются
          *  - Это защита от случайного использования cache-unfriendly контейнеров
@@ -259,7 +259,7 @@ namespace core::ecs {
          *  world.destroyEntities(toDestroy);
          *
          * Сложность: O(N × M), где N — количество сущностей, M — средние компоненты.
-         * Thread-safety: Небезопасно.
+         * Потокобезопасность: Небезопасно.
          */
         template <typename Container>
             requires std::ranges::contiguous_range<Container>
@@ -271,7 +271,7 @@ namespace core::ecs {
          * @brief Проверить, валидна ли сущность.
          *
          * Сложность: O(1)
-         * Thread-safety: Безопасно для чтения (если нет параллельных create/destroy).
+         * Потокобезопасность: Безопасно для чтения (если нет параллельных create/destroy).
          */
         [[nodiscard]] bool isAlive(Entity e) const noexcept(noexcept(mRegistry.valid(e))) {
             return mRegistry.valid(e);
@@ -290,7 +290,7 @@ namespace core::ecs {
          * РЕШЕНИЕ:
          *  - Собственный счётчик (стандарт Paradox/Unity/Unreal)
          *  - Increment в createEntity(), decrement в destroyEntity()
-         *  - O(1) гарантированно, stable API, детерминизм
+         *  - O(1) гарантированно, стабильный API, детерминизм
          *  - Легко расширить (entity count by archetype, component stats)
          *
          * КРИТИЧНО ДЛЯ ПРОФИЛИРОВАНИЯ:
@@ -302,7 +302,7 @@ namespace core::ecs {
          *  - Детектирует рассинхронизацию (например, прямой вызов registry.destroy)
          *
          * Сложность: O(1)
-         * Thread-safety: Безопасно для чтения.
+         * Потокобезопасность: Безопасно для чтения.
          */
         [[nodiscard]] std::size_t aliveEntityCount() const noexcept {
             return mAliveEntityCount;
@@ -311,19 +311,19 @@ namespace core::ecs {
         /**
          * @brief Уничтожить все сущности и сбросить счётчики (bulk reset).
          *
-         * USE CASES:
+         * СЦЕНАРИИ ИСПОЛЬЗОВАНИЯ:
          *  - Level transitions
          *  - Save/load
          *  - Stress test teardown
          *
-         * INVARIANT: Сбрасывает mAliveEntityCount синхронно с registry.clear().
+         * ИНВАРИАНТ: Сбрасывает mAliveEntityCount синхронно с registry.clear().
          *
-         * CRITICAL:
+         * КРИТИЧНО:
          *  - НЕ вызывать registry.clear() напрямую — используйте этот метод.
          *  - Observers on_destroy получат события для всех сущностей.
          *
          * Сложность: O(N), где N — количество компонентов × entities.
-         * Thread-safety: Небезопасно.
+         * Потокобезопасность: Небезопасно.
          */
         void clear() {
             mRegistry.clear();
@@ -334,13 +334,13 @@ namespace core::ecs {
         /**
          * @brief Debug-only: валидация синхронизации счётчика с реальностью.
          *
-         * DESIGN:
+         * Примечание по дизайну:
          *  - Использует storage<entity>.free_list() — официальный EnTT 3.16 API
          *  - free_list() возвращает количество живых сущностей (индекс границы)
          *  - O(1) — прямой доступ к внутреннему счётчику EnTT
          *  - Вызывается периодически (раз в 60 frames) или перед критическими ops
          *
-         * EnTT 3.16 IMPLEMENTATION NOTE:
+         * Примечание по имплементации в EnTT 3.16:
          *  - storage<entity> — специализированный storage для entity identifiers
          *  - free_list() — граница между живыми и удалёнными сущностями
          *  - valid(e) реализован как: find(e).index() < free_list()
@@ -381,7 +381,7 @@ namespace core::ecs {
          *      world.addComponent<Health>(e, Health{});
          *
          * Сложность: O(1) amortized.
-         * Thread-safety: Небезопасно.
+         * Потокобезопасность: Небезопасно.
          */
         template <Component T, typename... Args>
         requires std::constructible_from<T, Args...> T& addComponent(Entity e, Args&&... args) {
@@ -399,7 +399,7 @@ namespace core::ecs {
          * Используется, когда addComponent<T>() возвращает void для empty типов в EnTT.
          *
          * Сложность: O(1) amortized.
-         * Thread-safety: Небезопасно.
+         * Потокобезопасность: Небезопасно.
          */
         template <TagComponent T> void addTagComponent(Entity e) {
             assert(isAlive(e) && "addTagComponent: entity must be alive");
@@ -418,11 +418,11 @@ namespace core::ecs {
          *        используй tryGetComponent() — это быстрее (один lookup вместо двух).
          *
          * Сложность: O(1)
-         * Thread-safety: Безопасно для чтения.
+         * Потокобезопасность: Безопасно для чтения.
          */
         template <Component T>
         [[nodiscard]] bool hasComponent(Entity e) const noexcept {
-            // NO assert(isAlive) — EnTT safely returns false for invalid entities.
+            // НЕ делать assert(isAlive) — EnTT безопасно возвращает false для невалидных сущностей.
             // Это позволяет использовать hasComponent в hot-path без предварительной проверки.
             return mRegistry.any_of<T>(e);
         }
@@ -449,7 +449,7 @@ namespace core::ecs {
          *      }
          *
          * Сложность: O(1)
-         * Thread-safety: Небезопасно (эксклюзивный доступ на запись).
+         * Потокобезопасность: Небезопасно (эксклюзивный доступ на запись).
          */
         template <Component T> [[nodiscard]] T* tryGetComponent(Entity e) noexcept {
             // КОНТРАКТ: безопасно вызывать на мёртвой сущности; возвращает nullptr (гарантия EnTT).
@@ -463,7 +463,7 @@ namespace core::ecs {
          * CONTRACT: Безопасно вызывать с dead/invalid entity — вернёт nullptr.
          *
          * Сложность: O(1)
-         * Thread-safety: Безопасно для параллельного чтения.
+         * Потокобезопасность: Безопасно для параллельного чтения.
          */
         template <Component T> [[nodiscard]] const T* tryGetComponent(Entity e) const noexcept {
             // КОНТРАКТ: безопасно вызывать на мёртвой сущности; возвращает nullptr (гарантия EnTT).
@@ -478,7 +478,7 @@ namespace core::ecs {
          *  - Release: тот же контракт (не используешь — получишь UB), без лишнего оверхеда.
          *
          * Сложность: O(1)
-         * Thread-safety: Небезопасно (эксклюзивный доступ на запись).
+         * Потокобезопасность: Небезопасно (эксклюзивный доступ на запись).
          */
         template <Component T> [[nodiscard]] T& getComponent(Entity e) {
             assert(isAlive(e) && "getComponent: entity must be alive");
@@ -491,7 +491,7 @@ namespace core::ecs {
          * @brief Константная версия getComponent.
          *
          * Сложность: O(1)
-         * Thread-safety: Безопасно для параллельного чтения.
+         * Потокобезопасность: Безопасно для параллельного чтения.
          */
         template <Component T> [[nodiscard]] const T& getComponent(Entity e) const {
             assert(isAlive(e) && "getComponent: entity must be alive");
@@ -504,7 +504,7 @@ namespace core::ecs {
          * @brief Удалить компонент у сущности (если он присутствует).
          *
          * Сложность: O(1)
-         * Thread-safety: Небезопасно.
+         * Потокобезопасность: Небезопасно.
          */
         template <Component T>
         void removeComponent(Entity e) noexcept(noexcept(mRegistry.remove<T>(e))) {
@@ -515,7 +515,7 @@ namespace core::ecs {
         /**
          * @brief Пометить сущность компонентом-тегом (hot-path для dirty tracking).
          *
-         * DESIGN NOTE (TagComponent vs Component):
+         * Примечание по дизайну (TagComponent vs Component):
          *  - Требует TagComponent (не просто is_empty_v<T>)
          *  - Защищает от случайного misuse пустых data-структур
          *  - Явная семантика: это dirty-tag, не компонент с данными
@@ -529,7 +529,7 @@ namespace core::ecs {
          *  - Для data-компонентов использовать addComponent<T>(e, data).
          *
          * Сложность: O(1) amortized.
-         * Thread-safety: Небезопасно.
+         * Потокобезопасность: Небезопасно.
          */
         template <TagComponent T> void markDirty(Entity e) {
             assert(isAlive(e) && "markDirty: entity must be alive");
@@ -549,7 +549,7 @@ namespace core::ecs {
          *  }
          *
          * Сложность итерации: O(N), где N — количество сущностей с наименьшим компонентом.
-         * Thread-safety: Небезопасно (если есть параллельные модификации).
+         * Потокобезопасность: Небезопасно (если есть параллельные модификации).
          */
         template <Component... Components> [[nodiscard]] auto view() {
             return mRegistry.view<Components...>();
@@ -558,19 +558,19 @@ namespace core::ecs {
         /**
          * @brief Константный view для read-only систем.
          *
-         * CRITICAL THREAD-SAFETY NOTE:
+         * КРИТИЧЕСКОЕ ЗАМЕЧАНИЕ ПО ПОТОКОБЕЗОПАСНОСТИ:
          *  - Несмотря на const, этот метод НЕ thread-safe!
          *  - EnTT может мутировать внутренние структуры при формировании view
          *  - const здесь означает "логически read-only", а не "physically const"
          *  - НЕ используйте параллельные вызовы view() без синхронизации
          *
-         * DESIGN RATIONALE:
+         * ОБОСНОВАНИЕ ДИЗАЙНА:
          *  - Многие AAA ECS вообще не имеют const view (Unity/Unreal)
          *  - Мы оставляем const для удобства read-only систем
          *  - Но контракт честный: это НЕ гарантия thread-safety
          *
          * Сложность итерации: O(N)
-         * Thread-safety: НЕБЕЗОПАСНО (см. выше).
+         * Потокобезопасность: НЕБЕЗОПАСНО (см. выше).
          */
         template <Component... Components> [[nodiscard]] auto view() const {
             return mRegistry.view<Components...>();
@@ -589,7 +589,7 @@ namespace core::ecs {
          *  // Position и Velocity хранятся плотно, Sprite — отдельно.
          *
          * Сложность: O(1) для получения, O(N) для первой итерации (сортировка).
-         * Thread-safety: Небезопасно.
+         * Потокобезопасность: Небезопасно.
          */
         template <Component... Owned, Component... Get>
         [[nodiscard]] auto group(entt::get_t<Get...> get = entt::get_t<Get...>{}) {
@@ -628,13 +628,13 @@ namespace core::ecs {
         SystemManager mSystems{};
 
         // ----------------------------------------------------------------------------------------
-        // Диагностика (ECS metrics)
+        // Диагностика (ECS-метрики)
         // ----------------------------------------------------------------------------------------
 
         /**
          * @brief Счётчик живых сущностей (AAA production standard).
          *
-         * DESIGN RATIONALE:
+         * ОБОСНОВАНИЕ ДИЗАЙНА:
          *  - EnTT не предоставляет публичный O(1) метод для entity count
          *  - Собственный счётчик - стандарт индустрии (Paradox/Unity/Unreal)
          *  - Синхронизируется в createEntity()/destroyEntity()
@@ -646,7 +646,7 @@ namespace core::ecs {
          *  - Reset ТОЛЬКО в clear()
          *  - Debug: assert на underflow (детект lifecycle bugs)
          *
-         * COST:
+         * СТОИМОСТЬ:
          *  - Memory: 8 bytes (sizeof(std::size_t))
          *  - CPU: negligible (increment/decrement на create/destroy)
          *
@@ -664,14 +664,14 @@ namespace core::ecs {
         /**
          * @brief Прямой доступ к entt::registry для специальных механизмов EnTT.
          *
-         * DESIGN NOTE:
+         * Примечание по дизайну:
          *  - registry() намеренно private и доступен ТОЛЬКО избранным core-системам (через friend).
          *  - Game-уровень НИКОГДА не должен напрямую работать с EnTT — только через World API
          *    (createEntity, addComponent, view(), group()).
          *  - Это контролируемый escape hatch для случаев, которые невозможно выразить
          *    через чистый World API без потери производительности или детерминизма.
          *
-         * CRITICAL RESTRICTION:
+         * КРИТИЧЕСКОЕ ОГРАНИЧЕНИЕ:
          *  ❗ Friend-классы НЕ должны вызывать registry.create() напрямую
          *  ❗ Friend-классы НЕ должны вызывать registry.destroy() напрямую
          *  ❗ Friend-классы НЕ должны вызывать registry.clear() напрямую
