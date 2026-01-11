@@ -11,6 +11,7 @@
 // ================================================================================================
 #pragma once
 
+#include <algorithm>
 #include <cassert>
 #include <concepts>
 #include <cstddef>
@@ -18,6 +19,7 @@
 #include <ranges>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #include "third_party/entt/entt_registry.hpp"
 
@@ -29,6 +31,20 @@ namespace sf {
 } // namespace sf
 
 namespace core::ecs {
+
+#if !defined(NDEBUG)
+    namespace detail {
+        /**
+         * @brief Общий scratch buffer для валидации destroyEntities().
+         *
+         * Дизайн:
+         *  - inline thread_local: один буфер на поток, нет проблем с ODR.
+         *  - Только в Debug: zero overhead в Release.
+         *  - Переиспользуем при вызове для избежания повторных аллокаций.
+         */
+        inline thread_local std::vector<Entity> gDestroyEntitiesScratch{};
+    } // namespace detail
+#endif
 
     /**
      * @brief Политика допустимого ECS-компонента (фильтр на этапе компиляции).
@@ -199,11 +215,14 @@ namespace core::ecs {
          *
          * @pre [first, last) должен быть СТАБИЛЬНЫМ диапазоном (std::vector, std::array, std::span).
          *      Передача итераторов EnTT view = потенциальный UB.
-         * @pre ALL entities in [first, last) MUST be alive (isAlive() == true).
-         *      Passing destroyed/recycled entities = UB in Release, assert in Debug.
-         *      Caller is responsible for not storing "stale" entity IDs after destroy.
+         * @pre ВСЕ сущности в [first, last) ОБЯЗАНЫ быть живыми (isAlive() == true).
+         *      Передача destroyed/recycled entities = UB в Release, assert в Debug.
+         *      Вызывающая сторона ответственна за то, чтобы не хранить «устаревшие» ID сущностей
+         *      после уничтожения.
+         * @pre [first, last) ОБЯЗАНЫ содержать уникальные сущности (не дубликаты).
+         *      Дубликаты нарушают контракт и синхронизацию mAliveEntityCount.
          *
-         * @tparam Iterator ForwardIterator над Entity
+         * @tparam Iterator RandomAccessIterator над Entity
          * @param first Начало диапазона
          * @param last Конец диапазона (exclusive)
          *
@@ -211,11 +230,11 @@ namespace core::ecs {
          *            Но быстрее чем N вызовов destroyEntity() из-за EnTT batch optimization.
          * Потокобезопасность: Небезопасно.
          */
-        template <typename Iterator> void destroyEntities(Iterator first, Iterator last) {
-            // ВАЖНО: std::distance может вернуть отрицательное значение при некорректных итераторах.
-            // static_cast<std::size_t> от отрицательного числа = огромное положительное → underflow
-            // в mAliveEntityCount.
-            const auto signedDist = std::distance(first, last);
+        template <std::random_access_iterator Iterator>
+            requires std::same_as<std::iter_value_t<Iterator>, Entity>
+        void destroyEntities(Iterator first, Iterator last) {
+            // O(1) distance для random_access_iterator (гарантировано концептом)
+            const auto signedDist = last - first;
             assert(signedDist >= 0 && "destroyEntities: invalid iterator range (last < first)");
 
             const std::size_t count = static_cast<std::size_t>(signedDist);
@@ -228,6 +247,14 @@ namespace core::ecs {
             for (auto it = first; it != last; ++it) {
                 assert(isAlive(*it) && "destroyEntities: iterator contains invalid entity");
             }
+            // Debug: проверяем уникальность (дубликаты ломают контракт и счётчик)
+            auto& scratch = detail::gDestroyEntitiesScratch;
+            scratch.clear();
+            scratch.reserve(count);
+            scratch.insert(scratch.end(), first, last);
+            std::sort(scratch.begin(), scratch.end());
+            assert(std::adjacent_find(scratch.begin(), scratch.end()) == scratch.end() &&
+                   "destroyEntities: range contains duplicate entities");
 #endif
 
             // EnTT batch destroy (гораздо быстрее чем цикл)
@@ -244,6 +271,8 @@ namespace core::ecs {
          *
          * ОГРАНИЧЕНИЕ (на этапе компиляции):
          *  - Требует contiguous_range (vector, array, span)
+         *  - Требует sized_range (O(1) size())
+         *  - Требует common_range (begin/end одного типа)
          *  - std::list, lazy ranges и т.п. НЕ компилируются
          *  - Это защита от случайного использования cache-unfriendly контейнеров
          *
@@ -262,9 +291,11 @@ namespace core::ecs {
          * Потокобезопасность: Небезопасно.
          */
         template <typename Container>
-            requires std::ranges::contiguous_range<Container>
+            requires std::ranges::contiguous_range<Container> && std::ranges::sized_range<Container>
+                     && std::ranges::common_range<Container>
+                     && std::same_as<std::ranges::range_value_t<Container>, Entity>
         void destroyEntities(const Container& entities) {
-            destroyEntities(std::begin(entities), std::end(entities));
+            destroyEntities(std::ranges::begin(entities), std::ranges::end(entities));
         }
 
         /**
