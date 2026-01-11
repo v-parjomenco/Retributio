@@ -4,11 +4,10 @@
 
 #include <array>
 #include <cassert>
-#include <charconv>
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
-#include <string>
+#include <string_view>
 
 #include "core/config/engine_settings.h"
 #include "core/config/loader/debug_overlay_loader.h"
@@ -33,6 +32,7 @@
 #include "game/skyguard/ecs/systems/aircraft_control_system.h"
 #include "game/skyguard/ecs/systems/player_bounds_system.h"
 #include "game/skyguard/presentation/view_manager.h"
+#include "game/skyguard/utils/debug_format.h"
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
     #include "game/skyguard/dev/stress_scene.h"
@@ -48,30 +48,6 @@ namespace dbg = ::core::debug;
 namespace skycfg = ::game::skyguard::config;
 // Централизованное хранилище путей к JSON-конфигам
 namespace skycfg_paths = ::game::skyguard::config::paths;
-
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
-namespace {
-    void appendU32(std::string& out, const std::uint32_t value) {
-        std::array<char, 32> buf{};
-        auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + buf.size(), value);
-        if (ec == std::errc{}) {
-            out.append(buf.data(), static_cast<std::size_t>(ptr - buf.data()));
-        } else {
-            out.append("?");
-        }
-    }
-
-    void appendI32(std::string& out, const std::int32_t value) {
-        std::array<char, 32> buf{};
-        auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + buf.size(), value);
-        if (ec == std::errc{}) {
-            out.append(buf.data(), static_cast<std::size_t>(ptr - buf.data()));
-        } else {
-            out.append("?");
-        }
-    }
-} // namespace
-#endif
 
 namespace game::skyguard {
 
@@ -343,36 +319,6 @@ namespace game::skyguard {
 
         mWorld.update(dtSeconds); // обновляем все ECS-системы
         updateCamera();
-
-        if (mDebugOverlay) {
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
-            std::string extraText;
-            extraText.reserve(160);
-
-            const auto& bgStats = mBackgroundRenderer.getLastFrameStats();
-
-            extraText.append("Background: tiles ");
-            appendU32(extraText, bgStats.tilesDrawn);
-            extraText.append("  draws ");
-            appendU32(extraText, bgStats.drawCalls);
-            extraText.append("  tile ");
-            appendU32(extraText, bgStats.tileSize.x);
-            extraText.push_back('x');
-            appendU32(extraText, bgStats.tileSize.y);
-            extraText.append("  view ");
-            appendU32(extraText, static_cast<std::uint32_t>(bgStats.visibleRect.size.x));
-            extraText.push_back('x');
-            appendU32(extraText, static_cast<std::uint32_t>(bgStats.visibleRect.size.y));
-            extraText.append("  pos ");
-            appendI32(extraText, static_cast<std::int32_t>(bgStats.visibleRect.position.x));
-            extraText.push_back(',');
-            appendI32(extraText, static_cast<std::int32_t>(bgStats.visibleRect.position.y));
-
-            mDebugOverlay->prepareFrame(mWorld, extraText);
-#else
-            mDebugOverlay->prepareFrame(mWorld);
-#endif
-        }
     }
 
     void Game::updateCamera() {
@@ -435,6 +381,26 @@ namespace game::skyguard {
     void Game::renderUiPass() {
         mWindow.setView(mViewManager.getUiView());
         if (mDebugOverlay) {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            mDebugOverlay->clearExtraText();
+
+            std::array<char, 256> extraBuffer{};
+            const auto& bgStats = mBackgroundRenderer.getLastFrameStats();
+            const std::size_t extraSize =
+                utils::formatBackgroundStatsLine(extraBuffer.data(), extraBuffer.size(), bgStats);
+
+    #if !defined(NDEBUG)
+            // Если обрезали строку — увеличь буфер или сократи формат.
+            // (extraSize == cap) означает, что места могло не хватить)
+            assert(extraSize < extraBuffer.size() &&
+                   "Game::renderUiPass: background debug line truncated. Increase extraBuffer.");
+    #endif
+
+            if (extraSize > 0) {
+                mDebugOverlay->appendExtraLine(std::string_view(extraBuffer.data(), extraSize));
+            }
+#endif
+            mDebugOverlay->prepareFrame(mWorld);
             mDebugOverlay->draw(mWindow);
         }
     }

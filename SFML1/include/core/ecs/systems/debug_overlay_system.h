@@ -86,7 +86,11 @@ namespace core::ecs {
          * Вызывается один раз за кадр из игрового слоя.
          * Не рисует — только обновляет внутренний sf::Text.
          */
-        void prepareFrame(World& world, std::string_view extraText = {});
+        void prepareFrame(World& world);
+        void prepareFrame(World& world, std::string_view extraText);
+
+        void clearExtraText() noexcept;
+        void appendExtraLine(std::string_view line);
 
         /**
          * @brief Нарисовать оверлей.
@@ -110,9 +114,14 @@ namespace core::ecs {
         core::time::TimeService* mTime{nullptr}; // не владеем
         std::optional<sf::Text> mFpsText;
         std::string mTextBuffer; // scratch buffer (без аллокаций в каждом кадре)
+        std::string mExtraTextBuffer;
         bool mEnabled{true};
 
         // Обновляем строку не каждый кадр, чтобы не было дрожи и лишней работы.
+        // Throttling — сознательная фича: снижает стоимость форматирования/EMA,
+        // когда оверлей включён, но точность "каждый кадр" не нужна.
+        // Управляется через DebugOverlayRuntimeProperties::updateIntervalMs (JSON).
+        // 0ms => обновлять каждый кадр.
         sf::Clock mRenderClock;
         sf::Time  mAccumulatedTime{};
         sf::Time  mUpdateInterval{}; // 0 => каждый кадр (без троттлинга)

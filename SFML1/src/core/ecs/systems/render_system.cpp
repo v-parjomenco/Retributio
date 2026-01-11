@@ -174,11 +174,12 @@ namespace {
 
 namespace core::ecs {
 
-    RenderSystem::FrameStats RenderSystem::getLastFrameStats() const noexcept {
+    const RenderSystem::FrameStats& RenderSystem::getLastFrameStatsRef() const noexcept {
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         return mLastStats;
 #else
-        return FrameStats{};
+        static const FrameStats kEmpty{};
+        return kEmpty;
 #endif
     }
 

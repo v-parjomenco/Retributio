@@ -13,6 +13,12 @@ namespace game::skyguard::presentation {
         const sf::Texture& texture = resources.getTexture(textureId).get();
         mTexture = &texture;
         mTextureSize = texture.getSize();
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        // Контракт: повторяемость должна настраиваться в ресурсном лоадере/реестре.
+        // Если фон не тайлится — первым делом проверить repeated=true в resources.json и loader.
+         assert(texture.isRepeated() && 
+             "Background texture must be repeated (setRepeated(true) in loader).");
+#endif
     }
 
     void BackgroundRenderer::update(const sf::View& worldView) noexcept {
@@ -60,7 +66,7 @@ namespace game::skyguard::presentation {
         const std::uint32_t tilesX = static_cast<std::uint32_t>(std::ceil(size.x / texW));
         const std::uint32_t tilesY = static_cast<std::uint32_t>(std::ceil(size.y / texH));
 
-        mStats.tilesDrawn = tilesX * tilesY;
+        mStats.tilesCovered = tilesX * tilesY;
         mStats.drawCalls = 1;
         mStats.tileSize = mTextureSize;
         mStats.visibleRect = sf::FloatRect({topLeft.x, topLeft.y}, 

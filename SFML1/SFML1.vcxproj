@@ -412,6 +412,7 @@
     <ClInclude Include="include\core\ui\scaling_behavior.h" />
     <ClInclude Include="include\core\ui\viewport_utils.h" />
     <ClInclude Include="include\core\utils\file_loader.h" />
+    <ClInclude Include="include\core\utils\format\append_numbers.h" />
     <ClInclude Include="include\core\utils\json\json_common.h" />
     <ClInclude Include="include\core\utils\json\json_document.h" />
     <ClInclude Include="include\core\utils\json\json_parsers.h" />
@@ -437,6 +438,7 @@
     <ClInclude Include="include\game\skyguard\game.h" />
     <ClInclude Include="include\game\skyguard\presentation\background_renderer.h" />
     <ClInclude Include="include\game\skyguard\presentation\view_manager.h" />
+    <ClInclude Include="include\game\skyguard\utils\debug_format.h" />
     <ClInclude Include="include\pch.h" />
     <ClInclude Include="include\third_party\entt\entt_fwd.hpp" />
     <ClInclude Include="include\third_party\entt\entt_registry.hpp" />

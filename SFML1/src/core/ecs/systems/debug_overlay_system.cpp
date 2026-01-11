@@ -3,8 +3,8 @@
 #include "core/ecs/systems/debug_overlay_system.h"
 
 #include <array>
-#include <cassert>
 #include <charconv>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -14,38 +14,15 @@
 #include "core/config/properties/text_properties.h"
 #include "core/ecs/world.h"
 #include "core/time/time_service.h"
+#include "core/utils/format/append_numbers.h"
 
 // RenderSystem нужен только для Debug/Profile (статистика рендера).
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
     #include "core/ecs/systems/render_system.h"
 #endif
 
-namespace {
-
-    void appendU64(std::string& out, std::uint64_t value) {
-        std::array<char, 32> buf{};
-        auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + buf.size(), value);
-        if (ec == std::errc{}) {
-            out.append(buf.data(), static_cast<std::size_t>(ptr - buf.data()));
-        } else {
-            out.append("?");
-        }
-    }
-
 #if defined(SFML1_PROFILE)
-    void appendMs1DecimalFromUs(std::string& out, std::uint64_t us) {
-        // Печатаем миллисекунды с 1 знаком после точки без float:
-        // ms10 = (us / 100) == 0.1ms units (с округлением).
-        const std::uint64_t ms10 = (us + 50) / 100;
-
-        const std::uint64_t intPart = ms10 / 10;
-        const std::uint64_t frac = ms10 % 10;
-
-        appendU64(out, intPart);
-        out.push_back('.');
-        out.push_back(static_cast<char>('0' + static_cast<int>(frac)));
-    }
-
+namespace {
     [[nodiscard]] std::uint64_t emaPow2(std::uint64_t prev,
                                         std::uint64_t sample,
                                         const std::uint8_t shift) noexcept {
@@ -75,9 +52,8 @@ namespace {
         const std::uint64_t delta = roundDivPow2(prev - sample);
         return (prev > delta) ? (prev - delta) : 0;
     }
-#endif
-
 } // namespace
+#endif
 
 namespace core::ecs {
 
@@ -87,6 +63,8 @@ namespace core::ecs {
 
         mTextBuffer.clear();
         mTextBuffer.reserve(512);
+        mExtraTextBuffer.clear();
+        mExtraTextBuffer.reserve(512);
 
         mRenderClock.restart();
         mAccumulatedTime = mUpdateInterval; // чтобы первая отрисовка сразу обновила текст
@@ -131,6 +109,7 @@ namespace core::ecs {
         if (!mFpsText) {
             return;
         }
+
         mFpsText->setPosition(props.position);
         mFpsText->setCharacterSize(static_cast<unsigned int>(props.characterSize));
         mFpsText->setFillColor(props.color);
@@ -144,7 +123,7 @@ namespace core::ecs {
         (void)dt;
     }
 
-    void DebugOverlaySystem::prepareFrame(World& world, const std::string_view extraText) {
+    void DebugOverlaySystem::prepareFrame(World& world) {
         if (!mEnabled || !mFpsText) {
             return;
         }
@@ -180,42 +159,53 @@ namespace core::ecs {
         // Entity count — показываем ВСЕГДА (O(1) чтение, полезно для диагностики/аналитики)
         // ----------------------------------------------------------------------------------------
         mTextBuffer.append("\nEntities: ");
-        appendU64(mTextBuffer, static_cast<std::uint64_t>(world.aliveEntityCount()));
+        core::utils::format::appendU64(mTextBuffer,
+                                       static_cast<std::uint64_t>(world.aliveEntityCount()));
 
         // ----------------------------------------------------------------------------------------
         // Статистика рендера — только Debug/Profile.
         // ----------------------------------------------------------------------------------------
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         if (mRenderSystem) {
-            const auto stats = mRenderSystem->getLastFrameStats();
+            const auto& stats = mRenderSystem->getLastFrameStatsRef();
 
             mTextBuffer.append("  Sprites: ");
-            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.spriteCount));
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.spriteCount));
 
             mTextBuffer.append("  Vertices: ");
-            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.vertexCount));
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.vertexCount));
 
             mTextBuffer.append("\nDrawCalls: ");
-            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.batchDrawCalls));
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.batchDrawCalls));
 
             mTextBuffer.append("  TexSwitches: ");
-            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.textureSwitches));
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.textureSwitches));
 
             mTextBuffer.append("  UniqueTex*: ");
-            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.uniqueTexturePointers));
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.uniqueTexturePointers));
 
             mTextBuffer.append("  TexCache: ");
-            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.textureCacheSize));
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.textureCacheSize));
 
             mTextBuffer.append("  SlowResolves: ");
-            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.resourceLookupsThisFrame));
+            core::utils::format::appendU64(
+                mTextBuffer, static_cast<std::uint64_t>(stats.resourceLookupsThisFrame));
 
             mTextBuffer.append("\nCulling: ");
-            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.spriteCount));
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.spriteCount));
             mTextBuffer.push_back('/');
-            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.totalSpriteCount));
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.totalSpriteCount));
             mTextBuffer.push_back('/');
-            appendU64(mTextBuffer, static_cast<std::uint64_t>(stats.culledSpriteCount));
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.culledSpriteCount));
 
     #if defined(SFML1_PROFILE)
             // Тайминги CPU — только Profile (Debug не имеет таймингов).
@@ -223,9 +213,9 @@ namespace core::ecs {
             mSmoothedCpuDrawUs  = emaPow2(mSmoothedCpuDrawUs,  stats.cpuDrawUs,  mSmoothingShift);
 
             mTextBuffer.append("\nCPU: ");
-            appendMs1DecimalFromUs(mTextBuffer, mSmoothedCpuTotalUs);
+            core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedCpuTotalUs);
             mTextBuffer.append(" ms  (draw ");
-            appendMs1DecimalFromUs(mTextBuffer, mSmoothedCpuDrawUs);
+            core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedCpuDrawUs);
             mTextBuffer.append(" ms)");
 
             // Разбивка статистики RenderSystem: gather/sort/build/draw (в миллисекундах).
@@ -235,23 +225,56 @@ namespace core::ecs {
             mSmoothedRSDrawUs = emaPow2(mSmoothedRSDrawUs, stats.cpuDrawUs, mSmoothingShift);
 
             mTextBuffer.append("\nRender(ms): gather ");
-            appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSGatherUs);
+            core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSGatherUs);
             mTextBuffer.append(" | sort ");
-            appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSSortUs);
+            core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSSortUs);
             mTextBuffer.append(" | build ");
-            appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSBuildUs);
+            core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSBuildUs);
             mTextBuffer.append(" | draw ");
-            appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSDrawUs);
+            core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSDrawUs);
     #endif
         }
 #endif // !defined(NDEBUG) || defined(SFML1_PROFILE)
 
-        if (!extraText.empty()) {
+        if (!mExtraTextBuffer.empty()) {
             mTextBuffer.append("\n");
-            mTextBuffer.append(extraText);
+            mTextBuffer.append(mExtraTextBuffer);
         }
 
         mFpsText->setString(mTextBuffer);
+    }
+
+    void DebugOverlaySystem::prepareFrame(World& world, const std::string_view extraText) {
+        clearExtraText();
+        if (!extraText.empty()) {
+            appendExtraLine(extraText);
+        }
+        prepareFrame(world);
+    }
+
+    void DebugOverlaySystem::clearExtraText() noexcept {
+        mExtraTextBuffer.clear();
+    }
+
+    void DebugOverlaySystem::appendExtraLine(const std::string_view line) {
+        if (line.empty()) {
+            return;
+        }
+
+#if !defined(NDEBUG)
+        const std::size_t needed = 
+            mExtraTextBuffer.size() + 
+            (mExtraTextBuffer.empty() ? 0u : 1u) + 
+            line.size();
+        assert(needed <= mExtraTextBuffer.capacity() && 
+               "DebugOverlaySystem: mExtraTextBuffer would reallocate. "
+               "Increase reserve in bind().");
+#endif
+
+        if (!mExtraTextBuffer.empty()) {
+            mExtraTextBuffer.push_back('\n');
+        }
+        mExtraTextBuffer.append(line);
     }
 
     void DebugOverlaySystem::draw(sf::RenderWindow& window) const {

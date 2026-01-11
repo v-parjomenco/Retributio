@@ -28,7 +28,7 @@ namespace game::skyguard::presentation {
     class BackgroundRenderer {
       public:
         struct BackgroundStats {
-            std::uint32_t tilesDrawn{0};
+            std::uint32_t tilesCovered{0};
             std::uint32_t drawCalls{0};
             sf::Vector2u tileSize{0u, 0u};
             sf::FloatRect visibleRect{};

@@ -286,6 +286,18 @@
     <Filter Include="src\game\skyguard\presentation">
       <UniqueIdentifier>{78c0c48e-d0f3-488a-8269-f83cf2796a5e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\utils\format">
+      <UniqueIdentifier>{2ef2870d-cb5a-4501-b691-3063590bd453}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\utils\format">
+      <UniqueIdentifier>{ce9aefa1-021c-403a-8aa1-93437ff13d00}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\game\skyguard\utils">
+      <UniqueIdentifier>{0a825fd2-412d-4534-a450-30ebb732e757}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\utils">
+      <UniqueIdentifier>{412ace62-55fe-444c-9a9f-1563fc3b5238}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -655,6 +667,12 @@
     </ClInclude>
     <ClInclude Include="include\game\skyguard\presentation\background_renderer.h">
       <Filter>include\game\skyguard\presentation</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\utils\format\append_numbers.h">
+      <Filter>include\core\utils\format</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\utils\debug_format.h">
+      <Filter>include\game\skyguard\utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

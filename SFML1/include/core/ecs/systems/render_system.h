@@ -124,9 +124,9 @@ namespace core::ecs {
         /**
          * @brief Получить статистику последнего кадра.
          *
-         * @return FrameStats с метриками (zeroed в Release без SFML1_PROFILE)
+         * @return Ссылка на FrameStats (в Release возвращается zeroed static).
          */
-        [[nodiscard]] FrameStats getLastFrameStats() const noexcept;
+        [[nodiscard]] const FrameStats& getLastFrameStatsRef() const noexcept;
 
       private:
         // ------------------------------------------------------------------------------------
