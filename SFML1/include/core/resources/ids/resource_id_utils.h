@@ -2,76 +2,40 @@
 // File: core/resources/ids/resource_id_utils.h
 // Purpose: String ↔ enum helpers for resource IDs (TextureID, FontID, SoundID)
 // Used by: ResourcePaths, logging, debug tools
-// Related headers: resource_ids.h, resource_paths.h
+// Related headers: resource_ids.h
+//
+// Notes:
+//  - COLD PATH ONLY: эти функции предназначены для логов/диагностики/ошибок.
+//    Запрещено вызывать их в tight-loop / hot path (RenderSystem per-entity и т.п.).
 // ================================================================================================
 #pragma once
 
-#include <optional>
 #include <string>
 #include <string_view>
 
 #include "core/resources/ids/resource_ids.h"
 
 namespace core::resources::ids {
+
     // --------------------------------------------------------------------------------------------
     // Универсальный хелпер для логов: idToString(T)
-    // По умолчанию возвращает "Неизвестный ID", а для enum'ов использует toString(...) из
-    // resource_ids.h. Для std::string возвращает саму строку.
+    //
+    // Контракт:
+    //  - ResourceId enum'ы -> string_view без аллокаций.
+    //  - std::string -> string_view (без копирования).
+    //
+    // Примечание о времени жизни string_view:
+    //  - Возвращаемый std::string_view обязан жить дольше, чем выполняется вызов логгера.
+    //    В нашем логгере форматирование выполняется синхронно, поэтому это безопасно.
     // --------------------------------------------------------------------------------------------
-    template <typename Identifier> inline std::string idToString(const Identifier&) {
-        return "Unknown ID";
+
+    template <ResourceId Identifier>
+    [[nodiscard]] constexpr std::string_view idToString(Identifier id) noexcept {
+        return toString(id);
     }
 
-    // Специализации для ожидаемых типов ID (enum'ы)
-
-    template <> inline std::string idToString<TextureID>(const TextureID& id) {
-        return std::string(toString(id));
-    }
-
-    template <> inline std::string idToString<FontID>(const FontID& id) {
-        return std::string(toString(id));
-    }
-
-    template <> inline std::string idToString<SoundID>(const SoundID& id) {
-        return std::string(toString(id));
-    }
-
-    // Специализация для std::string (динамические пути/ключи)
-    template <> inline std::string idToString<std::string>(const std::string& id) {
+    [[nodiscard]] inline std::string_view idToString(const std::string& id) noexcept {
         return id;
-    }
-
-    // --------------------------------------------------------------------------------------------
-    // fromString(...) — парсинг строковых ID из JSON (resources.json), т.е. string -> enum
-    // Возвращают std::optional<Enum>: nullopt, если имя не распознано.
-    // --------------------------------------------------------------------------------------------
-    inline std::optional<TextureID> textureFromString(std::string_view name) noexcept {
-        if (name == "Player") {
-            return TextureID::Player;
-        }
-        if (name == "BackgroundDesert") {
-            return TextureID::BackgroundDesert;
-        }
-        // TODO: расширять при добавлении новых TextureID
-        return std::nullopt;
-    }
-
-    inline std::optional<FontID> fontFromString(std::string_view name) noexcept {
-        if (name == "Default") {
-            return FontID::Default;
-        }
-        // TODO: расширять при добавлении новых FontID
-        return std::nullopt;
-    }
-
-    inline std::optional<SoundID> soundFromString(std::string_view name) noexcept {
-        // Сейчас SoundID не расширен: мы намеренно НЕ распознаём ни одного имени.
-        //
-        // Контракт (чтобы не было WARN-спама):
-        //  - пока здесь всегда nullopt, в resources.json не должно быть entries в блоке "sounds";
-        //  - появятся звуки -> расширяем SoundID + добавляем маппинг здесь + регистрируем sounds в JSON.
-        (void) name;
-        return std::nullopt;
     }
 
 } // namespace core::resources::ids

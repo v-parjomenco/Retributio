@@ -233,7 +233,7 @@ namespace game::skyguard::config {
                 data,
                 keys::Player::TEXTURE,
                 rids::TextureID::Unknown,
-                rids::textureFromString);
+                rids::fromString<rids::TextureID>);
 
             using Kind = json_utils::EnumParseIssue::Kind;
             switch (res.issue.kind) {

@@ -315,7 +315,6 @@
     <ClCompile Include="src\core\ecs\systems\spatial_index_system.cpp" />
     <ClCompile Include="src\core\log\logging.cpp" />
     <ClCompile Include="src\core\log\log_level.cpp" />
-    <ClCompile Include="src\core\resources\ids\resource_ids.cpp" />
     <ClCompile Include="src\core\resources\paths\resource_paths.cpp" />
     <ClCompile Include="src\core\resources\resource_manager.cpp" />
     <ClCompile Include="src\core\spatial\spatial_index.cpp" />

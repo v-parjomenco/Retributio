@@ -353,15 +353,15 @@ namespace core::resources::paths {
         // Заполнение карт через специализированные загрузчики.
         loadTextureConfigMap(data,
                              registry_keys::Textures,
-                             ids::textureFromString,
+                             ids::fromString<ids::TextureID>,
                              getTextureMap());
         loadSimplePathConfigMapStrict(data,
                                       registry_keys::Fonts,
-                                      ids::fontFromString,
+                                      ids::fromString<ids::FontID>,
                                       getFontMap());
         loadSimplePathConfigMapSoft(data,
                                     registry_keys::Sounds,
-                                    ids::soundFromString,
+                                    ids::fromString<ids::SoundID>,
                                     getSoundMap());
     }
 

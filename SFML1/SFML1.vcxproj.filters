@@ -348,9 +348,6 @@
     <ClCompile Include="src\game\skyguard\config\loader\window_config_loader.cpp">
       <Filter>src\game\skyguard\config\loader</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\resources\ids\resource_ids.cpp">
-      <Filter>src\core\resources\ids</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\log\logging.cpp">
       <Filter>src\core\log</Filter>
     </ClCompile>
