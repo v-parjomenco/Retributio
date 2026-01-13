@@ -32,11 +32,11 @@ namespace game::skyguard::config {
      *  - Если отдельные поля отсутствуют:
      *      -> используются значения по умолчанию из ViewConfig.
      *
-     * Контракт:
-     *  - camera_center_y_max — это максимально допустимый Y центра камеры (SFML world space, +Y вниз).
+     * Контракт SkyGuard:
+     *  - cameraCenterYMax НЕ задаётся в JSON и фиксирован:
+     *      cameraCenterYMax = worldLogicalSize.y * 0.5f
      *  - Камера не откатывается вниз ниже стартовой точки:
      *      centerY = min(desiredCenterY, cameraCenterYMax)
-     *  - Если camera_center_y_max отсутствует в JSON, дефолт вычисляется как worldLogicalSize.y * 0.5f.
      *
      * Это НЕ критичный конфиг: игра может стартовать и с дефолтными значениями.
      */

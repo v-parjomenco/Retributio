@@ -19,6 +19,7 @@ namespace game::skyguard::config::keys {
     } // namespace Game
 
     namespace Window {
+        inline constexpr const char* MODE = "mode";
         inline constexpr const char* WIDTH = "width";
         inline constexpr const char* HEIGHT = "height";
         inline constexpr const char* TITLE = "title";
@@ -28,7 +29,6 @@ namespace game::skyguard::config::keys {
         inline constexpr const char* WORLD_LOGICAL_SIZE = "world_logical_size";
         inline constexpr const char* UI_LOGICAL_SIZE = "ui_logical_size";
         inline constexpr const char* CAMERA_OFFSET = "camera_offset";
-        inline constexpr const char* CAMERA_CENTER_Y_MAX = "camera_center_y_max";
     } // namespace View
 
     // --------------------------------------------------------------------------------------------

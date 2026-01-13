@@ -32,6 +32,9 @@ namespace game::skyguard::config {
      *  - Если отдельные поля отсутствуют:
      *      -> используются значения по умолчанию из WindowConfig.
      *
+     * Режим окна:
+     *  - window.mode: "windowed" | "borderless_fullscreen" | "fullscreen"
+     *
      * То есть это НЕ критичный конфиг: игра может стартовать и без него.
      */
     [[nodiscard]] WindowConfig loadWindowConfig(const std::string& path);

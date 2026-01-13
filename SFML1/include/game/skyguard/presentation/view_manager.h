@@ -53,17 +53,19 @@ namespace game::skyguard::presentation {
          *  - Камера НЕ должна скроллить "назад вниз" ниже стартовой точки.
          *  - Значит ограничиваем центр камеры максимумом по числу Y:
          *      centerY = min(desiredCenterY, cameraCenterYMax)
+         *  - cameraCenterYMax фиксирован и выводится из worldLogicalSize:
+         *      cameraCenterYMax = worldLogicalSize.y * 0.5f
          *
          * @param targetPosition Позиция игрока в world space (bottom-center).
          */
         void updateCamera(const sf::Vector2f& targetPosition) noexcept;
 
-        [[nodiscard]] const sf::View& getWorldView() const noexcept { return mWorldView; }
-        [[nodiscard]] const sf::View& getUiView() const noexcept { return mUiView; }
-        [[nodiscard]] sf::Vector2f getWorldLogicalSize() const noexcept { return mWorldLogicalSize; }
-        [[nodiscard]] sf::Vector2f getUiLogicalSize() const noexcept { return mUiLogicalSize; }
-        [[nodiscard]] sf::Vector2f getCameraOffset() const noexcept { return mCameraOffset; }
-        [[nodiscard]] float getCameraCenterYMax() const noexcept { return mCameraCenterYMax; }
+        [[nodiscard]] const sf::View& getWorldView() const noexcept {return mWorldView;}
+        [[nodiscard]] const sf::View& getUiView() const noexcept {return mUiView;}
+        [[nodiscard]] sf::Vector2f getWorldLogicalSize() const noexcept {return mWorldLogicalSize;}
+        [[nodiscard]] sf::Vector2f getUiLogicalSize() const noexcept {return mUiLogicalSize;}
+        [[nodiscard]] sf::Vector2f getCameraOffset() const noexcept {return mCameraOffset;}
+        [[nodiscard]] float getCameraCenterYMax() const noexcept {return mCameraCenterYMax;}
 
       private:
         sf::View mWorldView;
@@ -73,10 +75,7 @@ namespace game::skyguard::presentation {
         sf::Vector2f mUiLogicalSize{1920.f, 1080.f};
         sf::Vector2f mCameraOffset{0.f, -100.f};
 
-        // Максимально допустимый Y центра камеры (SFML world space, +Y вниз).
-        // Камера не должна "откатываться вниз" ниже стартовой точки:
-        // centerY = min(desiredCenterY, cameraCenterYMax).
-        float mCameraCenterYMax{540.f};
+        float mCameraCenterYMax{0.f};
 
         sf::Vector2u mCurrentWindowSize{1920u, 1080u};
     };

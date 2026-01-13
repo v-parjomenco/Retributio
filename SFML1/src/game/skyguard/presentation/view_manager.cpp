@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 
 #include "core/ui/viewport_utils.h"
 
@@ -16,15 +17,24 @@ namespace game::skyguard::presentation {
                "ViewManager::init: worldLogicalSize must be > 0 (validated in loader)");
         assert(config.uiLogicalSize.x > 0.f && config.uiLogicalSize.y > 0.f &&
                "ViewManager::init: uiLogicalSize must be > 0 (validated in loader)");
-        assert(config.cameraCenterYMax >= 0.f &&
-               "ViewManager::init: cameraCenterYMax must be >= 0 (validated in loader)");
         assert(initialWindowSize.x > 0u && initialWindowSize.y > 0u &&
                "ViewManager::init: initial window size must be > 0");
 #endif
         mWorldLogicalSize = config.worldLogicalSize;
         mUiLogicalSize = config.uiLogicalSize;
         mCameraOffset = config.cameraOffset;
-        mCameraCenterYMax = config.cameraCenterYMax;
+
+        // Контракт SkyGuard: cameraCenterYMax фиксирован и выводится из worldLogicalSize.
+        mCameraCenterYMax = mWorldLogicalSize.y * 0.5f;
+
+#if !defined(NDEBUG)
+        // Tripwire: если кто-то “исправит” формулу или попытается сделать параметром конфига.
+        static constexpr float kEps = 0.01f;
+        const float expected = mWorldLogicalSize.y * 0.5f;
+        assert(std::fabs(mCameraCenterYMax - expected) <= kEps &&
+               "ViewManager::init: cameraCenterYMax must equal worldLogicalSize.y * 0.5f "
+               "(fixed SkyGuard contract)");
+#endif
 
         mCurrentWindowSize = initialWindowSize;
 
@@ -56,8 +66,7 @@ namespace game::skyguard::presentation {
         const float desiredCenterY = targetPosition.y + mCameraOffset.y;
 
         // SFML world space: +Y вниз.
-        // Камера не должна "откатываться вниз" ниже стартовой точки, поэтому:
-        // centerY ограничиваем максимумом по числу Y (max center):
+        // Камера не должна "откатываться вниз" ниже стартовой точки:
         // centerY = min(desiredCenterY, cameraCenterYMax).
         const float centerY = std::min(desiredCenterY, mCameraCenterYMax);
 

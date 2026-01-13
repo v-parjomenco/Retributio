@@ -9,12 +9,14 @@
 #include <stdexcept>
 #include <string_view>
 
+#include <SFML/Window/Keyboard.hpp>
+
 #include "core/config/engine_settings.h"
 #include "core/config/loader/debug_overlay_loader.h"
 #include "core/config/loader/engine_settings_loader.h"
 #include "core/debug/debug_config.h"
-#include "core/ecs/components/transform_component.h"
 #include "core/ecs/components/sprite_component.h"
+#include "core/ecs/components/transform_component.h"
 #include "core/ecs/systems/debug_overlay_system.h"
 #include "core/ecs/systems/movement_system.h"
 #include "core/ecs/systems/render_system.h"
@@ -28,9 +30,9 @@
 #include "game/skyguard/config/loader/window_config_loader.h"
 #include "game/skyguard/config/window_config.h"
 #include "game/skyguard/ecs/components/player_tag_component.h"
-#include "game/skyguard/ecs/systems/player_init_system.h"
 #include "game/skyguard/ecs/systems/aircraft_control_system.h"
 #include "game/skyguard/ecs/systems/player_bounds_system.h"
+#include "game/skyguard/ecs/systems/player_init_system.h"
 #include "game/skyguard/presentation/view_manager.h"
 #include "game/skyguard/utils/debug_format.h"
 
@@ -60,39 +62,26 @@ namespace game::skyguard {
         const skycfg::ViewConfig viewCfg =
             skycfg::loadViewConfig(skycfg_paths::SKYGUARD_GAME);
 
-        // Создаём окно с настройками из JSON.
-        mWindow.create(sf::VideoMode({windowCfg.width, windowCfg.height}), windowCfg.title);
-
-        // Если окно не открылось — это фатально. (SFML обычно не кидает исключения здесь.)
-        if (!mWindow.isOpen()) {
-            LOG_ERROR(core::log::cat::Engine,
-                      "Failed to create main window ({}x{}).",
-                      windowCfg.width,
-                      windowCfg.height);
+        // Создаём окно (режимы: windowed/borderless/fullscreen).
+        // Используется менеджер для поддержки переключения режимов.
+        mWindowModeManager.init(windowCfg);
+        if (!mWindowModeManager.createInitial(mWindow) || !mWindow.isOpen()) {
             throw std::runtime_error("Failed to create main window");
         }
+        mWindow.setKeyRepeatEnabled(false);
 
         // ----------------------------------------------------------------------------------------
         // Загружаем движковые настройки рендеринга (EngineSettings)
         // ----------------------------------------------------------------------------------------
         mEngineSettings = cfg::loadEngineSettings(skycfg_paths::ENGINE_SETTINGS);
-
-        // Политика применения:
-        //  - VSync ON  => frameLimit выключен (0), избегаем двойного ограничения.
-        //  - VSync OFF => применяем frameLimit из конфига.
-        mWindow.setVerticalSyncEnabled(mEngineSettings.vsyncEnabled);
-        if (!mEngineSettings.vsyncEnabled) {
-            mWindow.setFramerateLimit(mEngineSettings.frameLimit);
-        } else {
-            mWindow.setFramerateLimit(0);
-        }
+        applyEngineSettingsToWindow();
 
         // Логируем итоговые настройки рендеринга один раз при запуске игры.
         LOG_INFO(core::log::cat::Gameplay, "[EngineSettings] VSync: {}, frameLimit: {}{}",
                  (mEngineSettings.vsyncEnabled ? "enabled" : "disabled"),
-                  mEngineSettings.frameLimit,
-                  (mEngineSettings.vsyncEnabled ? " (VSync enabled, frameLimit ignored)."
-                  : " (VSync disabled, frameLimit applied)."));
+                 mEngineSettings.frameLimit,
+                 (mEngineSettings.vsyncEnabled ? " (VSync enabled, frameLimit ignored)."
+                                               : " (VSync disabled, frameLimit applied)."));
 
         // ----------------------------------------------------------------------------------------
         // Инициализация view (letterbox + UI separation)
@@ -114,19 +103,30 @@ namespace game::skyguard {
         initWorld();
     }
 
+    void Game::applyEngineSettingsToWindow() noexcept {
+        // Политика применения:
+        //  - VSync ON  => frameLimit выключен (0), избегаем двойного ограничения.
+        //  - VSync OFF => применяем frameLimit из конфига.
+        mWindow.setVerticalSyncEnabled(mEngineSettings.vsyncEnabled);
+        if (!mEngineSettings.vsyncEnabled) {
+            mWindow.setFramerateLimit(mEngineSettings.frameLimit);
+        } else {
+            mWindow.setFramerateLimit(0);
+        }
+    }
+
     void Game::initResources() {
         // Загружаем реестр ресурсов из JSON.
         // Это критичный конфиг: если он сломан — игра не имеет смысла продолжать.
         mResources.loadRegistryFromJson(skycfg_paths::RESOURCES);
 
         // Настраиваем fallback-ресурсы на уровне ResourceManager.
-        //
         // Сейчас гарантированно есть только один игровой шрифт — FontID::Default.
         // Его и используем как "последний рубеж" на случай битых путей или ошибочных ID.
         mResources.setMissingFontFallback(core::resources::ids::FontID::Default);
 
-        // Для текстур и звуков пока специально не выставляем fallback:
-        //  - у нас ещё нет отдельной текстуры-заглушки (фиолетовый квадрат)
+        // -  Для текстур и звуков пока специально не выставляем fallback,
+        //    пока не появится отдельная текстура-заглушка (фиолетовый квадрат)
         //    с собственным TextureID;
         //  - звуки в текущем билде не используются.
         //
@@ -162,20 +162,20 @@ namespace game::skyguard {
         mWorld.addSystem<game::skyguard::ecs::PlayerBoundsSystem>(
             mViewManager.getWorldLogicalSize(),
             playerFloorY);
+
         auto& spatialSystem =
             mWorld.addSystem<core::ecs::SpatialIndexSystem>(mEngineSettings.spatialCellSize);
 
         // 1. Создаем систему рендеринга конструктором по умолчанию (без аргументов)
         auto& renderSys = mWorld.addSystem<core::ecs::RenderSystem>();
-        // 2. Привязываем зависимости через bind()
-        // Передаем адреса (&), так как bind принимает указатели
+        // 2. Привязываем зависимости через bind(). Передаем адреса (&).
         renderSys.bind(&spatialSystem.index(), &mResources);
         // 3. Сохраняем указатель
         mRenderSystem = &renderSys;
 
         // Эти системы требуют прямого доступа (onResize, onKeyEvent),
         // поэтому сохраняем указатели.
-        mDebugOverlay   = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
+        mDebugOverlay = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
 
         // Привязываем оверлей к сервису времени и шрифту (через ResourceManager).
         // Важно: ресурсы резолвим один раз при старте, не в hot-path.
@@ -195,7 +195,7 @@ namespace game::skyguard {
             // Политика дефолтного состояния оверлея при старте:
             //  - overlayCfg.enabled может ОТКЛЮЧИТЬ оверлей по умолчанию;
             //  - dbg::SHOW_FPS_OVERLAY — compile-time флаг (Debug/Profile: true, Release: false).
-            //
+            // 
             // ВАЖНО: при формуле ниже JSON не может "включить оверлей в Release на старте",
             // потому что compile-time флаг сильнее. Но хоткей F3 (dbg::HOTKEY_TOGGLE_OVERLAY)
             // всё равно позволяет включить оверлей в рантайме в любой сборке.
@@ -212,7 +212,7 @@ namespace game::skyguard {
     }
 
     void Game::run() {
-        assert(mWindow.isOpen()); // проверка, что окно открылось
+        assert(mWindow.isOpen());
 
         const sf::Time fixedTimeStep = timecfg::FIXED_TIME_STEP;
 
@@ -234,14 +234,14 @@ namespace game::skyguard {
         while (mWindow.isOpen()) {
             // Обновляем время кадра (raw dt, scaled dt, FPS/метрики).
             mTime.tick();
-
+            
             // Обрабатываем события окна и ввода.
             processEvents();
 
-            // ----------------------------------------------------------------------------------------
+            // ------------------------------------------------------------------------------------
             // Выполняем один или несколько фиксированных шагов логики.
             // Ограничение на количество апдейтов за кадр предотвращает спираль смерти при лагах.
-            // ----------------------------------------------------------------------------------------
+            // ------------------------------------------------------------------------------------
             int updateCount = 0;
             while (mTime.shouldUpdate(fixedTimeStep)) {
                 update(fixedTimeStep);
@@ -277,6 +277,12 @@ namespace game::skyguard {
             }
             // Нажатие клавиш.
             else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+                // Alt+Enter: стандартный toggle Windowed <-> BorderlessFullscreen.
+                if (keyPressed->alt && keyPressed->code == sf::Keyboard::Key::Enter) {
+                    mWindowModeManager.requestToggleWindowedBorderless();
+                    continue;
+                }
+
                 mAircraftControlSystem->onKeyEvent(keyPressed->code, true);
 
                 // Debug overlay toggle: хоткей работает во всех сборках (Debug/Release/Profile).
@@ -285,27 +291,38 @@ namespace game::skyguard {
                 if (keyPressed->code == dbg::HOTKEY_TOGGLE_OVERLAY) {
                     mDebugOverlay->setEnabled(!mDebugOverlay->isEnabled());
                 }
-            }
+            } 
             // Отпускание клавиш.
             else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) {
                 mAircraftControlSystem->onKeyEvent(keyReleased->code, false);
-            }
-
-            // Потеря фокуса: сбрасываем ввод, чтобы не залипали клавиши при Alt-Tab/клике мимо окна.
+            } 
+            // Потеря фокуса: сбрасываем ввод, чтобы не залипали клавиши при Alt-Tab.
+            // Также сбрасываем состояние управления самолетом.            
             else if (event->is<sf::Event::FocusLost>()) {
                 mAircraftControlSystem->resetState();
-            }
-
+            } 
             // Изменение размера окна.
             else if (const auto* resized = event->getIf<sf::Event::Resized>()) {
                 const sf::Vector2u newSize{resized->size.x, resized->size.y};
-
                 // При минимизации окно может сообщить 0x0. Не создаём/не применяем невалидный view.
                 if (newSize.x == 0u || newSize.y == 0u) {
                     continue;
                 }
-
                 mViewManager.onResize(newSize);
+                mWindowModeManager.onWindowResized(newSize);
+            }
+        }
+
+        // Применяем отложенный Alt+Enter toggle одним действием, вне цикла pollEvent.
+        if (mWindow.isOpen() && mWindowModeManager.applyPending(mWindow)) {
+            mWindow.setKeyRepeatEnabled(false);
+
+            applyEngineSettingsToWindow();
+            mViewManager.onResize(mWindow.getSize());
+
+            // Безопасно сбросить ввод: при пересоздании окна возможны "залипания" состояния.
+            if (mAircraftControlSystem) {
+                mAircraftControlSystem->resetState();
             }
         }
     }
@@ -316,7 +333,6 @@ namespace game::skyguard {
     void Game::update(const sf::Time& dt) {
         const float dtSeconds = dt.asSeconds();
         assert(dtSeconds > 0.0f); // фиксированный шаг должен быть положительным
-
         mWorld.update(dtSeconds); // обновляем все ECS-системы
         updateCamera();
     }

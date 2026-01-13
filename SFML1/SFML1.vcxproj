@@ -331,6 +331,7 @@
     <ClCompile Include="src\game\skyguard\game.cpp" />
     <ClCompile Include="src\game\skyguard\presentation\background_renderer.cpp" />
     <ClCompile Include="src\game\skyguard\presentation\view_manager.cpp" />
+    <ClCompile Include="src\game\skyguard\presentation\window_mode_manager.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">pch.h</PrecompiledHeaderFile>
@@ -437,6 +438,7 @@
     <ClInclude Include="include\game\skyguard\game.h" />
     <ClInclude Include="include\game\skyguard\presentation\background_renderer.h" />
     <ClInclude Include="include\game\skyguard\presentation\view_manager.h" />
+    <ClInclude Include="include\game\skyguard\presentation\window_mode_manager.h" />
     <ClInclude Include="include\game\skyguard\utils\debug_format.h" />
     <ClInclude Include="include\pch.h" />
     <ClInclude Include="include\third_party\entt\entt_fwd.hpp" />

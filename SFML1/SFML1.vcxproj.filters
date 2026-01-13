@@ -381,6 +381,9 @@
     <ClCompile Include="src\game\skyguard\presentation\background_renderer.cpp">
       <Filter>src\game\skyguard\presentation</Filter>
     </ClCompile>
+    <ClCompile Include="src\game\skyguard\presentation\window_mode_manager.cpp">
+      <Filter>src\game\skyguard\presentation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\resources\resource_manager.h">
@@ -670,6 +673,9 @@
     </ClInclude>
     <ClInclude Include="include\game\skyguard\utils\debug_format.h">
       <Filter>include\game\skyguard\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\presentation\window_mode_manager.h">
+      <Filter>include\game\skyguard\presentation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

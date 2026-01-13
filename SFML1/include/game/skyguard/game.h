@@ -18,6 +18,7 @@
 #include "core/time/time_service.h"
 #include "game/skyguard/presentation/background_renderer.h"
 #include "game/skyguard/presentation/view_manager.h"
+#include "game/skyguard/presentation/window_mode_manager.h"
 
 namespace core::ecs {
     class DebugOverlaySystem;
@@ -50,6 +51,8 @@ namespace game::skyguard {
         void renderWorldPass();
         void renderUiPass();
 
+        void applyEngineSettingsToWindow() noexcept;
+
         /// Инициализация ресурсного слоя (ResourcePaths + fallback-ресурсы ResourceManager).
         void initResources();
 
@@ -58,6 +61,8 @@ namespace game::skyguard {
 
       private:
         sf::RenderWindow mWindow;
+        presentation::WindowModeManager mWindowModeManager;
+
         core::resources::ResourceManager mResources;
         core::config::EngineSettings mEngineSettings;
 

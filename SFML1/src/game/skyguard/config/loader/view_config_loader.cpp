@@ -27,13 +27,12 @@ namespace {
 
     static constexpr std::string_view kLoaderTag = "SkyGuard::ViewConfigLoader";
     static constexpr std::string_view kKnownKeysHint =
-        "view.world_logical_size/view.ui_logical_size/view.camera_offset/view.camera_center_y_max";
+        "view.world_logical_size/view.ui_logical_size/view.camera_offset";
 
     static constexpr std::array kKnownKeys{
         vk::WORLD_LOGICAL_SIZE,
         vk::UI_LOGICAL_SIZE,
-        vk::CAMERA_OFFSET,
-        vk::CAMERA_CENTER_Y_MAX
+        vk::CAMERA_OFFSET
     };
 
     static_assert(kKnownKeys.size() <= Report::kMaxFields,
@@ -151,23 +150,6 @@ namespace game::skyguard::config {
             cfg.cameraOffset = offsetRes.value;
         } else if (offsetRes.issue.kind != json_utils::Vec2ParseIssue::Kind::MissingKey) {
             report.addInvalidField(vk::CAMERA_OFFSET);
-        }
-
-        // AAA: дефолт cameraCenterYMax зависит от worldLogicalSize.
-        // Если ключ отсутствует в JSON, используем центр стартового view:
-        // worldLogicalSize.y * 0.5f.
-        cfg.cameraCenterYMax = cfg.worldLogicalSize.y * 0.5f;
-
-        const auto maxCenterYRes =
-            json_utils::parseFloatWithIssue(viewData, vk::CAMERA_CENTER_Y_MAX, cfg.cameraCenterYMax);
-        if (maxCenterYRes.issue.kind == json_utils::FloatParseIssue::Kind::None) {
-            cfg.cameraCenterYMax = maxCenterYRes.value;
-            if (!(cfg.cameraCenterYMax >= 0.f)) {
-                report.addSemanticInvalidField(vk::CAMERA_CENTER_Y_MAX);
-                cfg.cameraCenterYMax = cfg.worldLogicalSize.y * 0.5f;
-            }
-        } else if (maxCenterYRes.issue.kind != json_utils::FloatParseIssue::Kind::MissingKey) {
-            report.addInvalidField(vk::CAMERA_CENTER_Y_MAX);
         }
 
         if (report.hasAnyIssues()) {

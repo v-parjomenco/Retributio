@@ -27,9 +27,10 @@ namespace {
     using Report = core::config::loader::detail::NonCriticalConfigReport;
 
     static constexpr std::string_view kLoaderTag = "SkyGuard::WindowConfigLoader";
-    static constexpr std::string_view kKnownKeysHint = "window.width/window.height/window.title";
+    static constexpr std::string_view kKnownKeysHint =
+        "window.mode/window.width/window.height/window.title";
 
-    static constexpr std::array kKnownKeys{wk::WIDTH, wk::HEIGHT, wk::TITLE};
+    static constexpr std::array kKnownKeys{wk::MODE, wk::WIDTH, wk::HEIGHT, wk::TITLE};
 
     static_assert(kKnownKeys.size() <= Report::kMaxFields,
                   "NonCriticalConfigReport buffer too small for WindowConfigLoader");
@@ -54,9 +55,10 @@ namespace game::skyguard::config {
         if (!fileContentOpt) {
             LOG_WARN(core::log::cat::Config,
                      "[{}] Файл не найден или не читается: '{}'. "
-                     "Используются значения по умолчанию (width={}, height={}, title='{}').",
+                     "Используются значения по умолчанию (mode={}, width={}, height={}, title='{}').",
                      kLoaderTag,
                      path,
+                     static_cast<int>(cfg.mode),
                      cfg.width,
                      cfg.height,
                      cfg.title);
@@ -73,10 +75,11 @@ namespace game::skyguard::config {
         if (!dataOpt) {
             LOG_WARN(core::log::cat::Config,
                      "[{}] Не удалось разобрать JSON в '{}'. "
-                     "Используются значения по умолчанию (width={}, height={}, title='{}'). "
+                     "Используются значения по умолчанию (mode={}, width={}, height={}, title='{}'). "
                      "Подробности — DEBUG.",
                      kLoaderTag,
                      path,
+                     static_cast<int>(cfg.mode),
                      cfg.width,
                      cfg.height,
                      cfg.title);
@@ -88,9 +91,10 @@ namespace game::skyguard::config {
         if (!data.is_object()) {
             LOG_WARN(core::log::cat::Config,
                      "[{}] Корневой JSON в '{}' должен быть object. "
-                     "Используются значения по умолчанию (width={}, height={}, title='{}').",
+                     "Используются значения по умолчанию (mode={}, width={}, height={}, title='{}').",
                      kLoaderTag,
                      path,
+                     static_cast<int>(cfg.mode),
                      cfg.width,
                      cfg.height,
                      cfg.title);
@@ -101,10 +105,11 @@ namespace game::skyguard::config {
         if (windowIt == data.end()) {
             LOG_WARN(core::log::cat::Config,
                      "[{}] Отсутствует блок '{}' в '{}'. "
-                     "Используются значения по умолчанию (width={}, height={}, title='{}').",
+                     "Используются значения по умолчанию (mode={}, width={}, height={}, title='{}').",
                      kLoaderTag,
                      gk::WINDOW,
                      path,
+                     static_cast<int>(cfg.mode),
                      cfg.width,
                      cfg.height,
                      cfg.title);
@@ -114,10 +119,11 @@ namespace game::skyguard::config {
         if (!windowIt->is_object()) {
             LOG_WARN(core::log::cat::Config,
                      "[{}] Блок '{}' в '{}' должен быть object. "
-                     "Используются значения по умолчанию (width={}, height={}, title='{}').",
+                     "Используются значения по умолчанию (mode={}, width={}, height={}, title='{}').",
                      kLoaderTag,
                      gk::WINDOW,
                      path,
+                     static_cast<int>(cfg.mode),
                      cfg.width,
                      cfg.height,
                      cfg.title);
@@ -133,14 +139,39 @@ namespace game::skyguard::config {
             return cfg;
         }
 
+        // Режим окна
+        {
+            const WindowMode defaultMode = cfg.mode;
+
+            const auto it = windowData.find(wk::MODE);
+            if (it != windowData.end()) {
+                if (it->is_string()) {
+                    const std::string_view modeStr = it->get_ref<const std::string&>();
+
+                    if (modeStr == "windowed") {
+                        cfg.mode = WindowMode::Windowed;
+                    } else if (modeStr == "borderless_fullscreen") {
+                        cfg.mode = WindowMode::BorderlessFullscreen;
+                    } else if (modeStr == "fullscreen") {
+                        cfg.mode = WindowMode::Fullscreen;
+                    } else {
+                        report.addSemanticInvalidField(wk::MODE);
+                        cfg.mode = defaultMode;
+                    }
+                } else {
+                    report.addInvalidField(wk::MODE);
+                }
+            }
+        }
+
         // Ширина
         {
             const std::uint32_t defaultWidth = cfg.width;
 
             const auto res =
                 json_utils::parseUIntWithIssue<std::uint32_t>(windowData,
-                                                              wk::WIDTH,
-                                                              defaultWidth);
+                                                             wk::WIDTH,
+                                                             defaultWidth);
 
             cfg.width = res.value;
             core::config::loader::detail::noteUIntIssue(report, wk::WIDTH, res);
@@ -160,8 +191,8 @@ namespace game::skyguard::config {
 
             const auto res =
                 json_utils::parseUIntWithIssue<std::uint32_t>(windowData,
-                                                              wk::HEIGHT,
-                                                              defaultHeight);
+                                                             wk::HEIGHT,
+                                                             defaultHeight);
 
             cfg.height = res.value;
             core::config::loader::detail::noteUIntIssue(report, wk::HEIGHT, res);
