@@ -8,6 +8,6 @@
     "world_logical_size": [ 1920, 1080 ],
     "ui_logical_size": [ 1920, 1080 ],
     "camera_offset": [ 0, -100 ],
-    "camera_min_y": 540
+    "camera_center_y_max": 540
   }
 }

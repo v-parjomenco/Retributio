@@ -2,6 +2,7 @@
 
 #include "game/skyguard/presentation/view_manager.h"
 
+#include <algorithm>
 #include <cassert>
 
 #include "core/ui/viewport_utils.h"
@@ -15,15 +16,15 @@ namespace game::skyguard::presentation {
                "ViewManager::init: worldLogicalSize must be > 0 (validated in loader)");
         assert(config.uiLogicalSize.x > 0.f && config.uiLogicalSize.y > 0.f &&
                "ViewManager::init: uiLogicalSize must be > 0 (validated in loader)");
-        assert(config.cameraMinY >= 0.f &&
-               "ViewManager::init: cameraMinY must be >= 0 (validated in loader)");
+        assert(config.cameraCenterYMax >= 0.f &&
+               "ViewManager::init: cameraCenterYMax must be >= 0 (validated in loader)");
         assert(initialWindowSize.x > 0u && initialWindowSize.y > 0u &&
                "ViewManager::init: initial window size must be > 0");
 #endif
         mWorldLogicalSize = config.worldLogicalSize;
         mUiLogicalSize = config.uiLogicalSize;
         mCameraOffset = config.cameraOffset;
-        mCameraMinY = config.cameraMinY;
+        mCameraCenterYMax = config.cameraCenterYMax;
 
         mCurrentWindowSize = initialWindowSize;
 
@@ -53,8 +54,13 @@ namespace game::skyguard::presentation {
 
     void ViewManager::updateCamera(const sf::Vector2f& targetPosition) noexcept {
         const float desiredCenterY = targetPosition.y + mCameraOffset.y;
-        const float baseCenterY = mCameraMinY;
-        const float centerY = (desiredCenterY < baseCenterY) ? desiredCenterY : baseCenterY;
+
+        // SFML world space: +Y вниз.
+        // Камера не должна "откатываться вниз" ниже стартовой точки, поэтому:
+        // centerY ограничиваем максимумом по числу Y (max center):
+        // centerY = min(desiredCenterY, cameraCenterYMax).
+        const float centerY = std::min(desiredCenterY, mCameraCenterYMax);
+
         // X намеренно зафиксирован по центру мира для вертикального скроллера.
         mWorldView.setCenter({mWorldLogicalSize.x * 0.5f, centerY});
     }

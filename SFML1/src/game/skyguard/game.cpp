@@ -342,12 +342,12 @@ namespace game::skyguard {
                 const sf::Vector2f cameraOffset = mViewManager.getCameraOffset();
                 LOG_DEBUG(core::log::cat::Gameplay,
                           "CamDebug: playerY={:.2f} viewCenterY={:.2f} viewSizeY={:.2f} "
-                          "cameraOffsetY={:.2f} cameraMinY={:.2f}",
+                          "cameraOffsetY={:.2f} cameraCenterYMax={:.2f}",
                           transform.position.y,
                           viewRef.getCenter().y,
                           viewRef.getSize().y,
                           cameraOffset.y,
-                          mViewManager.getCameraMinY());
+                          mViewManager.getCameraCenterYMax());
             }
 #endif
         }

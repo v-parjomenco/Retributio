@@ -28,7 +28,7 @@ namespace game::skyguard::config::keys {
         inline constexpr const char* WORLD_LOGICAL_SIZE = "world_logical_size";
         inline constexpr const char* UI_LOGICAL_SIZE = "ui_logical_size";
         inline constexpr const char* CAMERA_OFFSET = "camera_offset";
-        inline constexpr const char* CAMERA_MIN_Y = "camera_min_y";
+        inline constexpr const char* CAMERA_CENTER_Y_MAX = "camera_center_y_max";
     } // namespace View
 
     // --------------------------------------------------------------------------------------------

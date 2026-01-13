@@ -46,8 +46,13 @@ namespace game::skyguard::presentation {
 
         /**
          * @brief Обновить центр камеры (вызывать после движения игрока).
-         * 
+         *
          * X зафиксирован по центру мира (вертикальный скроллер). По Y камера следует за игроком.
+         *
+         * Контракт clamp по Y (SFML world space, +Y вниз):
+         *  - Камера НЕ должна скроллить "назад вниз" ниже стартовой точки.
+         *  - Значит ограничиваем центр камеры максимумом по числу Y:
+         *      centerY = min(desiredCenterY, cameraCenterYMax)
          *
          * @param targetPosition Позиция игрока в world space (bottom-center).
          */
@@ -58,7 +63,7 @@ namespace game::skyguard::presentation {
         [[nodiscard]] sf::Vector2f getWorldLogicalSize() const noexcept { return mWorldLogicalSize; }
         [[nodiscard]] sf::Vector2f getUiLogicalSize() const noexcept { return mUiLogicalSize; }
         [[nodiscard]] sf::Vector2f getCameraOffset() const noexcept { return mCameraOffset; }
-        [[nodiscard]] float getCameraMinY() const noexcept { return mCameraMinY; }
+        [[nodiscard]] float getCameraCenterYMax() const noexcept { return mCameraCenterYMax; }
 
       private:
         sf::View mWorldView;
@@ -67,7 +72,11 @@ namespace game::skyguard::presentation {
         sf::Vector2f mWorldLogicalSize{1920.f, 1080.f};
         sf::Vector2f mUiLogicalSize{1920.f, 1080.f};
         sf::Vector2f mCameraOffset{0.f, -100.f};
-        float mCameraMinY{540.f};
+
+        // Максимально допустимый Y центра камеры (SFML world space, +Y вниз).
+        // Камера не должна "откатываться вниз" ниже стартовой точки:
+        // centerY = min(desiredCenterY, cameraCenterYMax).
+        float mCameraCenterYMax{540.f};
 
         sf::Vector2u mCurrentWindowSize{1920u, 1080u};
     };
