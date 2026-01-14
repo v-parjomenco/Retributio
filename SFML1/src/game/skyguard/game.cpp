@@ -5,6 +5,7 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
@@ -25,14 +26,17 @@
 #include "core/time/time_config.h"
 
 #include "game/skyguard/config/config_paths.h"
+#include "game/skyguard/config/loader/app_config_loader.h"
 #include "game/skyguard/config/loader/config_loader.h"
 #include "game/skyguard/config/loader/view_config_loader.h"
 #include "game/skyguard/config/loader/window_config_loader.h"
+#include "game/skyguard/config/loader/user_settings_loader.h"
 #include "game/skyguard/config/window_config.h"
 #include "game/skyguard/ecs/components/player_tag_component.h"
 #include "game/skyguard/ecs/systems/aircraft_control_system.h"
 #include "game/skyguard/ecs/systems/player_bounds_system.h"
 #include "game/skyguard/ecs/systems/player_init_system.h"
+#include "game/skyguard/platform/user_paths.h"
 #include "game/skyguard/presentation/view_manager.h"
 #include "game/skyguard/utils/debug_format.h"
 
@@ -51,9 +55,17 @@ namespace skycfg = ::game::skyguard::config;
 // Централизованное хранилище путей к JSON-конфигам
 namespace skycfg_paths = ::game::skyguard::config::paths;
 
+namespace platform = ::game::skyguard::platform;
+
 namespace game::skyguard {
 
     Game::Game() {
+
+        // ----------------------------------------------------------------------------------------
+        // Загружаем app identity (единый источник: app.id + app.display_name)
+        // ----------------------------------------------------------------------------------------
+        const skycfg::AppConfig appCfg = skycfg::loadAppConfig(skycfg_paths::SKYGUARD_GAME);
+
         // ----------------------------------------------------------------------------------------
         // Загружаем конфиг окна и view SkyGuard из JSON (skyguard_game.json)
         // ----------------------------------------------------------------------------------------
@@ -62,9 +74,33 @@ namespace game::skyguard {
         const skycfg::ViewConfig viewCfg =
             skycfg::loadViewConfig(skycfg_paths::SKYGUARD_GAME);
 
+        // ----------------------------------------------------------------------------------------
+        // Загружаем пользовательские настройки (переопределяя дефолты)
+        //  из стандартного пути записи ОС
+        // ----------------------------------------------------------------------------------------
+        mUserSettingsPath = platform::getUserSettingsPath(appCfg.id);
+#if !defined(NDEBUG)
+        // Диагностика пути user settings (только Debug, один раз на запуск).
+        // Полезно для тестов на Linux/macOS, чтобы сразу видеть OS-standard location.
+        try {
+            LOG_DEBUG(core::log::cat::Config, "[UserSettingsLoader] Path: '{}'",
+                      mUserSettingsPath.string());
+        } catch (...) {
+            // На Windows строковая конверсия path может теоретически бросить
+            // (экзотика с кодировками).
+            LOG_DEBUG(core::log::cat::Config,
+                      "[UserSettingsLoader] Path: <failed to stringify std::filesystem::path>");
+        }
+#endif
+        mUserSettings = skycfg::loadUserSettings(mUserSettingsPath);
+
+        // Итоговый runtime window config: shipped -> user override.
+        const skycfg::WindowConfig effectiveWindowCfg =
+            skycfg::applyUserSettings(windowCfg, mUserSettings);
+
         // Создаём окно (режимы: windowed/borderless/fullscreen).
         // Используется менеджер для поддержки переключения режимов.
-        mWindowModeManager.init(windowCfg);
+        mWindowModeManager.init(effectiveWindowCfg, appCfg.displayName);
         if (!mWindowModeManager.createInitial(mWindow) || !mWindow.isOpen()) {
             throw std::runtime_error("Failed to create main window");
         }
@@ -211,6 +247,20 @@ namespace game::skyguard {
 #endif
     }
 
+    void Game::persistUserSettings() noexcept {
+        if (mUserSettingsSavingDisabled) {
+            return;
+        }
+
+        if (!skycfg::saveUserSettingsAtomic(mUserSettingsPath, mUserSettings)) {
+            mUserSettingsSavingDisabled = true;
+            // Один WARN на сессию: не спамим.
+            LOG_WARN(core::log::cat::Config,
+                     "[UserSettings] Не удалось сохранить настройки пользователя. "
+                     "Дальнейшие попытки сохранения отключены на время сессии.");
+        }
+    }
+
     void Game::run() {
         assert(mWindow.isOpen());
 
@@ -277,9 +327,15 @@ namespace game::skyguard {
             }
             // Нажатие клавиш.
             else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
-                // Alt+Enter: стандартный toggle Windowed <-> BorderlessFullscreen.
+                // Alt+Enter: циклическое переключение режимов:
+                //   Windowed -> BorderlessFullscreen -> Fullscreen -> Windowed.
+                //
+                // TODO (когда появится меню настроек):
+                //  - Alt+Enter оставить как Windowed <-> Borderless 
+                //    (или Windowed <-> LastFullscreenMode),
+                //  - Exclusive Fullscreen включать только через меню.
                 if (keyPressed->alt && keyPressed->code == sf::Keyboard::Key::Enter) {
-                    mWindowModeManager.requestToggleWindowedBorderless();
+                    mWindowModeManager.requestCycleMode();
                     continue;
                 }
 
@@ -310,6 +366,14 @@ namespace game::skyguard {
                 }
                 mViewManager.onResize(newSize);
                 mWindowModeManager.onWindowResized(newSize);
+
+                if (mWindowModeManager.getMode() == skycfg::WindowMode::Windowed) {
+                    const bool changed =
+                        skycfg::setWindowedSize(mUserSettings, newSize.x, newSize.y);
+                    if (changed) {
+                        persistUserSettings();
+                    }
+                }
             }
         }
 
@@ -323,6 +387,23 @@ namespace game::skyguard {
             // Безопасно сбросить ввод: при пересоздании окна возможны "залипания" состояния.
             if (mAircraftControlSystem) {
                 mAircraftControlSystem->resetState();
+            }
+
+            // Примечание:
+            //  - mode сохраняем всегда (Alt+Enter).
+            //  - width/height сохраняем только в Windowed, чтобы не "затирать" желаемый размер
+            //    случайным desktop size из borderless/fullscreen.
+            bool changed = false;
+
+            changed = skycfg::setWindowMode(mUserSettings, mWindowModeManager.getMode()) || changed;
+
+            if (mWindowModeManager.getMode() == skycfg::WindowMode::Windowed) {
+                const sf::Vector2u sz = mWindow.getSize();
+                changed = skycfg::setWindowedSize(mUserSettings, sz.x, sz.y) || changed;
+            }
+
+            if (changed) {
+                persistUserSettings();
             }
         }
     }

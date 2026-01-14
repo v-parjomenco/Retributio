@@ -16,6 +16,7 @@
 #include "core/ecs/world.h"
 #include "core/resources/resource_manager.h"
 #include "core/time/time_service.h"
+#include "game/skyguard/config/loader/user_settings_loader.h"
 #include "game/skyguard/presentation/background_renderer.h"
 #include "game/skyguard/presentation/view_manager.h"
 #include "game/skyguard/presentation/window_mode_manager.h"
@@ -59,6 +60,8 @@ namespace game::skyguard {
         /// Создаёт ECS-мир и инициализирует сущности SkyGuard.
         void initWorld();
 
+        void persistUserSettings() noexcept;
+
       private:
         sf::RenderWindow mWindow;
         presentation::WindowModeManager mWindowModeManager;
@@ -88,6 +91,10 @@ namespace game::skyguard {
         game::skyguard::ecs::AircraftControlSystem* mAircraftControlSystem{nullptr};
         core::ecs::DebugOverlaySystem* mDebugOverlay{nullptr};
         core::ecs::RenderSystem* mRenderSystem{nullptr};
+
+        game::skyguard::config::UserSettings mUserSettings{};
+        std::filesystem::path mUserSettingsPath{};
+        bool mUserSettingsSavingDisabled = false;
     };
 
 } // namespace game::skyguard

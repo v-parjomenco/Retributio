@@ -298,6 +298,12 @@
     <Filter Include="src\game\skyguard\utils">
       <UniqueIdentifier>{412ace62-55fe-444c-9a9f-1563fc3b5238}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\game\skyguard\platform">
+      <UniqueIdentifier>{2db5f6a5-1def-443a-b70e-76f60ef9e344}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\platform">
+      <UniqueIdentifier>{c50c2a15-5975-4305-b77d-adb7cf565d8f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -383,6 +389,15 @@
     </ClCompile>
     <ClCompile Include="src\game\skyguard\presentation\window_mode_manager.cpp">
       <Filter>src\game\skyguard\presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\skyguard\platform\user_paths.cpp">
+      <Filter>src\game\skyguard\platform</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\skyguard\config\loader\app_config_loader.cpp">
+      <Filter>src\game\skyguard\config\loader</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\skyguard\config\loader\user_settings_loader.cpp">
+      <Filter>src\game\skyguard\config\loader</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -676,6 +691,18 @@
     </ClInclude>
     <ClInclude Include="include\game\skyguard\presentation\window_mode_manager.h">
       <Filter>include\game\skyguard\presentation</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\platform\user_paths.h">
+      <Filter>include\game\skyguard\platform</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\app_config.h">
+      <Filter>include\game\skyguard\config</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\loader\app_config_loader.h">
+      <Filter>include\game\skyguard\config\loader</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\loader\user_settings_loader.h">
+      <Filter>include\game\skyguard\config\loader</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -28,9 +28,9 @@ namespace {
 
     static constexpr std::string_view kLoaderTag = "SkyGuard::WindowConfigLoader";
     static constexpr std::string_view kKnownKeysHint =
-        "window.mode/window.width/window.height/window.title";
+        "window.mode/window.width/window.height";
 
-    static constexpr std::array kKnownKeys{wk::MODE, wk::WIDTH, wk::HEIGHT, wk::TITLE};
+    static constexpr std::array kKnownKeys{wk::MODE, wk::WIDTH, wk::HEIGHT};
 
     static_assert(kKnownKeys.size() <= Report::kMaxFields,
                   "NonCriticalConfigReport buffer too small for WindowConfigLoader");
@@ -55,13 +55,12 @@ namespace game::skyguard::config {
         if (!fileContentOpt) {
             LOG_WARN(core::log::cat::Config,
                      "[{}] Файл не найден или не читается: '{}'. "
-                     "Используются значения по умолчанию (mode={}, width={}, height={}, title='{}').",
+                     "Используются значения по умолчанию (mode={}, width={}, height={}).",
                      kLoaderTag,
                      path,
                      static_cast<int>(cfg.mode),
                      cfg.width,
-                     cfg.height,
-                     cfg.title);
+                     cfg.height);
             return cfg;
         }
 
@@ -75,14 +74,13 @@ namespace game::skyguard::config {
         if (!dataOpt) {
             LOG_WARN(core::log::cat::Config,
                      "[{}] Не удалось разобрать JSON в '{}'. "
-                     "Используются значения по умолчанию (mode={}, width={}, height={}, title='{}'). "
+                     "Используются значения по умолчанию (mode={}, width={}, height={}). "
                      "Подробности — DEBUG.",
                      kLoaderTag,
                      path,
                      static_cast<int>(cfg.mode),
                      cfg.width,
-                     cfg.height,
-                     cfg.title);
+                     cfg.height);
             return cfg;
         }
 
@@ -91,13 +89,12 @@ namespace game::skyguard::config {
         if (!data.is_object()) {
             LOG_WARN(core::log::cat::Config,
                      "[{}] Корневой JSON в '{}' должен быть object. "
-                     "Используются значения по умолчанию (mode={}, width={}, height={}, title='{}').",
+                     "Используются значения по умолчанию (mode={}, width={}, height={}).",
                      kLoaderTag,
                      path,
                      static_cast<int>(cfg.mode),
                      cfg.width,
-                     cfg.height,
-                     cfg.title);
+                     cfg.height);
             return cfg;
         }
 
@@ -105,28 +102,26 @@ namespace game::skyguard::config {
         if (windowIt == data.end()) {
             LOG_WARN(core::log::cat::Config,
                      "[{}] Отсутствует блок '{}' в '{}'. "
-                     "Используются значения по умолчанию (mode={}, width={}, height={}, title='{}').",
+                     "Используются значения по умолчанию (mode={}, width={}, height={}).",
                      kLoaderTag,
                      gk::WINDOW,
                      path,
                      static_cast<int>(cfg.mode),
                      cfg.width,
-                     cfg.height,
-                     cfg.title);
+                     cfg.height);
             return cfg;
         }
 
         if (!windowIt->is_object()) {
             LOG_WARN(core::log::cat::Config,
                      "[{}] Блок '{}' в '{}' должен быть object. "
-                     "Используются значения по умолчанию (mode={}, width={}, height={}, title='{}').",
+                     "Используются значения по умолчанию (mode={}, width={}, height={}).",
                      kLoaderTag,
                      gk::WINDOW,
                      path,
                      static_cast<int>(cfg.mode),
                      cfg.width,
-                     cfg.height,
-                     cfg.title);
+                     cfg.height);
             return cfg;
         }
 
@@ -203,18 +198,6 @@ namespace game::skyguard::config {
             if (hasKey && res.issue.kind == Kind::None && cfg.height == 0u) {
                 report.addSemanticInvalidField(wk::HEIGHT);
                 cfg.height = defaultHeight;
-            }
-        }
-
-        // Заголовок окна
-        {
-            const auto it = windowData.find(wk::TITLE);
-            if (it != windowData.end()) {
-                if (it->is_string()) {
-                    cfg.title = it->get_ref<const std::string&>();
-                } else {
-                    report.addInvalidField(wk::TITLE);
-                }
             }
         }
 

@@ -1,40 +1,36 @@
 #include "pch.h"
 
 #include "game/skyguard/presentation/window_mode_manager.h"
-
 #include <algorithm>
 #include <cstdint>
+#include <utility>
 
 #include <SFML/Window/VideoMode.hpp>
 
 #include "core/log/log_macros.h"
 
 #if defined(_WIN32)
-    #include "core/compiler/platform/windows.h"
-    #include <Windows.h>
+#include "core/compiler/platform/windows.h"
+
+#include <Windows.h>
 #endif
 
 namespace game::skyguard::presentation {
 
-    void WindowModeManager::init(const config::WindowConfig& cfg) {
+    void WindowModeManager::init(const config::WindowConfig& cfg, std::string windowTitle) {
         mMode = cfg.mode;
-        mTitle = cfg.title;
+        mTitle = std::move(windowTitle);
         mDesiredWindowedSize = {cfg.width, cfg.height};
 
-#if !defined(_WIN32)
-        // Политика кроссплатформенности:
-        // на не-Windows пока не реализуем "work area" (панели/доки) по OS API.
-        // Поэтому Windowed в рантайме принудительно заменяем на BorderlessFullscreen,
-        // чтобы системные панели не перекрывали игру.
-        if (mMode == config::WindowMode::Windowed) {
-            mMode = config::WindowMode::BorderlessFullscreen;
-        }
-#endif
-
-        // Стартовое "восстановление" windowed режима — это желаемые значения из JSON.
+        // Стартовое "восстановление" windowed режима — желаемые значения из конфига.
         mSavedWindowed.size = mDesiredWindowedSize;
         mSavedWindowed.position = {0, 0};
         mHasSavedWindowed = false;
+
+        // validate-on-write: title не должен быть пустым (но мы всё равно держим fallback).
+        if (mTitle.empty()) {
+            mTitle = "SkyGuard";
+        }
     }
 
     bool WindowModeManager::createInitial(sf::RenderWindow& window) noexcept {
@@ -42,15 +38,24 @@ namespace game::skyguard::presentation {
     }
 
     bool WindowModeManager::applyPending(sf::RenderWindow& window) noexcept {
-        if (!mToggleRequested) {
+        if (!mCycleRequested) {
             return false;
         }
-        mToggleRequested = false;
+        mCycleRequested = false;
 
-        const config::WindowMode target =
-            (mMode == config::WindowMode::Windowed)
-                ? config::WindowMode::BorderlessFullscreen
-                : config::WindowMode::Windowed;
+        // Alt+Enter: цикл 3 режимов.
+        config::WindowMode target = config::WindowMode::Windowed;
+        switch (mMode) {
+        case config::WindowMode::Windowed:
+            target = config::WindowMode::BorderlessFullscreen;
+            break;
+        case config::WindowMode::BorderlessFullscreen:
+            target = config::WindowMode::Fullscreen;
+            break;
+        case config::WindowMode::Fullscreen:
+            target = config::WindowMode::Windowed;
+            break;
+        }
 
         return applyMode(window, target);
     }
@@ -64,11 +69,13 @@ namespace game::skyguard::presentation {
         mHasSavedWindowed = true;
     }
 
-    bool WindowModeManager::applyMode(sf::RenderWindow& window, config::WindowMode newMode) noexcept {
+    bool WindowModeManager::applyMode(sf::RenderWindow& window,
+                                      config::WindowMode newMode) noexcept {
         if (mTitle.empty()) {
             mTitle = "SkyGuard";
         }
 
+        // При уходе из Windowed сохраняем размер/позицию для восстановления.
         if (mMode == config::WindowMode::Windowed && newMode != config::WindowMode::Windowed) {
             mSavedWindowed.size = window.getSize();
             mSavedWindowed.position = window.getPosition();
@@ -124,7 +131,7 @@ namespace game::skyguard::presentation {
                 desiredPos = mSavedWindowed.position;
             }
 
-            // IMPORTANT: clamp учитывает non-client (рамку/заголовок) на Windows.
+            // ВАЖНО: clamp учитывает non-client (рамку/заголовок) на Windows.
             const sf::Vector2u clampedClient =
                 clampWindowedClientToWorkArea(desiredClient, workArea);
 
@@ -142,11 +149,10 @@ namespace game::skyguard::presentation {
 
             // Позиционирование:
             //  - если есть сохранённая позиция — клампим её в work area;
-            //  - иначе — ставим в левый верх work area (минимум “полей” вокруг).
-            const sf::Vector2i pos = clampWindowedPosition(
-                desiredPos,
-                clampedClient,
-                workArea);
+            //  - иначе — ставим в левый верх work area.
+            const sf::Vector2i pos = clampWindowedPosition(desiredPos,
+                                                           clampedClient,
+                                                           workArea);
 
             window.setPosition(pos);
 

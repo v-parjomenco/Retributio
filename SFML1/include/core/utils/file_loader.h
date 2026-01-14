@@ -9,8 +9,10 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace core::utils {
@@ -41,6 +43,22 @@ namespace core::utils {
         // Утилиты
         [[nodiscard]] static bool fileExists(const std::string& path);
         [[nodiscard]] static bool isReadable(const std::string& path);
+
+        // Чтение (filesystem::path)
+        [[nodiscard]] static std::optional<std::string>
+        loadTextFile(const std::filesystem::path& path);
+
+        [[nodiscard]] static std::optional<std::vector<std::uint8_t>>
+        loadBinaryFile(const std::filesystem::path& path);
+
+        [[nodiscard]] static bool fileExists(const std::filesystem::path& path);
+        [[nodiscard]] static bool isReadable(const std::filesystem::path& path);
+
+        // Атомарная запись
+        [[nodiscard]] static bool writeTextFileAtomic(const std::filesystem::path& path,
+                                                      std::string_view content) noexcept;
+        [[nodiscard]] static bool writeTextFileAtomic(const std::string& path,
+                                                      std::string_view content) noexcept;
     };
 
 } // namespace core::utils

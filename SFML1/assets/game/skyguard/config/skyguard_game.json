@@ -1,9 +1,12 @@
 {
+  "app": {
+    "id": "skyguard",
+    "display_name": "SkyGuard (name subject to change)"
+  },
   "window": {
     "mode": "borderless_fullscreen",
     "width": 1920,
-    "height": 1080,
-    "title": "SkyGuard (name subject to change)"
+    "height": 1080
   },
   "view": {
     "world_logical_size": [ 1920, 1080 ],

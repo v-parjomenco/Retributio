@@ -8,6 +8,7 @@
 //  - IMPORTANT (Windows): clamp must account for non-client area (titlebar/borders).
 //  - Borderless fullscreen: Style::None + State::Windowed at desktop resolution.
 //  - Fullscreen: State::Fullscreen at desktop video mode.
+//  - Alt+Enter behavior: cycle Windowed -> Borderless -> Fullscreen -> Windowed.
 // ================================================================================================
 #pragma once
 
@@ -22,17 +23,24 @@ namespace game::skyguard::presentation {
 
     class WindowModeManager {
       public:
-        void init(const config::WindowConfig& cfg);
+        void init(const config::WindowConfig& cfg, std::string windowTitle);
 
         [[nodiscard]] bool createInitial(sf::RenderWindow& window) noexcept;
 
-        void requestToggleWindowedBorderless() noexcept { mToggleRequested = true; }
+        // Запросить циклическое переключение режимов (Alt+Enter).
+        void requestCycleMode() noexcept {
+            mCycleRequested = true;
+        }
 
+        // Применить отложенное переключение режимов одним действием (вне pollEvent цикла).
         [[nodiscard]] bool applyPending(sf::RenderWindow& window) noexcept;
 
+        // Для Windowed: обновляем last-known client size (после resize).
         void onWindowResized(const sf::Vector2u& newSize) noexcept;
 
-        [[nodiscard]] config::WindowMode getMode() const noexcept { return mMode; }
+        [[nodiscard]] config::WindowMode getMode() const noexcept {
+            return mMode;
+        }
 
       private:
         struct WorkArea {
@@ -43,16 +51,17 @@ namespace game::skyguard::presentation {
         };
 
         struct WindowedState {
-            sf::Vector2u size{};          // client size (runtime last-known)
-            sf::Vector2i position{0, 0};  // window top-left
+            sf::Vector2u size{};         // client size (runtime last-known)
+            sf::Vector2i position{0, 0}; // window top-left
         };
 
         [[nodiscard]] bool applyMode(sf::RenderWindow& window, config::WindowMode newMode) noexcept;
 
         [[nodiscard]] static WorkArea getWorkAreaPrimary() noexcept;
 
-        [[nodiscard]] static sf::Vector2u clampWindowedClientToWorkArea(sf::Vector2u desiredClient,
-                                                                        const WorkArea& workArea) noexcept;
+        [[nodiscard]] static sf::Vector2u
+        clampWindowedClientToWorkArea(sf::Vector2u desiredClient,
+                                      const WorkArea& workArea) noexcept;
 
         [[nodiscard]] static sf::Vector2i clampWindowedPosition(sf::Vector2i desiredPos,
                                                                 sf::Vector2u clientSize,
@@ -60,6 +69,8 @@ namespace game::skyguard::presentation {
 
       private:
         config::WindowMode mMode{config::WindowMode::Windowed};
+
+        // Заголовок окна — app-level значение (app.display_name). Храним копию для create().
         std::string mTitle;
 
         sf::Vector2u mDesiredWindowedSize{1920u, 1080u};
@@ -67,7 +78,7 @@ namespace game::skyguard::presentation {
         WindowedState mSavedWindowed{};
         bool mHasSavedWindowed = false;
 
-        bool mToggleRequested = false;
+        bool mCycleRequested = false;
     };
 
 } // namespace game::skyguard::presentation

@@ -14,15 +14,20 @@ namespace game::skyguard::config::keys {
     // Ключи для игрового конфига SkyGuard (assets/game/skyguard/config/skyguard_game.json)
     // --------------------------------------------------------------------------------------------
     namespace Game {
+        inline constexpr const char* APP = "app";
         inline constexpr const char* WINDOW = "window";
         inline constexpr const char* VIEW = "view";
     } // namespace Game
+
+    namespace App {
+        inline constexpr const char* ID = "id";
+        inline constexpr const char* DISPLAY_NAME = "display_name";
+    } // namespace App
 
     namespace Window {
         inline constexpr const char* MODE = "mode";
         inline constexpr const char* WIDTH = "width";
         inline constexpr const char* HEIGHT = "height";
-        inline constexpr const char* TITLE = "title";
     } // namespace Window
 
     namespace View {
