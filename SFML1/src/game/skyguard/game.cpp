@@ -347,6 +347,34 @@ namespace game::skyguard {
                 if (keyPressed->code == dbg::HOTKEY_TOGGLE_OVERLAY) {
                     mDebugOverlay->setEnabled(!mDebugOverlay->isEnabled());
                 }
+
+#if !defined(NDEBUG)
+                if (keyPressed->code == dbg::HOTKEY_DUMP_CAMERA) {
+                    auto view = mWorld.view<
+                        game::skyguard::ecs::LocalPlayerTagComponent,
+                        core::ecs::TransformComponent
+                    >();
+
+                    const auto it = view.begin();
+                    if (it == view.end()) {
+                        LOG_DEBUG(core::log::cat::Gameplay, "CamDebug: no local player");
+                    } else {
+                        const core::ecs::Entity e = *it;
+                        const auto& tr = view.get<core::ecs::TransformComponent>(e);
+                        const auto& vw = mViewManager.getWorldView();
+                        const sf::Vector2f off = mViewManager.getCameraOffset();
+
+                        LOG_DEBUG(core::log::cat::Gameplay,
+                                  "CamDebug: playerY={:.2f} viewCenterY={:.2f} viewSizeY={:.2f} "
+                                  "cameraOffsetY={:.2f} cameraCenterYMax={:.2f}",
+                                  tr.position.y,
+                                  vw.getCenter().y,
+                                  vw.getSize().y,
+                                  off.y,
+                                  mViewManager.getCameraCenterYMax());
+                    }
+                }
+#endif
             } 
             // Отпускание клавиш.
             else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) {
@@ -375,6 +403,7 @@ namespace game::skyguard {
                     }
                 }
             }
+
         }
 
         // Применяем отложенный Alt+Enter toggle одним действием, вне цикла pollEvent.
@@ -430,23 +459,6 @@ namespace game::skyguard {
             const core::ecs::Entity entity = *it;
             auto& transform = view.get<core::ecs::TransformComponent>(entity);
             mViewManager.updateCamera(transform.position);
-
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
-            static std::uint32_t logCounter = 0;
-            if (++logCounter % 60u == 0u) {
-                const auto& viewRef = mViewManager.getWorldView();
-                (void)viewRef;
-                const sf::Vector2f cameraOffset = mViewManager.getCameraOffset();
-                LOG_DEBUG(core::log::cat::Gameplay,
-                          "CamDebug: playerY={:.2f} viewCenterY={:.2f} viewSizeY={:.2f} "
-                          "cameraOffsetY={:.2f} cameraCenterYMax={:.2f}",
-                          transform.position.y,
-                          viewRef.getCenter().y,
-                          viewRef.getSize().y,
-                          cameraOffset.y,
-                          mViewManager.getCameraCenterYMax());
-            }
-#endif
         }
 
 #if !defined(NDEBUG)
@@ -478,25 +490,62 @@ namespace game::skyguard {
     void Game::renderUiPass() {
         mWindow.setView(mViewManager.getUiView());
         if (mDebugOverlay) {
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
-            mDebugOverlay->clearExtraText();
 
-            std::array<char, 256> extraBuffer{};
-            const auto& bgStats = mBackgroundRenderer.getLastFrameStats();
-            const std::size_t extraSize =
-                utils::formatBackgroundStatsLine(extraBuffer.data(), extraBuffer.size(), bgStats);
+    #if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            // Важно для Profile: если overlay выключен — не тратим CPU на форматирование extra-строк.
+            if (mDebugOverlay->isEnabled()) {
+                mDebugOverlay->clearExtraText();
 
-    #if !defined(NDEBUG)
-            // Если обрезали строку — увеличь буфер или сократи формат.
-            // (extraSize == cap) означает, что места могло не хватить)
-            assert(extraSize < extraBuffer.size() &&
-                   "Game::renderUiPass: background debug line truncated. Increase extraBuffer.");
-    #endif
+                // Background line (Debug/Profile)
+                std::array<char, 256> extraBuffer{};
+                const auto& bgStats = mBackgroundRenderer.getLastFrameStats();
+                const std::size_t extraSize =
+                    utils::formatBackgroundStatsLine(extraBuffer.data(), extraBuffer.size(), bgStats);
 
-            if (extraSize > 0) {
-                mDebugOverlay->appendExtraLine(std::string_view(extraBuffer.data(), extraSize));
+        #if !defined(NDEBUG)
+                // Если обрезали строку — увеличь буфер или сократи формат.
+                // (extraSize == cap) означает, что места могло не хватить)
+                assert(extraSize < extraBuffer.size() &&
+                       "Game::renderUiPass: background debug line truncated. Increase extraBuffer.");
+        #endif
+                if (extraSize > 0) {
+                    mDebugOverlay->appendExtraLine(std::string_view(extraBuffer.data(), extraSize));
+                }
+
+        #if !defined(NDEBUG)
+                // Camera line (Debug only; Profile stays release-like)
+                {
+                    auto view = mWorld.view<
+                        game::skyguard::ecs::LocalPlayerTagComponent,
+                        core::ecs::TransformComponent
+                    >();
+
+                    const auto it = view.begin();
+                    if (it != view.end()) {
+                        const core::ecs::Entity e = *it;
+                        const auto& tr = view.get<core::ecs::TransformComponent>(e);
+
+                        std::array<char, 256> camBuf{};
+                        const auto& vw = mViewManager.getWorldView();
+                        const sf::Vector2f off = mViewManager.getCameraOffset();
+
+                        const std::size_t camSize =
+                            utils::formatCameraStatsLine(camBuf.data(), camBuf.size(),
+                                                         tr.position.y,
+                                                         vw.getCenter().y,
+                                                         vw.getSize().y,
+                                                         off.y,
+                                                         mViewManager.getCameraCenterYMax());
+
+                        if (camSize > 0) {
+                            mDebugOverlay->appendExtraLine(
+                                std::string_view(camBuf.data(), camSize));
+                        }
+                    }
+                }
+        #endif
             }
-#endif
+    #endif
             mDebugOverlay->prepareFrame(mWorld);
             mDebugOverlay->draw(mWindow);
         }

@@ -36,6 +36,9 @@ namespace core::debug {
      */
     inline constexpr sf::Keyboard::Key HOTKEY_TOGGLE_OVERLAY = sf::Keyboard::Key::F3;
 
+    // One-shot camera dump (dev-only): одна строка в лог по требованию.
+    inline constexpr sf::Keyboard::Key HOTKEY_DUMP_CAMERA = sf::Keyboard::Key::F8;
+
     // --------------------------------------------------------------------------------------------
     // Debug UX при завершении приложения
     // --------------------------------------------------------------------------------------------
