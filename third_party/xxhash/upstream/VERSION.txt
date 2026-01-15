@@ -1,0 +1,4 @@
+xxHash v0.8.3
+upstream: Cyan4973/xxHash
+“files copied verbatim from release archive”
+added: 15.01.2026

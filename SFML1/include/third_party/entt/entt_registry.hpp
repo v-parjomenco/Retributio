@@ -3,7 +3,6 @@
 // Purpose: Full EnTT includes (registry, view, group) with MSVC warning suppression
 // Used by: Implementation files (.cpp) working with EnTT directly
 // Related headers: entt_fwd.hpp (forward-only version for headers)
-// Notes: Pure preprocessor directives - zero runtime cost
 // ================================================================================================
 #pragma once
 

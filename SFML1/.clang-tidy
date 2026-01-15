@@ -12,7 +12,7 @@ Checks: >-
 
 WarningsAsErrors: ''
 
-HeaderFilterRegex: '^(include|src)/'
+HeaderFilterRegex: '^(SFML1/)?(include|src)/'
 
 FormatStyle: none
 

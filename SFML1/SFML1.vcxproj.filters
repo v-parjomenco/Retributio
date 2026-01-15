@@ -304,6 +304,12 @@
     <Filter Include="src\game\skyguard\platform">
       <UniqueIdentifier>{c50c2a15-5975-4305-b77d-adb7cf565d8f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="third_party">
+      <UniqueIdentifier>{512fb6bb-5181-4632-9847-016490f5897d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\third_party\xxhash">
+      <UniqueIdentifier>{a397930f-088c-4708-8448-509525356edf}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -398,6 +404,9 @@
     </ClCompile>
     <ClCompile Include="src\game\skyguard\config\loader\user_settings_loader.cpp">
       <Filter>src\game\skyguard\config\loader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\xxhash\upstream\xxhash.c">
+      <Filter>third_party</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -703,6 +712,12 @@
     </ClInclude>
     <ClInclude Include="include\game\skyguard\config\loader\user_settings_loader.h">
       <Filter>include\game\skyguard\config\loader</Filter>
+    </ClInclude>
+    <ClInclude Include="include\third_party\xxhash\xxhash.h">
+      <Filter>include\third_party\xxhash</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\xxhash\upstream\xxhash.h">
+      <Filter>third_party</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
