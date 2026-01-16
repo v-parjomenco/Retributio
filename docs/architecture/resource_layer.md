@@ -1,84 +1,90 @@
-# Resource Layer Overview
+# Resource Layer Overview (Resource Registry v1)
 
-This document describes the **resource layer** of the engine: how textures, fonts and sounds
-are defined, loaded, cached and accessed in a consistent, data-driven way.
+This document describes the **resource layer** of the engine: how textures, fonts and sounds are
+**identified**, **defined**, **loaded**, **cached**, and **accessed** in a consistent, data-driven way.
 
-The pipeline is designed to scale from small games (SkyGuard) up to large 4X projects
-with many assets and possible streaming.
+The design scales from small games (SkyGuard) up to large 4X projects (100k+ unique resources, data-only mods),
+while keeping **zero-overhead in hot paths** and **deterministic behavior**.
 
 ---
 
 ## 1. High-Level Pipeline
 
 ```text
-          Compile-time IDs                         Runtime data
-    (TextureID / FontID / SoundID)              (resources.json)
-                 │                                      │
-                 └───────────────┬──────────────────────┘
-                                 ▼
-                    ResourcePaths + *ResourceConfig
-                    (ID → { path, flags… })
-                                 │
-                                 ▼
-                         ResourceManager
-         (public API: getTexture / getFont / getSound / preload / unload)
-                                 │
-                                 ▼
-        ResourceHolder<Resource, Identifier> (per resource kind)
-                   (in-memory cache of loaded resources)
-                                 │
-                                 ▼
-      TextureResource / FontResource / SoundBufferResource
-                (thin wrappers around SFML: sf::Texture, sf::Font,
-                 sf::SoundBuffer, etc.)
-				 
-				 Key ideas:
+             Authoring / Mods / DLC                        Runtime (hot path)
+        (resources.json + ordered sources)               (ECS + RenderSystem)
+                       │
+                       ▼
+              Resource Registry Build (validate-on-write)
+    - validate Canonical Key String format
+    - merge by override policy (layer + loadOrder)
+    - compute StableKey64 (xxHash3_64, seed=0)
+    - detect StableKey64 collisions → PANIC
+    - sort by StableKey64 total order
+    - assign RuntimeKey32 indices deterministically
+                       │
+                       ▼
+                ResourceRegistry (cold-ish storage)
+      - typed vectors: textures / fonts / sounds
+      - debug indices: name → RuntimeKey32 (O(log N))
+                       │
+                       ▼
+                    ResourceManager (façade)
+        (public API: getTexture / getFont / tryGetSound)
+                       │
+                       ▼
+        Vector-backed runtime caches (index-addressed, no maps)
+      - nullptr means “not loaded yet”
+      - O(1) by RuntimeKey32.index()
+                       │
+                       ▼
+        TextureResource / FontResource / SoundBufferResource
+             (thin wrappers around SFML resources)
+```
 
-- Enum IDs are the canonical way to address engine resources.
-- resources.json describes where the data lives and low-level flags.
-- ResourcePaths converts enum IDs into *ResourceConfig.
-- ResourceManager is the façade used by gameplay / ECS / UI.
-- ResourceHolder is the internal cache keyed by IDs or strings.
-- SFML types live at the very bottom; higher-level systems never talk to them directly.
+**Key ideas (v1):**
 
+- Resource identity is **not** compile-time enums; it is a runtime contract:
+  **Canonical Key String** + **StableKey64** + **RuntimeKey32**.
+- **Validate on write, trust on read:** all validation happens at registry build / config load boundaries.
+- **Hot path uses only RuntimeKey32** (no strings, no hashing, no maps).
+- Registry build and runtime indices are **deterministic** given the same ordered sources.
+
+---
 
 ## 2. Core Concepts
 
-2.1. Resource identifiers (IDs)
+### 2.1 Resource identities (frozen contract)
 
-Header: include/core/resources/ids/resource_ids.h
-Helpers: include/core/resources/ids/resource_id_utils.h + src/core/resources/ids/resource_ids.cpp
+Resource Registry v1 defines three identities:
 
-We currently use three enum classes:
+- **Canonical Key String** — canonical, human-readable, mod-friendly identifier.
+  - Format: `namespace.category.name`.
+  - Minimum 3 segments separated by `.`.
+  - Each segment: `[a-z][a-z0-9_-]*`.
+  - Entire key is lowercase; allowed chars: `[a-z0-9._-]`.
+  - Regex: `^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*){2,}$`.
+  - Invalid format → **PANIC** at registry build.
 
-enum class TextureID : std::uint16_t {
-    Unknown = 0,
-    Player,
-    // ...
-};
+- **StableKey64** — persistence/cross-version stability.
+  - Derived deterministically from the canonical key string.
+  - Hash: **xxHash3_64**, seed **0** (frozen; never change for v1).
+  - Collision (two different canonical keys with the same StableKey64) → **PANIC**.
 
-enum class FontID   : std::uint16_t { Unknown = 0, Default };
-enum class SoundID  : std::uint16_t { Unknown = 0 };
+- **RuntimeKey32** — hot path handle (ECS components, render loops).
+  - Encodes `(index + 1)` in low 24 bits and generation in high 8 bits.
+  - `raw == 0` is the only invalid sentinel.
+  - In v1, generation is stored but **not checked in Release**.
 
-Each enum has:
+**Rule:** runtime code stores and uses **only RuntimeKey32**.
+Strings and StableKey64 are load-time / tooling / persistence only.
 
-- a toString(...) function for logging and error messages;
-- a std::hash<> specialization to be used as keys in std::unordered_map;
-- string→enum helpers (textureFromString, fontFromString, soundFromString) used when parsing JSON.
+### 2.2 Resource configs (`*ResourceConfig`)
 
-These IDs describe the resource set of the current build (e.g. SkyGuard).
-For multi-game setups they can be split per game while keeping the same pattern.
+`*ResourceConfig` describes *how to load/configure* low-level resources (path + low-level flags),
+not how they are used in gameplay.
 
-2.2. Resource configs (*ResourceConfig)
-
-Headers:
-
-- core/resources/config/texture_resource_config.h
-- core/resources/config/font_resource_config.h
-- core/resources/config/sound_resource_config.h
-
-Each config is a plain data struct describing how to load/configure the low-level resource, not how it is used in the game:
-
+```cpp
 struct TextureResourceConfig {
     std::string path;
     bool smooth         = true;
@@ -88,413 +94,220 @@ struct TextureResourceConfig {
 
 struct FontResourceConfig {
     std::string path;
-    // Future low-level font flags may appear here.
 };
 
 struct SoundResourceConfig {
     std::string path;
-    // Future streaming / compression / preload flags may appear here.
+    // v1: no streaming flags; extension point.
 };
+```
 
-Important separation:
+Separation of concerns:
 
-- *ResourceConfig — low-level GPU / SoundBuffer configuration (path, flags).
-- Higher-level things like character size, color, UI layout, sound volume, looping belong to
-other models (e.g. text blueprints, audio systems), not here.
+- `*ResourceConfig` — low-level GPU / `sf::SoundBuffer` configuration (path, flags).
+- Higher-level usage (character size, UI layout, sound volume, looping) belongs to higher-level systems
+  (blueprints, UI, audio), not the resource layer.
 
-2.3. JSON registry (resources.json) and ResourcePaths
+### 2.3 JSON registry (`resources.json`) and ordered sources
 
-Header: include/core/resources/paths/resource_paths.h
-Implementation: src/core/resources/paths/resource_paths.cpp
+The runtime registry is built from **one or more ordered sources** (Core/DLC/Patches/Mods),
+each with:
 
-ResourcePaths is a centralized read-only registry:
+- `layerPriority` (frozen layer policy)
+- `loadOrder` (explicit ordering within the same layer)
+- `sourceName` (diagnostics)
+- `path` (source file)
 
-- loaded once from resources.json at startup;
-- maps enum IDs to TextureResourceConfig, FontResourceConfig, SoundResourceConfig;
-- exposes simple static accessors:
+**Duplicate keys:**
 
-// Per-ID access (throws std::runtime_error if ID is not found)
-const TextureConfig& getTextureConfig(ids::TextureID id);
-const FontConfig&    getFontConfig   (ids::FontID id);
-const SoundConfig&   getSoundConfig  (ids::SoundID id);
+- Duplicate canonical key **within one source file** → **PANIC** (authoring error).
+- Duplicate canonical key **across sources** → expected; resolved deterministically by override policy.
 
-// Presence checks (no exceptions)
-bool contains(ids::TextureID id) noexcept;
-bool contains(ids::FontID id) noexcept;
-bool contains(ids::SoundID id) noexcept;
+#### 2.3.1 Canonical JSON layout (namespaced)
 
-// Bulk access (for preload, tools)
-const std::unordered_map<ids::TextureID, TextureConfig>& getAllTextureConfigs() noexcept;
-const std::unordered_map<ids::FontID,    FontConfig>&    getAllFontConfigs()    noexcept;
-const std::unordered_map<ids::SoundID,   SoundConfig>&   getAllSoundConfigs()   noexcept;
+Example:
 
-2.3.1. JSON layout
-
-Canonical JSON structure:
-
+```json
 {
   "textures": {
-    "Player": {
-      "path": "assets/game/skyguard/images/0000su-57.png",
+    "skyguard.sprite.player": {
+      "path": "assets/game/skyguard/images/su-57.png",
       "smooth": true,
+      "repeated": false,
+      "mipmap": false
+    },
+    "core.texture.missing": {
+      "path": "assets/core/images/missing.png",
+      "smooth": false,
       "repeated": false,
       "mipmap": false
     }
   },
   "fonts": {
-    "Default": "assets/core/fonts/Wolgadeutsche.otf"
+    "core.font.default": {
+      "path": "assets/core/fonts/Wolgadeutsche.otf"
+    }
   },
   "sounds": {
-    // "Click": "assets/core/sounds/ui_click.wav"
+    "skyguard.ui.click": {
+      "path": "assets/core/sounds/ui_click.wav"
+    }
   }
 }
+```
 
-- textures — object; each key is a string ID (e.g. "Player"), value is an object → TextureResourceConfig.
-- fonts — object; each key is a string ID, value is a string path → FontResourceConfig.
-- sounds — optional object; layout analogous to fonts.
+Notes:
 
-String keys are parsed via textureFromString(...), fontFromString(...), soundFromString(...)
-to map them to the corresponding enum IDs.
+- Keys in `textures/fonts/sounds` are **canonical key strings**.
+- Values are config objects (even for fonts/sounds) to keep the format uniform and extensible.
 
-2.3.2. Validation and error handling
+#### 2.3.2 Validation and error handling
 
-ResourcePaths::loadFromJSON(...):
+At registry build:
 
-- Reads file via FileLoader::loadTextFile.
-- Parses JSON with nlohmann::json.
-- Validates overall structure using JsonValidator.
-- On critical errors (missing file, invalid JSON, wrong shape):
-	- uses message::showError(...);
-	- terminates the process via std::exit(EXIT_FAILURE).
+- validate canonical key format
+- validate per-type JSON shape and required fields
+- merge sources deterministically (override policy)
+- compute StableKey64 and detect collisions
+- assign RuntimeKey32 indices deterministically
 
-At this level the game cannot run without a valid resources registry, so failing fast is correct.
+Failure policy:
 
+- **Textures/Fonts:** Type A → **PANIC** on any registry build failure.
+- **Sounds:** soft-fail → **WARN + skip** invalid/missing entries (never PANIC due to sound assets).
 
-## 3. ResourceHolder: in-memory cache
+---
 
-Header: include/core/resources/holders/resource_holder.h
-Implementation: include/core/resources/holders/resource_holder.inl
+## 3. ResourceRegistry: runtime index + debug indices
 
-Generic template:
+`ResourceRegistry` is the built, immutable runtime representation:
 
-template <typename Resource, typename Identifier>
-class ResourceHolder {
-    // std::unordered_map<Identifier, std::unique_ptr<Resource>> mResourceMap;
-};
+- typed vectors per kind (textures/fonts/sounds), ordered by StableKey64 total order
+- O(1) access by `RuntimeKey32.index()`
+- debug indices (tools/overlay only):
+  - canonical name → RuntimeKey32 (sorted by name; O(log N))
+  - stableKey → RuntimeKey32 (binary search over stable-sorted entries; or an optional index)
 
-Main responsibilities:
+Fallback keys (Type A):
 
-- Store resources as std::unique_ptr<Resource> keyed by Identifier (enum or std::string).
-- Provide a simple API:
+- `core.texture.missing`
+- `core.font.default`
 
-template <typename... Args>
-bool load(const Identifier& id, const std::string& filename, Args&&... args);
-// Throws std::runtime_error on I/O / parse errors.
+They must exist and be resolvable during finalize/build; otherwise **PANIC**.
 
-void insert(const Identifier& id, std::unique_ptr<Resource> resource);
-// Takes ownership of an already-loaded resource.
+---
 
-Resource&       get(const Identifier& id);
-const Resource& get(const Identifier& id) const;
-// Throws std::runtime_error if not found.
+## 4. ResourceManager: public API (hot path safe)
 
-bool contains(const Identifier& id) const noexcept;
-void unload(const Identifier& id);
-void clear() noexcept;
-std::size_t size() const noexcept;
+`ResourceManager` is the high-level façade used by gameplay, ECS systems, UI, etc.
 
-Error policy:
+### 4.1 RuntimeKey32-based access (canonical runtime path)
 
-- load(...) and get(...) throw std::runtime_error on problems.
-- Fallbacks / user-visible recovery are handled one level above (in ResourceManager).
+```cpp
+const sf::Texture& getTexture(TextureKey key); // returns fallback on invalid
+const sf::Font&    getFont(FontKey key);       // returns fallback on invalid
+const sf::SoundBuffer* tryGetSound(SoundKey key); // returns nullptr on invalid/missing
+```
 
+Rules:
 
-## 4. ResourceManager: public API
+- Texture/Font access never throws in runtime hot paths; invalid keys map to fallbacks.
+- Sound access is pointer-returning because “skip on missing” is part of the policy.
 
-Header: include/core/resources/resource_manager.h
-Implementation: src/core/resources/resource_manager.cpp
+### 4.2 Runtime caches (no maps)
 
-ResourceManager is the high-level façade used by gameplay, ECS systems, UI, etc.
+ResourceManager caches loaded SFML resources using **vector-backed caches indexed by runtime index**:
 
-Internally it has six holders:
+- `std::vector<std::unique_ptr<sf::Texture>>` (or wrapper) sized to `registry.textureCount()`
+- `nullptr` means “not loaded yet”
 
-ResourceHolder<TextureResource, TextureID>     mTextures;
-ResourceHolder<FontResource,    FontID>        mFonts;
-ResourceHolder<SoundBufferResource, SoundID>   mSounds;
+This guarantees:
 
-ResourceHolder<TextureResource, std::string>   mDynamicTextures;
-ResourceHolder<FontResource,    std::string>   mDynamicFonts;
-ResourceHolder<SoundBufferResource, std::string> mDynamicSounds;
+- O(1) lookups by index
+- stable cache locality
+- zero associative container overhead
 
-Plus fallback IDs (for “purple square”, default font, etc.):
+### 4.3 Debug/tooling lookup (cold path)
 
-bool         mHasMissingTextureFallback = false;
-TextureID    mMissingTextureID{};
+For tools and debugging, name/stable-key lookups may exist:
 
-bool         mHasMissingFontFallback = false;
-FontID       mMissingFontID{};
+- resolve canonical key string → `TextureKey/FontKey/SoundKey` via debug index (O(log N))
+- resolve StableKey64 similarly
 
-bool         mHasMissingSoundFallback = false;
-SoundID      mMissingSoundID{};
+These lookups are **not** permitted in render hot loops.
 
-4.1. Enum-based access (canonical path)
-const types::TextureResource& getTexture(TextureID id);
-const types::FontResource&    getFont   (FontID id);
-const types::SoundBufferResource& getSound(SoundID id);
+---
 
-Flow for textures (fonts/sounds analogous):
+## 5. Render hot path integration (per-frame cache)
 
-Query ResourcePaths::getTextureConfig(id) → TextureResourceConfig:
+Hard rule:
 
-- path
-- smooth
-- repeated
-- generateMipmap
+- Render hot loops must not do string lookups, hashing, or map lookups.
 
-Use helper ensureTextureLoadedWithConfig(...):
+Correct per-frame cache contract:
 
-- if resource is not in the holder:
-- call holder.load(id, config.path);
+- RenderSystem keeps two arrays sized to `registry.textureCount()`:
+  - `mFrameTexturePtr[idx]` (`const sf::Texture*`)
+  - `mFrameTextureStamp[idx]` (`uint32_t`)
+- RenderSystem increments `mFrameId` each frame.
+- For a texture key:
+  - `idx = key.index()`
+  - if `mFrameTextureStamp[idx] != mFrameId`:
+    - `mFrameTexturePtr[idx] = &resources.getTexture(key)`
+    - `mFrameTextureStamp[idx] = mFrameId`
+  - use `mFrameTexturePtr[idx]` for draw
 
-apply flags: setSmooth(config.smooth), setRepeated(config.repeated),
-generateMipmap() if requested (with debug logging on failure).
+This yields **one ResourceManager call per unique texture per frame**, with **zero overhead per sprite**.
 
-Return a const TextureResource&.
+---
 
-Error behavior:
+## 6. Error-handling strategy by layer
 
-- If getTextureConfig(id) or the load fails:
-	- if a fallback texture is configured and id != mMissingTextureID:
-		- log a debug message with details and return the fallback ID via getTexture(mMissingTextureID);
-	- otherwise, rethrow the original exception to the caller.
+**Registry build / config load boundary:**
 
-This is the main path used by the engine and gameplay code.
+- Textures/Fonts: Type A → PANIC on any invalid registry/build condition.
+- Sounds: WARN + skip invalid/missing entries.
 
-4.2. Dynamic string IDs
-const types::TextureResource&       getTexture(const std::string& id);
-const types::FontResource&          getFont(const std::string& id);
-const types::SoundBufferResource&   getSound(const std::string& id);
+**Runtime access:**
 
-Semantics:
+- invalid TextureKey → fallback texture
+- invalid FontKey → fallback font
+- invalid/missing SoundKey → `tryGetSound()` returns nullptr; caller skips
 
-- Intended for tools, modding, prototypes, tests.
-- The string is treated as a logical ID, but the current implementation maps it 1:1 to a file path.
+---
 
-Current implementation:
+## 7. Usage examples & patterns
 
-- Builds a temporary *ResourceConfig:
+### 7.1 Load-time resolution (validate-on-write)
 
-	TextureResourceConfig cfg{};
-	cfg.path          = id;
-	cfg.smooth        = true;
-	cfg.repeated      = false;
-	cfg.generateMipmap = false;
+Blueprint/config loaders parse canonical key strings and resolve them **once** at load time:
 
-	( analogous configs for fonts / sounds with just path )
+```cpp
+// Load-time boundary code (may log/PANIC based on policy).
+// After this point, the runtime stores only TextureKey.
+TextureKey playerTex = registry.resolveTextureKey("skyguard.sprite.player");
+entity.add<SpriteComponent>({ .textureKey = playerTex, /* ... */ });
+```
 
-- Calls ensure*LoadedWithConfig(mDynamic*, id, cfg).
+### 7.2 Runtime usage (trust-on-read)
 
-Error / fallback policy:
+```cpp
+// Hot path: only TextureKey, no strings.
+const sf::Texture& tex = resourceManager.getTexture(sprite.textureKey);
+```
 
-- Same pattern as enum methods:
+### 7.3 Tooling / debug usage (cold path)
 
-	- try to load;
-    - on failure, if a fallback (texture/font/sound) is configured → log and return fallback;
-	- if not, rethrow.
+```cpp
+// Tools/overlay: canonical name lookup is allowed (O(log N)), not in hot loops.
+auto key = registry.tryResolveTextureKeyByName("skyguard.sprite.player");
+```
 
-Conceptually:
+---
 
-- Enum + resources.json is the canonical way for engine/game code.
-- Dynamic string IDs are a consciously more “loose” path for tools and modding,
-with hard-coded default flags for now.
-- In the future, a dedicated registry (dynamic_resources.json) can be introduced to
-describe these dynamic resources with full configs.
+## 8. Future extensions (roadmap)
 
-4.3. Escape hatch: getTextureByPath
-const types::TextureResource& getTextureByPath(const std::string& path);
-
-Semantics:
-
-- Direct access by physical filesystem path, bypassing any ID schemes.
-- Key in the cache is the exact path string.
-- Used for low-level testing, debugging and ad-hoc utilities.
-
-Current implementation:
-
-- Builds a TextureResourceConfig:
-	TextureResourceConfig cfg{};
-	cfg.path          = path;
-	cfg.smooth        = true;
-	cfg.repeated      = false;
-	cfg.generateMipmap = false;
-
-- Calls the same helper ensureTextureLoadedWithConfig(mDynamicTextures, path, cfg).
-
-- Error policy is identical:
- - if fallback texture is configured → log and return fallback;
- - otherwise, rethrow.
-
-4.4. Fallback resources
-void setMissingTextureFallback(TextureID id);
-void setMissingFontFallback   (FontID id);
-void setMissingSoundFallback  (SoundID id);
-
-Responsibilities:
-
-- Store which ID should be used as the fallback.
-- Immediately warm it up:
-
-void ResourceManager::setMissingTextureFallback(TextureID id) {
-    mMissingTextureID = id;
-    mHasMissingTextureFallback = true;
-    (void)getTexture(id); // will throw early if fallback is misconfigured
-}
-
-If a later load fails, the corresponding getTexture/getFont/getSound method will:
-
-- log a detailed debug message including:
-	- failing ID,
-	- fallback ID,
-	- exception message;
-- attempt to return the fallback resource.
-
-If the fallback itself is broken, the exception will propagate.
-
-4.5. Preload, unload and metrics
-
-Preload:
-
-void preloadTexture(TextureID id);
-void preloadFont   (FontID id);
-void preloadSound  (SoundID id);
-
-void preloadAllTextures();
-void preloadAllFonts();
-void preloadAllSounds();
-
-- Per-ID methods simply call get* and discard the result.
-- preloadAll* iterate over ResourcePaths::getAll*Configs() and call get* for each ID.
-- Typical usage:
-	- loading screens,
-	- preparing a heavy scene,
-	- profiling asset memory usage.
-
-Unload and clear:
-
-void unloadTexture(TextureID id) noexcept;
-void unloadTexture(const std::string& id) noexcept;
-// Same for Font and Sound.
-
-void clearAll() noexcept;
-
-- unload* removes specific entries from the holders (careful with dangling references).
-- clearAll() wipes all caches; fallback IDs remain but their resources will be reloaded lazily.
-
-Metrics:
-
-struct ResourceMetrics {
-    std::size_t textureCount        = 0;
-    std::size_t dynamicTextureCount = 0;
-    std::size_t fontCount           = 0;
-    std::size_t dynamicFontCount    = 0;
-    std::size_t soundCount          = 0;
-    std::size_t dynamicSoundCount   = 0;
-};
-
-ResourceMetrics getMetrics() const noexcept;
-
-- Simple snapshot of how many resources are currently cached in each holder.
-- Useful for debug overlays, profiling tools and unit tests.
-
-
-## 5. Error-handling strategy by layer
-
-FileLoader / JSON utils / ResourcePaths:
-- On critical configuration errors at startup (e.g. missing / broken resources.json):
-	- log via message::showError(...);
-	- terminate the process via std::exit(EXIT_FAILURE).
-ResourceHolder:
-- Throws std::runtime_error with detailed messages when:
-	- file loading fails in load(...);
-	- resource is missing in get(...).
-ResourceManager:
-- Wraps ResourceHolder calls in try/catch.
-- On failure:
-	- if a fallback is configured → log + return fallback;
-	- else rethrow.
-Gameplay / ECS systems / Game class:
-- Consumer code (e.g. Game::initWorld) either:
-	- lets exceptions bubble up to a top-level try/catch in main() or Game::run(),
-	- or catches them and shows user-facing error messages.
-
-
-## 6. Usage examples & patterns
-
-6.1. Typical engine usage (enum IDs)
-// Game / ECS system
-const sf::Texture& playerTexture =
-    resourceManager.getTexture(core::resources::ids::TextureID::Player).get();
-
-// Debug overlay
-const sf::Font& debugFont =
-    resourceManager.getFont(core::resources::ids::FontID::Default).get();
-
-
-Everything goes through:
-
-EnumID → ResourcePaths → *ResourceConfig → ResourceManager → ResourceHolder → SFML
-
-6.2. Dynamic / tools / modding usage
-// Tool or editor prototype
-const sf::Texture& tempTexture =
-    resourceManager.getTexture("C:/tmp/experimental_sprite.png").get();
-
-// Hard-coded experimental font for a debug tool
-const sf::Font& tempFont =
-    resourceManager.getFont("assets/dev/fonts/DebugMono.ttf").get();
-
-Here:
-
-- String is used as a flexible ID.
-- Low-level flags for textures are currently fixed (smooth = true; repeated = false; mipmap = false),
-which is acceptable for tools and prototypes.
-- For any asset that becomes part of the final build, it’s recommended to:
-	- add a proper TextureID/FontID/SoundID,
-	- describe it in resources.json,
-	- switch to the enum-based path.
-
-6.3. Escape hatch using paths directly
-// One-off debug helper
-const sf::Texture& tex =
-    resourceManager.getTextureByPath("assets/debug/test_pattern.png").get();
-
-Use this when:
-
-- you explicitly want to bypass all registries,
-- you are in a debug / experimental context.
-
-
-## 7. Future extensions for 4X-scale projects
-
-The current design is intentionally minimal, but extendable. Natural evolution paths:
-
-- Separate registry for dynamic resources
-	- Introduce dynamic_resources.json:
-		- map string IDs to *ResourceConfig with full control over flags;
-		- keep the same helper functions (ensure*LoadedWithConfig).
-- Streaming / hot-reload layer
-	- Add a streaming manager on top of ResourceManager, responsible for:
-		- unloading rarely used assets by region / chunk;
-		- background loading;
-		- reacting to editor / file-watcher signals for hot-reload.
-- Memory budgets and advanced metrics
-	- Add tracking of approximate memory usage per resource type.
-	- Integrate with debug overlays and profiling tools.
-- Integration with higher-level blueprints
-	- Keep the clean separation:
-		- *ResourceConfig — low-level resource.
-		- PlayerBlueprint, TerrainTileBlueprint, UITextBlueprint — high-level usage.
-	- Larger games can build complex blueprints on top of a stable and simple resource layer.
-
-The goal is to keep the core resource pipeline small and robust, so that all future 4X-specific
-features can be layered on top without having to rewrite the fundamentals.
+- **Compiled registry:** offline-built registry binary to reduce load-time cost and strengthen determinism guarantees.
+- **Hot reload:** v1 supports reload-in-place and append-only; full rebuild is not supported in v1.
+- **Streaming:** layered on top of ResourceManager with budgets and streaming policies.
+- **Richer configs:** extend `*ResourceConfig` without changing the identity contract.

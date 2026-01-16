@@ -296,7 +296,7 @@ namespace {
         }
 
         // Оставляем верхний левый угол чище для DebugOverlay (читать метрики должно быть удобно).
-        const sf::Vector2f start{10.f, 170.f};
+        const sf::Vector2f start{0.f, 200.f};
         const sf::Vector2f step{10.f, 10.f};
 
         constexpr float kTargetWorldSize = 8.f; // хотим ~8x8 в мире, независимо от rect

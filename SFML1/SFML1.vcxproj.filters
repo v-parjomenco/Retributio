@@ -310,6 +310,18 @@
     <Filter Include="include\third_party\xxhash">
       <UniqueIdentifier>{a397930f-088c-4708-8448-509525356edf}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\resources\keys">
+      <UniqueIdentifier>{fd6e977f-3b82-4d99-8c47-e0667c0745e9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\resources\keys">
+      <UniqueIdentifier>{bf207c25-1204-4503-9118-71a014d7496a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\resources\registry">
+      <UniqueIdentifier>{c3688b5b-1ef8-4fc5-83d8-c05b427a64d2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\resources\registry">
+      <UniqueIdentifier>{ca314746-c576-421f-919e-63f51bbab94a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -407,6 +419,15 @@
     </ClCompile>
     <ClCompile Include="..\third_party\xxhash\upstream\xxhash.c">
       <Filter>third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\resources\registry\string_pool.cpp">
+      <Filter>src\core\resources\registry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\resources\registry\string_pool_self_test.cpp">
+      <Filter>src\core\resources\registry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\resources\keys\stable_key.cpp">
+      <Filter>src\core\resources\keys</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -718,6 +739,15 @@
     </ClInclude>
     <ClInclude Include="..\third_party\xxhash\upstream\xxhash.h">
       <Filter>third_party</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\keys\resource_key.h">
+      <Filter>include\core\resources\keys</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\keys\stable_key.h">
+      <Filter>include\core\resources\keys</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\registry\string_pool.h">
+      <Filter>include\core\resources\registry</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
