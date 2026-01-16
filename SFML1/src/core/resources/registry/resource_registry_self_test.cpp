@@ -9,6 +9,7 @@
 
 #if defined(SFML1_TESTS)
 
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -147,17 +148,31 @@ namespace core::resources::registry::self_test {
             assert(registry.fontCount() == 1u);
             assert(registry.soundCount() == 1u);
 
+            // findTextureByName + runtime getTexture
             const TextureKey missingKey = registry.findTextureByName("core.texture.missing");
             assert(missingKey.valid());
-
             const auto& missingEntry = registry.getTexture(missingKey);
             assert(missingEntry.name == "core.texture.missing");
 
-            const std::uint64_t stableKey = 
+            // findTextureByStableKey
+            const std::uint64_t stableKey =
                 core::resources::computeStableKey64("core.texture.missing");
             const TextureKey stableLookup = registry.findTextureByStableKey(stableKey);
             assert(stableLookup.valid());
             assert(stableLookup == missingEntry.key);
+
+            // findFontByName + runtime getFont
+            const FontKey fontKey = registry.findFontByName("core.font.default");
+            assert(fontKey.valid());
+            const auto& fontEntryLoaded = registry.getFont(fontKey);
+            assert(fontEntryLoaded.name == "core.font.default");
+
+            // findSoundByName + runtime tryGetSound
+            const SoundKey soundKey = registry.findSoundByName("core.sound.click");
+            assert(soundKey.valid());
+            const auto* soundEntryLoaded = registry.tryGetSound(soundKey);
+            assert(soundEntryLoaded != nullptr);
+            assert(soundEntryLoaded->name == "core.sound.click");
         }
 
         void testDuplicateWithinSourcePanics() {
@@ -169,10 +184,10 @@ namespace core::resources::registry::self_test {
             writeTextFileOrFail(fontPath, "font");
 
             const std::string textureEntry =
-                "{\"core.texture.missing\":{\"path\":\"" + 
+                "{\"core.texture.missing\":{\"path\":\"" +
                 texturePath.generic_string() + "\"}}";
             const std::string fontEntry =
-                "{\"core.texture.missing\":{\"path\":\"" + 
+                "{\"core.texture.missing\":{\"path\":\"" +
                 fontPath.generic_string() + "\"}}";
             const std::string soundEntry = "{}";
 
@@ -199,10 +214,10 @@ namespace core::resources::registry::self_test {
             writeTextFileOrFail(fontPath, "font");
 
             const std::string coreTextures =
-                "{\"core.texture.missing\":{\"path\":\"" + 
+                "{\"core.texture.missing\":{\"path\":\"" +
                 coreTexturePath.generic_string() + "\"}}";
             const std::string coreFonts =
-                "{\"core.font.default\":{\"path\":\"" + 
+                "{\"core.font.default\":{\"path\":\"" +
                 fontPath.generic_string() + "\"}}";
             const std::string emptySounds = "{}";
 
@@ -211,7 +226,7 @@ namespace core::resources::registry::self_test {
             writeTextFileOrFail(coreJsonPath, coreJson);
 
             const std::string modTextures =
-                "{\"core.texture.missing\":{\"path\":\"" + 
+                "{\"core.texture.missing\":{\"path\":\"" +
                 modTexturePath.generic_string() + "\"}}";
             const std::string modFonts = "{}";
             const std::string modJson = makeRegistryJson(modTextures, modFonts, emptySounds);
@@ -232,6 +247,44 @@ namespace core::resources::registry::self_test {
             assert(entry.path == modTexturePath.generic_string());
         }
 
+        // Tie в override-политике (layerPriority/loadOrder совпали) => PANIC.
+        void testOverrideTiePanics() {
+            const auto dir = makeTempDir("override_tie");
+            const auto texA = dir / "a.png";
+            const auto texB = dir / "b.png";
+            const auto fontPath = dir / "default.ttf";
+
+            writeTextFileOrFail(texA, "a");
+            writeTextFileOrFail(texB, "b");
+            writeTextFileOrFail(fontPath, "font");
+
+            const std::string texturesA =
+                "{\"core.texture.missing\":{\"path\":\"" + texA.generic_string() + "\"}}";
+            const std::string fontsA =
+                "{\"core.font.default\":{\"path\":\"" + fontPath.generic_string() + "\"}}";
+            const std::string soundsA = "{}";
+            const auto jsonAPath = dir / "a.json";
+            writeTextFileOrFail(jsonAPath, makeRegistryJson(texturesA, fontsA, soundsA));
+
+            const std::string texturesB =
+                "{\"core.texture.missing\":{\"path\":\"" + texB.generic_string() + "\"}}";
+            const std::string fontsB =
+                "{\"core.font.default\":{\"path\":\"" + fontPath.generic_string() + "\"}}";
+            const std::string soundsB = "{}";
+            const auto jsonBPath = dir / "b.json";
+            writeTextFileOrFail(jsonBPath, makeRegistryJson(texturesB, fontsB, soundsB));
+
+            // Одинаковые layerPriority и loadOrder => tie => PANIC.
+            const std::vector<ResourceSource> sources{
+                makeSource(jsonAPath, 0, 0, "A"),
+                makeSource(jsonBPath, 0, 0, "B")};
+
+            expectPanic([&]() {
+                ResourceRegistry registry;
+                registry.loadFromSources(sources);
+            });
+        }
+
         void testInvalidCanonicalKeyPanics() {
             const auto dir = makeTempDir("invalid_key");
             const auto texturePath = dir / "missing.png";
@@ -241,10 +294,10 @@ namespace core::resources::registry::self_test {
             writeTextFileOrFail(fontPath, "font");
 
             const std::string textures =
-                "{\"Core.Texture.Missing\":{\"path\":\"" + 
+                "{\"Core.Texture.Missing\":{\"path\":\"" +
                 texturePath.generic_string() + "\"}}";
             const std::string fonts =
-                "{\"core.font.default\":{\"path\":\"" + 
+                "{\"core.font.default\":{\"path\":\"" +
                 fontPath.generic_string() + "\"}}";
             const std::string sounds = "{}";
 
@@ -297,6 +350,58 @@ namespace core::resources::registry::self_test {
             });
         }
 
+        // Детерминизм не должен зависеть от порядка ключей в JSON.
+        void testDeterminismIgnoresJsonKeyOrder() {
+            const auto dir = makeTempDir("determinism_order");
+            const auto texMissing = dir / "missing.png";
+            const auto texSecondary = dir / "secondary.png";
+            const auto fontPath = dir / "default.ttf";
+
+            writeTextFileOrFail(texMissing, "m");
+            writeTextFileOrFail(texSecondary, "s");
+            writeTextFileOrFail(fontPath, "font");
+
+            // JSON #1: missing затем secondary
+            const std::string textures1 =
+                "{\"core.texture.missing\":{\"path\":\"" + 
+                texMissing.generic_string() +
+                "\"},\"core.texture.secondary\":{\"path\":\"" + 
+                texSecondary.generic_string() + "\"}}";
+            const std::string fonts = "{\"core.font.default\":{\"path\":\"" + 
+                fontPath.generic_string() + "\"}}";
+            const std::string sounds = "{}";
+            const auto json1Path = dir / "one.json";
+            writeTextFileOrFail(json1Path, makeRegistryJson(textures1, fonts, sounds));
+
+            // JSON #2: secondary затем missing (порядок ключей поменяли)
+            const std::string textures2 =
+                "{\"core.texture.secondary\":{\"path\":\"" + 
+                texSecondary.generic_string() +
+                "\"},\"core.texture.missing\":{\"path\":\"" + 
+                texMissing.generic_string() + "\"}}";
+            const auto json2Path = dir / "two.json";
+            writeTextFileOrFail(json2Path, makeRegistryJson(textures2, fonts, sounds));
+
+            ResourceRegistry reg1;
+            const std::array<ResourceSource, 1> sources1{makeSource(json1Path, 0, 0, "one")};
+            reg1.loadFromSources(sources1);
+
+            ResourceRegistry reg2;
+            const std::array<ResourceSource, 1> sources2{makeSource(json2Path, 0, 0, "two")};
+            reg2.loadFromSources(sources2);
+
+            const TextureKey m1 = reg1.findTextureByName("core.texture.missing");
+            const TextureKey s1 = reg1.findTextureByName("core.texture.secondary");
+            const TextureKey m2 = reg2.findTextureByName("core.texture.missing");
+            const TextureKey s2 = reg2.findTextureByName("core.texture.secondary");
+
+            assert(m1.valid() && s1.valid() && m2.valid() && s2.valid());
+
+            // Индексы должны совпасть, несмотря на порядок ключей в JSON.
+            assert(m1.index() == m2.index());
+            assert(s1.index() == s2.index());
+        }
+
         void testDeterminism() {
             const auto dir = makeTempDir("determinism");
             const auto texturePathA = dir / "a.png";
@@ -313,7 +418,7 @@ namespace core::resources::registry::self_test {
                 "\"},\"core.texture.secondary\":{\"path\":\"" +
                 texturePathB.generic_string() + "\"}}";
             const std::string fonts =
-                "{\"core.font.default\":{\"path\":\"" + 
+                "{\"core.font.default\":{\"path\":\"" +
                 fontPath.generic_string() + "\"}}";
             const std::string sounds = "{}";
 
@@ -330,9 +435,9 @@ namespace core::resources::registry::self_test {
                 ResourceRegistry registry;
                 registry.loadFromSources(sources);
 
-                const TextureKey missingKey = 
+                const TextureKey missingKey =
                     registry.findTextureByName("core.texture.missing");
-                const TextureKey secondaryKey = 
+                const TextureKey secondaryKey =
                     registry.findTextureByName("core.texture.secondary");
 
                 assert(missingKey.valid());
@@ -354,8 +459,10 @@ namespace core::resources::registry::self_test {
         testLoadValidJson();
         testDuplicateWithinSourcePanics();
         testDuplicateAcrossSourcesOverride();
+        testOverrideTiePanics();
         testInvalidCanonicalKeyPanics();
         testStableKeyCollisionPanics();
+        testDeterminismIgnoresJsonKeyOrder();
         testDeterminism();
     }
 
