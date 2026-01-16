@@ -13,7 +13,9 @@
 
 namespace core::resources {
 
-    template <typename Tag> struct ResourceKey {
+    template <typename Tag>
+    class ResourceKey {
+      public:
         static constexpr std::uint32_t InvalidRaw = 0u;
 
         static constexpr std::uint32_t IndexBits = 24u;
@@ -24,8 +26,6 @@ namespace core::resources {
         // 0x00FFFFFF запрещён, иначе (index+1) станет 0 и сломает кодировку.
         static constexpr std::uint32_t MaxIndex = IndexMask - 1u;
 
-        std::uint32_t raw = InvalidRaw;
-
         constexpr ResourceKey() noexcept = default;
 
         [[nodiscard]] static constexpr ResourceKey make(std::uint32_t index,
@@ -35,14 +35,14 @@ namespace core::resources {
             assert(index <= MaxIndex);
 #endif
             const std::uint32_t encodedIndex = index + 1u; // 1..IndexMask (валидно при контракте)
-            const std::uint32_t encodedGeneration = static_cast<std::uint32_t>(generation)
-                                                    << GenerationShift;
+            const std::uint32_t encodedGeneration =
+                static_cast<std::uint32_t>(generation) << GenerationShift;
 
             return ResourceKey(encodedGeneration | encodedIndex);
         }
 
         [[nodiscard]] constexpr bool valid() const noexcept {
-            return raw != InvalidRaw;
+            return mRaw != InvalidRaw;
         }
 
         [[nodiscard]] constexpr std::uint32_t index() const noexcept {
@@ -50,22 +50,29 @@ namespace core::resources {
             // trust-on-read: invalid отсекается на границах (load/resolve), не в hot path.
             assert(valid());
 #endif
-            return (raw & IndexMask) - 1u;
+            return (mRaw & IndexMask) - 1u;
         }
 
         [[nodiscard]] constexpr std::uint8_t generation() const noexcept {
-            return static_cast<std::uint8_t>(raw >> GenerationShift);
+            return static_cast<std::uint8_t>(mRaw >> GenerationShift);
         }
 
         [[nodiscard]] constexpr std::uint32_t sortKey() const noexcept {
             return index();
         }
 
+        [[nodiscard]] constexpr std::uint32_t rawValue() const noexcept {
+            return mRaw;
+        }
+
         auto operator<=>(const ResourceKey&) const = default;
 
       private:
-        explicit constexpr ResourceKey(std::uint32_t rawValue) noexcept : raw(rawValue) {
+        explicit constexpr ResourceKey(std::uint32_t rawValue) noexcept
+            : mRaw(rawValue) {
         }
+
+        std::uint32_t mRaw = InvalidRaw;
     };
 
     struct TextureTag {};
@@ -83,19 +90,19 @@ namespace core::resources {
 
     struct TextureKeyHash {
         [[nodiscard]] std::size_t operator()(TextureKey key) const noexcept {
-            return std::hash<std::uint32_t>{}(key.raw);
+            return std::hash<std::uint32_t>{}(key.rawValue());
         }
     };
 
     struct FontKeyHash {
         [[nodiscard]] std::size_t operator()(FontKey key) const noexcept {
-            return std::hash<std::uint32_t>{}(key.raw);
+            return std::hash<std::uint32_t>{}(key.rawValue());
         }
     };
 
     struct SoundKeyHash {
         [[nodiscard]] std::size_t operator()(SoundKey key) const noexcept {
-            return std::hash<std::uint32_t>{}(key.raw);
+            return std::hash<std::uint32_t>{}(key.rawValue());
         }
     };
 

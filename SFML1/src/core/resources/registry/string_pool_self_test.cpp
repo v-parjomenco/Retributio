@@ -29,7 +29,7 @@ namespace core::resources::registry::self_test {
 
             const TextureKey invalid{};
             assert(!invalid.valid());
-            assert(invalid.raw == 0u);
+            assert(invalid.rawValue() == 0u);
 
             const TextureKey key0 = TextureKey::make(0u, 0u);
             assert(key0.valid());

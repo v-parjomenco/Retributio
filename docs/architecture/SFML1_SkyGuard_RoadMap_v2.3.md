@@ -1,7 +1,7 @@
 # SFML1 / SkyGuard → 4X "Titan"
 ## ARCHITECTURE & ROADMAP v2.2 (FINAL)
 
-**Last Updated:** 2026-01-04  
+**Last Updated:** 2026-01-16  
 **Status:** Active Development - Phase 0/1
 
 ---
@@ -334,8 +334,9 @@
   std::optional<Config> tryLoadConfig(const std::filesystem::path& path) noexcept;
   ```
 - [ ] **Texture Handle System:**
-  - ID-based (entt::resource_handle or custom)
-  - Deterministic loading (std::sort by enum ID)
+  - RuntimeKey32-based handles (TextureKey/FontKey/SoundKey/MusicKey) issued by Resource Registry v1.
+  - Deterministic registry build: StableKey64 total order + explicit source/mod load order; RuntimeKey32 indices assigned in that order.
+  - Hot path: O(1) index-addressed lookup only (no strings/hashes/maps).
 - [ ] **Render Hot-Path Audit:**
   - NO per-entity validation in Release
   - Assertions ONLY in Debug/Profile
@@ -398,7 +399,7 @@
           // One-shot positional sound
       }
       
-      void playMusic(MusicID id, bool loop);
+      void playMusic(MusicKey music, bool loop);
   };
   ```
 - [ ] **SkyGuard Sounds:**
@@ -777,8 +778,8 @@
   - Ugly but functional (CSV/JSON editor)
   - NO fancy UI needed (Civ III editor inspiration for LATER)
 - [ ] **Asset Binding:**
-  - TextureID → province/unit/tech graphics
-  - SoundID → events, battles, UI feedback
+  - Canonical Key String → TextureKey (RuntimeKey32) for province/unit/tech graphics (resolved at load; stored in components).
+  - Canonical Key String → SoundKey/MusicKey (RuntimeKey32) for events, battles, UI feedback, music (resolved at load; runtime uses handles).
 - [ ] **Mod Loading:**
   ```
   assets/core/        # Base game data
