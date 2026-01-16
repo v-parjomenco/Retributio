@@ -435,6 +435,9 @@
     <ClCompile Include="src\core\resources\registry\resource_registry_self_test.cpp">
       <Filter>src\core\resources\registry</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\resources\resource_manager_self_test.cpp">
+      <Filter>src\core\resources</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\resources\resource_manager.h">

@@ -461,6 +461,7 @@
     <ClCompile Include="src\core\resources\registry\string_pool.cpp" />
     <ClCompile Include="src\core\resources\registry\string_pool_self_test.cpp" />
     <ClCompile Include="src\core\resources\resource_manager.cpp" />
+    <ClCompile Include="src\core\resources\resource_manager_self_test.cpp" />
     <ClCompile Include="src\core\spatial\spatial_index.cpp" />
     <ClCompile Include="src\core\time\time_service.cpp" />
     <ClCompile Include="src\core\ui\anchor_policy.cpp" />
