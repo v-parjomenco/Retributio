@@ -45,16 +45,19 @@
 /Debug/
 /Profile/
 /Release/
+/DebugTests/
 /x64/
 /SFML1/Debug/
 /SFML1/Profile/
 /SFML1/Release/
+/SFML1/DebugTests/
 /SFML1/x64/
 /bin/
 /obj/
 **/build/Debug/
 **/build/Profile/
 **/build/Release/
+**/build/DebugTests/
 **/cmake-build-*/Debug/
 **/cmake-build-*/Profile/
 **/cmake-build-*/Release/
@@ -75,6 +78,7 @@
 logs/
 Debug/logs/
 Release/logs/
+DebugTests/logs/
 build/**/logs/
 *.log
 *.tmp
