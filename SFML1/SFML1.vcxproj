@@ -456,6 +456,8 @@
     <ClCompile Include="src\core\log\log_level.cpp" />
     <ClCompile Include="src\core\resources\keys\stable_key.cpp" />
     <ClCompile Include="src\core\resources\paths\resource_paths.cpp" />
+    <ClCompile Include="src\core\resources\registry\resource_registry.cpp" />
+    <ClCompile Include="src\core\resources\registry\resource_registry_self_test.cpp" />
     <ClCompile Include="src\core\resources\registry\string_pool.cpp" />
     <ClCompile Include="src\core\resources\registry\string_pool_self_test.cpp" />
     <ClCompile Include="src\core\resources\resource_manager.cpp" />
@@ -549,6 +551,8 @@
     <ClInclude Include="include\core\resources\keys\resource_key.h" />
     <ClInclude Include="include\core\resources\keys\stable_key.h" />
     <ClInclude Include="include\core\resources\paths\resource_paths.h" />
+    <ClInclude Include="include\core\resources\registry\resource_entry.h" />
+    <ClInclude Include="include\core\resources\registry\resource_registry.h" />
     <ClInclude Include="include\core\resources\registry\string_pool.h" />
     <ClInclude Include="include\core\resources\resource_manager.h" />
     <ClInclude Include="include\core\resources\types\font_resource.h" />

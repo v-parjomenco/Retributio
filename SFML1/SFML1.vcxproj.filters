@@ -429,6 +429,12 @@
     <ClCompile Include="src\core\resources\keys\stable_key.cpp">
       <Filter>src\core\resources\keys</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\resources\registry\resource_registry.cpp">
+      <Filter>src\core\resources\registry</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\resources\registry\resource_registry_self_test.cpp">
+      <Filter>src\core\resources\registry</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\resources\resource_manager.h">
@@ -747,6 +753,12 @@
       <Filter>include\core\resources\keys</Filter>
     </ClInclude>
     <ClInclude Include="include\core\resources\registry\string_pool.h">
+      <Filter>include\core\resources\registry</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\registry\resource_entry.h">
+      <Filter>include\core\resources\registry</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\registry\resource_registry.h">
       <Filter>include\core\resources\registry</Filter>
     </ClInclude>
   </ItemGroup>

@@ -19,6 +19,10 @@ static_assert(true, "SFML1_TESTS enabled for self-test TU");
 #include "core/resources/registry/string_pool.h"
 
 namespace core::resources::registry::self_test {
+    void runResourceRegistry();
+}
+
+namespace core::resources::registry::self_test {
 
     namespace {
 
@@ -106,6 +110,7 @@ namespace core::resources::registry::self_test {
         testStringPoolDedup();
         testStringPoolChunkGrowth();
         testStringPoolClearLookup();
+        ::core::resources::registry::self_test::runResourceRegistry();
     }
 
 } // namespace core::resources::registry::self_test
