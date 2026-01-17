@@ -3,6 +3,7 @@
 #include "game/skyguard/config/loader/user_settings_loader.h"
 
 #include <array>
+#include <filesystem>
 #include <string>
 #include <string_view>
 
