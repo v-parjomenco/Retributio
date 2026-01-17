@@ -21,7 +21,7 @@
 #include <utility>
 #include <vector>
 
-#include "third_party/entt/entt_registry.hpp"
+#include "adapters/entt/entt_registry.hpp"
 
 #include "core/ecs/entity.h"
 #include "core/ecs/system_manager.h"

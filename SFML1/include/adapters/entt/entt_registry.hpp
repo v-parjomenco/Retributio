@@ -1,5 +1,5 @@
 // ================================================================================================
-// File: third_party/entt/entt_registry.hpp
+// File: adapters/entt/entt_registry.hpp
 // Purpose: Full EnTT includes (registry, view, group) with MSVC warning suppression
 // Used by: Implementation files (.cpp) working with EnTT directly
 // Related headers: entt_fwd.hpp (forward-only version for headers)

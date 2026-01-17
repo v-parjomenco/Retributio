@@ -30,10 +30,8 @@ namespace core::resources {
 
         [[nodiscard]] static constexpr ResourceKey make(std::uint32_t index,
                                                         std::uint8_t generation = 0u) noexcept {
-#if !defined(NDEBUG)
             // validate-on-write: index обязан быть в контрактном диапазоне.
             assert(index <= MaxIndex);
-#endif
             const std::uint32_t encodedIndex = index + 1u; // 1..IndexMask (валидно при контракте)
             const std::uint32_t encodedGeneration =
                 static_cast<std::uint32_t>(generation) << GenerationShift;
@@ -46,10 +44,8 @@ namespace core::resources {
         }
 
         [[nodiscard]] constexpr std::uint32_t index() const noexcept {
-#if !defined(NDEBUG)
             // trust-on-read: invalid отсекается на границах (load/resolve), не в hot path.
             assert(valid());
-#endif
             return (mRaw & IndexMask) - 1u;
         }
 

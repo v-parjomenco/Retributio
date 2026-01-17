@@ -25,9 +25,6 @@
     <Filter Include="include\core">
       <UniqueIdentifier>{9aef76b6-d00c-450e-80af-0192eb5b8991}</UniqueIdentifier>
     </Filter>
-    <Filter Include="include\third_party">
-      <UniqueIdentifier>{a4b6391a-fbd9-4df8-8c13-f11daa9def5c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="assets">
       <UniqueIdentifier>{61620380-0e66-4572-b0c4-5abad7c7b71e}</UniqueIdentifier>
     </Filter>
@@ -78,9 +75,6 @@
     </Filter>
     <Filter Include="include\core\resources\types">
       <UniqueIdentifier>{7f1718df-4b54-421b-98ea-750867b1ea19}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="src\third_party">
-      <UniqueIdentifier>{542da4e4-e92e-4b57-9522-03efbc1328f4}</UniqueIdentifier>
     </Filter>
     <Filter Include="include\core\utils">
       <UniqueIdentifier>{8aa01b97-66eb-4970-85d6-966448855cb3}</UniqueIdentifier>
@@ -238,12 +232,6 @@
     <Filter Include="src\core\debug">
       <UniqueIdentifier>{b8f755f4-9e45-4234-a140-6ee661260b2a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="include\third_party\json">
-      <UniqueIdentifier>{862771aa-e4e5-4bbe-a46d-129428f5fb53}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="include\third_party\entt">
-      <UniqueIdentifier>{381451f7-1e7c-4cf2-8f4c-f70f74cc2c01}</UniqueIdentifier>
-    </Filter>
     <Filter Include="src\game\skyguard\dev">
       <UniqueIdentifier>{a8ccc805-74a0-47af-8cbc-81eeefdd81fd}</UniqueIdentifier>
     </Filter>
@@ -307,9 +295,6 @@
     <Filter Include="third_party">
       <UniqueIdentifier>{512fb6bb-5181-4632-9847-016490f5897d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="include\third_party\xxhash">
-      <UniqueIdentifier>{a397930f-088c-4708-8448-509525356edf}</UniqueIdentifier>
-    </Filter>
     <Filter Include="include\core\resources\keys">
       <UniqueIdentifier>{fd6e977f-3b82-4d99-8c47-e0667c0745e9}</UniqueIdentifier>
     </Filter>
@@ -321,6 +306,24 @@
     </Filter>
     <Filter Include="include\core\resources\registry">
       <UniqueIdentifier>{ca314746-c576-421f-919e-63f51bbab94a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\xxhash">
+      <UniqueIdentifier>{3383bf52-004f-49f8-adbc-9a106247bc59}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\xxhash\upstream">
+      <UniqueIdentifier>{612d2cec-7d5b-4521-a050-5e6bbf83f3e9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\adapters">
+      <UniqueIdentifier>{a4b6391a-fbd9-4df8-8c13-f11daa9def5c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\adapters\json">
+      <UniqueIdentifier>{862771aa-e4e5-4bbe-a46d-129428f5fb53}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\adapters\entt">
+      <UniqueIdentifier>{381451f7-1e7c-4cf2-8f4c-f70f74cc2c01}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\adapters\xxhash">
+      <UniqueIdentifier>{a397930f-088c-4708-8448-509525356edf}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -417,9 +420,6 @@
     <ClCompile Include="src\game\skyguard\config\loader\user_settings_loader.cpp">
       <Filter>src\game\skyguard\config\loader</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\xxhash\upstream\xxhash.c">
-      <Filter>third_party</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\resources\registry\string_pool.cpp">
       <Filter>src\core\resources\registry</Filter>
     </ClCompile>
@@ -437,6 +437,9 @@
     </ClCompile>
     <ClCompile Include="src\core\resources\resource_manager_self_test.cpp">
       <Filter>src\core\resources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\xxhash\upstream\xxhash.c">
+      <Filter>third_party\xxhash\upstream</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -629,18 +632,6 @@
     <ClInclude Include="include\core\debug\debug_config.h">
       <Filter>include\core\debug</Filter>
     </ClInclude>
-    <ClInclude Include="include\third_party\json\json_fwd.hpp">
-      <Filter>include\third_party\json</Filter>
-    </ClInclude>
-    <ClInclude Include="include\third_party\json\json_silent.hpp">
-      <Filter>include\third_party\json</Filter>
-    </ClInclude>
-    <ClInclude Include="include\third_party\entt\entt_fwd.hpp">
-      <Filter>include\third_party\entt</Filter>
-    </ClInclude>
-    <ClInclude Include="include\third_party\entt\entt_registry.hpp">
-      <Filter>include\third_party\entt</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\utils\json\json_parsers.h">
       <Filter>include\core\utils\json</Filter>
     </ClInclude>
@@ -743,12 +734,6 @@
     <ClInclude Include="include\game\skyguard\config\loader\user_settings_loader.h">
       <Filter>include\game\skyguard\config\loader</Filter>
     </ClInclude>
-    <ClInclude Include="include\third_party\xxhash\xxhash.h">
-      <Filter>include\third_party\xxhash</Filter>
-    </ClInclude>
-    <ClInclude Include="..\third_party\xxhash\upstream\xxhash.h">
-      <Filter>third_party</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\resources\keys\resource_key.h">
       <Filter>include\core\resources\keys</Filter>
     </ClInclude>
@@ -763,6 +748,24 @@
     </ClInclude>
     <ClInclude Include="include\core\resources\registry\resource_registry.h">
       <Filter>include\core\resources\registry</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\xxhash\upstream\xxhash.h">
+      <Filter>third_party\xxhash\upstream</Filter>
+    </ClInclude>
+    <ClInclude Include="include\adapters\entt\entt_fwd.hpp">
+      <Filter>include\adapters\entt</Filter>
+    </ClInclude>
+    <ClInclude Include="include\adapters\entt\entt_registry.hpp">
+      <Filter>include\adapters\entt</Filter>
+    </ClInclude>
+    <ClInclude Include="include\adapters\json\json_fwd.hpp">
+      <Filter>include\adapters\json</Filter>
+    </ClInclude>
+    <ClInclude Include="include\adapters\json\json_silent.hpp">
+      <Filter>include\adapters\json</Filter>
+    </ClInclude>
+    <ClInclude Include="include\adapters\xxhash\xxhash.h">
+      <Filter>include\adapters\xxhash</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

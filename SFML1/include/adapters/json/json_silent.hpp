@@ -1,13 +1,13 @@
 // ================================================================================================
-// File: third_party/json/json_silent.hpp
+// File: adapters/json/json_silent.hpp
 // Purpose: Wrapper around <nlohmann/json.hpp> with warning suppression for third-party code.
 // Notes:
-//  - Used in implementation files and JSON helpers.
-//  - Suppresses noisy /Wall diagnostics coming from nlohmann-json internals only.
+//  - Suppresses noisy diagnostics coming from nlohmann-json internals only.
 // ================================================================================================
 #pragma once
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
+    #pragma warning(push)
     // Все эти отключения применяются только к коду nlohmann-json,
     // чтобы не засорять билд ворнингами в чужой библиотеке.
     #pragma warning(disable : 26819) // unannotated fallthrough / SAL issues in switch
@@ -22,6 +22,6 @@
 
 #include <nlohmann/json.hpp>
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
     #pragma warning(pop)
 #endif

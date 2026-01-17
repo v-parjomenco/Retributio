@@ -190,12 +190,10 @@ namespace core::ecs {
     // --------------------------------------------------------------------------------------------
 
     void RenderSystem::render(World& world, sf::RenderWindow& window) {
-#if !defined(NDEBUG)
         assert(window.getView().getRotation() == sf::Angle::Zero &&
                "RenderSystem: view rotation is not supported (view.getRotation() must be 0).");
         assert(mSpatialIndex != nullptr && "RenderSystem: bind() не вызван — mSpatialIndex null");
         assert(mResources != nullptr && "RenderSystem: bind() не вызван — mResources null");
-#endif
 
         // View-culling в world-space координатах текущего view.
         const core::spatial::Aabb2 viewAabb = makeViewAabb(window.getView());
@@ -312,10 +310,8 @@ namespace core::ecs {
         //  packed iteration через view.each() + inline culling.
 
         for (const Entity entity : mVisibleEntities) {
-#if !defined(NDEBUG)
             assert(ecsView.contains(entity) &&
                    "RenderSystem: SpatialIndex вернул entity без (Transform, Sprite, SpatialHandle)");
-#endif
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
             ++totalCandidates;
 #endif
@@ -336,10 +332,8 @@ namespace core::ecs {
 #endif
 
             const sf::IntRect rect = spr.textureRect;
-#if !defined(NDEBUG)
             assert((rect.size.x > 0 && rect.size.y > 0) &&
                    "RenderSystem: textureRect должен иметь положительный размер");
-#endif
 
             // SpatialIndex возвращает cell-level кандидатов.
             // Fine AABB culling обязателен для pixel-accurate visibility.

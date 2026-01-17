@@ -73,14 +73,12 @@ namespace core::ecs {
     void DebugOverlaySystem::applyRuntimeProperties(
         const core::config::properties::DebugOverlayRuntimeProperties& props) noexcept {
         // Контракт: loader валидирует/клампит. Здесь trust-on-read.
-#if !defined(NDEBUG)
         assert(props.updateIntervalMs <=
                    core::config::properties::DebugOverlayRuntimeProperties::kMaxUpdateIntervalMs &&
                "updateIntervalMs violates contract (must be clamped in loader)");
         assert(props.smoothingShift <=
                    core::config::properties::DebugOverlayRuntimeProperties::kMaxSmoothingShift &&
                "smoothingShift violates contract (must be clamped in loader)");
-#endif
         // 0 ms => обновлять каждый кадр.
         if (props.updateIntervalMs == 0) {
             mUpdateInterval = sf::Time::Zero;

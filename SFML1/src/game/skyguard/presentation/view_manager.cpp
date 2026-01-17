@@ -12,14 +12,12 @@ namespace game::skyguard::presentation {
 
     void ViewManager::init(const config::ViewConfig& config,
                            const sf::Vector2u& initialWindowSize) noexcept {
-#if !defined(NDEBUG)
         assert(config.worldLogicalSize.x > 0.f && config.worldLogicalSize.y > 0.f &&
                "ViewManager::init: worldLogicalSize must be > 0 (validated in loader)");
         assert(config.uiLogicalSize.x > 0.f && config.uiLogicalSize.y > 0.f &&
                "ViewManager::init: uiLogicalSize must be > 0 (validated in loader)");
         assert(initialWindowSize.x > 0u && initialWindowSize.y > 0u &&
                "ViewManager::init: initial window size must be > 0");
-#endif
         mWorldLogicalSize = config.worldLogicalSize;
         mUiLogicalSize = config.uiLogicalSize;
         mCameraOffset = config.cameraOffset;

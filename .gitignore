@@ -83,11 +83,6 @@ build/**/logs/
 *.log
 *.tmp
 
-# Big or temporary assets
-assets/cache/
-assets/tmp/
-assets/sounds/raw/
-
 #CMake files
 CMakeFiles/
 CMakeCache.txt

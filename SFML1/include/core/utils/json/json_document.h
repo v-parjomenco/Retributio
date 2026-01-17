@@ -5,7 +5,7 @@
 // Related headers:
 //  - core/utils/json/json_common.h
 //  - core/utils/json/json_validator.h   // only for SchemaPolicy::Validate / KeyRule API
-//  - third_party/json/json_silent.hpp
+//  - adapters/json/json_silent.hpp
 //  - core/log/log_macros.h
 // Notes:
 //  - Not a DOM wrapper. "Document" means a loaded JSON text file.
@@ -89,7 +89,9 @@ namespace core::utils::json {
     // Парсинг JSON-текста + (опциональная) проверка структуры.
     // Некритический режим: LOG_DEBUG + возврат nullopt при ошибке.
     [[nodiscard]] std::optional<json> parseAndValidateNonCritical(
-        const std::string& fileContent, std::string_view path, std::string_view moduleTag,
+        const std::string& fileContent,
+        [[maybe_unused]] std::string_view path,
+        [[maybe_unused]] std::string_view moduleTag,
         std::span<const JsonValidator::KeyRule> rules, JsonParseOptions options);
 
     // --------------------------------------------------------------------------------------------

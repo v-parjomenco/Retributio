@@ -1,5 +1,5 @@
 // ================================================================================================
-// File: third_party/entt/entt_fwd.hpp
+// File: adapters/entt/entt_fwd.hpp
 // Purpose: Forward declarations from EnTT with MSVC warning suppression
 // Used by: Headers that need entt::entity type but not full registry definition
 // Related headers: entt_registry.hpp (for full EnTT includes)

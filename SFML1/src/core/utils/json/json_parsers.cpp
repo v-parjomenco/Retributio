@@ -11,7 +11,7 @@
 #include <system_error>
 #include <utility>
 
-#include "third_party/json/json_silent.hpp"
+#include "adapters/json/json_silent.hpp"
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -414,8 +414,8 @@ namespace core::utils::json::detail {
         using IntT = json::number_integer_t;
         using UIntT = json::number_unsigned_t;
 
-        const long double minF = static_cast<long double>(std::numeric_limits<float>::lowest());
-        const long double maxF = static_cast<long double>(std::numeric_limits<float>::max());
+        constexpr long double minF = static_cast<long double>(std::numeric_limits<float>::lowest());
+        constexpr long double maxF = static_cast<long double>(std::numeric_limits<float>::max());
 
         if (const auto* pf = v.get_ptr<const FloatT*>()) {
             const FloatT dRaw = *pf;

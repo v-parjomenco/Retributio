@@ -502,12 +502,10 @@ namespace game::skyguard {
                 const std::size_t extraSize =
                     utils::formatBackgroundStatsLine(extraBuffer.data(), extraBuffer.size(), bgStats);
 
-        #if !defined(NDEBUG)
                 // Если обрезали строку — увеличь буфер или сократи формат.
                 // (extraSize == cap) означает, что места могло не хватить)
                 assert(extraSize < extraBuffer.size() &&
                        "Game::renderUiPass: background debug line truncated. Increase extraBuffer.");
-        #endif
                 if (extraSize > 0) {
                     mDebugOverlay->appendExtraLine(std::string_view(extraBuffer.data(), extraSize));
                 }

@@ -24,7 +24,7 @@
 
 // ВАЖНО: здесь есть inline/template код, использующий методы и nested-типы nlohmann::json.
 // json_common.h обычно даёт только forward-decl, поэтому подключаем полное определение.
-#include "third_party/json/json_silent.hpp"
+#include "adapters/json/json_silent.hpp"
 
 namespace core::utils::json {
 

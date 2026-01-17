@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "core/config/loader/detail/non_critical_config_report.h"
+
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -54,19 +55,33 @@ namespace {
         auto end = list.begin();
         std::advance(end, static_cast<std::ptrdiff_t>(count));
 
+        // Резервируем место для маркера усечения, чтобы гарантировать, что он всегда поместится
+        static constexpr std::size_t kTruncateReserve = kListTruncate.size();
+        static constexpr std::size_t kMaxUsableSize = kListBufferSize - kTruncateReserve;
+
+        auto appendOrTruncate = [&](std::string_view text) noexcept -> bool {
+            if (buffer.size + text.size() > kMaxUsableSize) {
+                [[maybe_unused]] const bool truncated = appendToBuffer(buffer, kListTruncate);
+                assert(truncated && "Truncate marker must fit by design");
+                return false;
+            }
+
+            [[maybe_unused]] const bool appended = appendToBuffer(buffer, text);
+            assert(appended && "Append must succeed within reserved capacity");
+            return true;
+        };
+
         bool first = true;
 
         for (; it != end; ++it) {
             if (!first) {
-                if (!appendToBuffer(buffer, kListSeparator)) {
-                    appendToBuffer(buffer, kListTruncate);
+                if (!appendOrTruncate(kListSeparator)) {
                     break;
                 }
             }
             first = false;
 
-            if (!appendToBuffer(buffer, *it)) {
-                appendToBuffer(buffer, kListTruncate);
+            if (!appendOrTruncate(*it)) {
                 break;
             }
         }
@@ -87,9 +102,7 @@ namespace core::config::loader::detail {
         // Без этого можно получить UB на std::advance/*endIt
         // при нарушении контракта (например, новый loader без static_assert).
         if (count >= list.size()) {
-#if !defined(NDEBUG)
             assert(false && "NonCriticalConfigReport overflow: increase kMaxFields or fix loader");
-#endif
             return false;
         }
 

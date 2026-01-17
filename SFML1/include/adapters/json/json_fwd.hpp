@@ -1,5 +1,5 @@
 // ================================================================================================
-// File: third_party/json/json_fwd.hpp
+// File: adapters/json/json_fwd.hpp
 // Purpose: Thin wrapper around nlohmann/json_fwd.hpp for forward declarations.
 // Use this in headers that only need nlohmann::json as a type (no methods), to avoid pulling the
 //  full json.hpp everywhere.

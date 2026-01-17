@@ -16,7 +16,7 @@
 #include <string_view>
 #include <vector>
 
-#include "third_party/json/json_silent.hpp"
+#include "adapters/json/json_silent.hpp"
 
 #ifdef _MSC_VER
 // C5045: "Spectre mitigation" шум при проходе по вектору правил.

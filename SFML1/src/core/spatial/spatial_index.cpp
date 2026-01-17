@@ -20,18 +20,14 @@ namespace core::spatial {
         : mCellSize(cellSize)
         , mInvCellSize(1.f / cellSize)
         , mNextHandle(1) {
-#if !defined(NDEBUG)
         assert(cellSize >= 64.f && cellSize <= 2048.f &&
                "SpatialIndex: cellSize out of allowed range [64..2048]");
-#endif
     }
 
     std::uint32_t SpatialIndex::registerEntity(core::ecs::Entity entity, const Aabb2& bounds) {
         const std::uint32_t handle = mNextHandle++;
 
-#if !defined(NDEBUG)
         assert(handle != 0 && "SpatialIndex: handle overflow");
-#endif
 
         if (handle >= mQueryMarks.size()) {
             const std::size_t newSize = static_cast<std::size_t>(handle) + 1u;
@@ -48,10 +44,8 @@ namespace core::spatial {
 
     void SpatialIndex::update(std::uint32_t handle, const Aabb2& oldBounds,
                               const Aabb2& newBounds) {
-#if !defined(NDEBUG)
         assert(handle < mHandleToEntity.size() &&
                "SpatialIndex::update: handle out of range");
-#endif
         const CellRange oldRange = computeCellRange(oldBounds);
         const CellRange newRange = computeCellRange(newBounds);
 
@@ -65,10 +59,8 @@ namespace core::spatial {
     }
 
     void SpatialIndex::unregister(std::uint32_t handle, const Aabb2& lastBounds) noexcept {
-#if !defined(NDEBUG)
         assert(handle < mHandleToEntity.size() &&
                "SpatialIndex::unregister: handle out of range");
-#endif
         const CellRange range = computeCellRange(lastBounds);
         eraseFromCells(handle, range);
         if (handle < mHandleToEntity.size()) {
@@ -94,20 +86,16 @@ namespace core::spatial {
 
                 const auto& entries = it->second;
                 for (const std::uint32_t handle : entries) {
-#if !defined(NDEBUG)
                     assert(handle < mQueryMarks.size() && 
                         "SpatialIndex::query: corrupted handle in cell");
-#endif
                     if (mQueryMarks[handle] == mQueryStamp) {
                         continue;
                     }
 
                     mQueryMarks[handle] = mQueryStamp;
                     const core::ecs::Entity e = mHandleToEntity[handle];
-#if !defined(NDEBUG)
                     assert(e != core::ecs::NullEntity && 
                         "SpatialIndex::query: handle->entity is NullEntity");
-#endif
                     out.push_back(e);
                 }
             }

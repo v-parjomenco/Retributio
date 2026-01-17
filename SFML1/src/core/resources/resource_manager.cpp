@@ -94,10 +94,8 @@ namespace core::resources {
             const auto raw = static_cast<U>(id);
             const auto [ptr, ec] = std::to_chars(out, buf.data() + buf.size(), raw);
 
-#ifndef NDEBUG
             assert(ec == std::errc{} &&
                    "[makeProfileStressTextureKey] to_chars failed unexpectedly.");
-#endif
 
             return std::string(buf.data(), ptr);
         }

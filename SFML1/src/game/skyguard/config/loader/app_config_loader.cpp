@@ -48,13 +48,19 @@ namespace {
             return false;
         }
 
-        for (const unsigned char ch : s) {
-            if (std::isalnum(ch) != 0) {
+        // Используем char, так как именно он хранится в std::string
+        for (const char ch : s) {
+            // Явно приводим к unsigned char ТОЛЬКО для функции проверки.
+            // Это убирает UB и удовлетворяет компилятор.
+            if (std::isalnum(static_cast<unsigned char>(ch)) != 0) {
                 continue;
             }
+
+            // Сравнение с литералами работает корректно с обычным char
             if (ch == '.' || ch == '_' || ch == '-') {
                 continue;
             }
+
             return false;
         }
         return true;

@@ -44,10 +44,8 @@ namespace core::ecs {
             entt::exclude<SpatialHandleComponent>);
 
         for (auto [entity, transform, sprite] : newView.each()) {
-#if !defined(NDEBUG)
             assert(core::ecs::render::hasExplicitRect(sprite.textureRect) &&
                    "SpatialIndexSystem: SpriteComponent.textureRect must be explicit");
-#endif
 
             const core::spatial::Aabb2 aabb = computeEntityAabb(transform, sprite);
 
@@ -68,10 +66,8 @@ namespace core::ecs {
             (void)entity;
             hadDirty = true;
 
-#if !defined(NDEBUG)
             assert(core::ecs::render::hasExplicitRect(sprite.textureRect) &&
                    "SpatialIndexSystem: SpriteComponent.textureRect must be explicit");
-#endif
 
             const core::spatial::Aabb2 newAabb = computeEntityAabb(transform, sprite);
 

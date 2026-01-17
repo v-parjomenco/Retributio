@@ -26,12 +26,10 @@ namespace core::resources::holders {
 
         // Если вставка не произошла — значит ресурс уже был
         if (!inserted) {
-#ifndef NDEBUG
             // Инвариант: в кэше не должно быть nullptr.
             // Если это случилось — значит кто-то нарушил контракт (например, insert(id, nullptr)).
             assert(it->second && 
                    "[ResourceHolder::getOrLoad] Invariant broken: nullptr stored in cache.");
-#endif
             return {it->second.get(), false};
         }
 
@@ -82,11 +80,9 @@ namespace core::resources::holders {
         auto [it, inserted] = mResourceMap.try_emplace(id, nullptr);
 
         if (!inserted) {
-#ifndef NDEBUG
             // В Debug подсвечиваем попытку перезаписать существующий ресурс.
             // В Release просто игнорируем (first wins).
             assert(false && "[ResourceHolder::insert] Resource with this ID already exists.");
-#endif
             return;
         }
 
@@ -119,10 +115,7 @@ namespace core::resources::holders {
     template <typename Resource, typename Identifier>
     const Resource& ResourceHolder<Resource, Identifier>::get(const Identifier& id) const {
         const Resource* ptr = tryGet(id);
-
-#ifndef NDEBUG
         assert(ptr && "[ResourceHolder::get] Missing resource (contract violation).");
-#endif
 
         if (!ptr) {
             // Trust-on-Read нарушен: это фатальная ошибка логики.

@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string_view>
 
-#include "third_party/xxhash/xxhash.h"
+#include "adapters/xxhash/xxhash.h"
 
 namespace core::resources {
 

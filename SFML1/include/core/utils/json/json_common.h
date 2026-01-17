@@ -4,11 +4,11 @@
 // Used by: core/utils/json/*, config loaders, resource loaders.
 // Notes:
 //  - This header is intentionally light: it pulls only forward declarations.
-//  - Include third_party/json/json_silent.hpp in .cpp (or headers with inline/template JSON logic).
+//  - Include adapters/json/json_silent.hpp in .cpp (or headers with inline/template JSON logic).
 // ================================================================================================
 #pragma once
 
-#include "third_party/json/json_fwd.hpp"
+#include "adapters/json/json_fwd.hpp"
 
 namespace core::utils::json {
 

@@ -7,7 +7,7 @@
 
 #include <entt/signal/sigh.hpp>
 
-#include "third_party/entt/entt_registry.hpp"
+#include "adapters/entt/entt_registry.hpp"
 
 #include "core/ecs/system.h"
 #include "core/spatial/spatial_index.h"

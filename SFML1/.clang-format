@@ -25,7 +25,7 @@ AlignConsecutiveDeclarations: None
 AlignConsecutiveAssignments: None
 AlignConsecutiveMacros: None
 
-# Пробелы	
+# Пробелы
 SpaceBeforeParens: ControlStatements
 SpaceBeforeRangeBasedForLoopColon: true
 SpaceAfterCStyleCast: true
@@ -55,12 +55,12 @@ IncludeCategories:
   - Regex: '^<SFML/.*>'
     Priority: 1
 
-  # 3) third_party
-  - Regex: '^"third_party/.*"'
+  # 3) Third-party (vendor) — ожидаем <entt/...>, <nlohmann/...>, и т.п.
+  - Regex: '^<(entt|nlohmann|xxhash)/.*>'
     Priority: 2
 
-  # 4) Хедеры движка/игр
-  - Regex: '^"(core|entities|graphics|utils)/.*"'
+  # 4) Хедеры проекта (включая adapters)
+  - Regex: '^"(adapters|core|game|entities|graphics|utils)/.*"'
     Priority: 3
 
   # 5) Всё остальное в кавычках

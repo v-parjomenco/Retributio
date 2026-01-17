@@ -2,7 +2,7 @@
 // File: core/ecs/entity.h
 // Purpose: Canonical entity handle type for ECS (EnTT backend)
 // Used by: core/ecs/world.h, all ECS systems, game layer entity references
-// Related headers: world.h, registry.h, third_party/entt/entt_registry.hpp
+// Related headers: world.h, registry.h, adapters/entt/entt_registry.hpp
 // ================================================================================================
 #pragma once
 
@@ -10,7 +10,7 @@
 #include <functional>
 #include <type_traits>
 
-#include "third_party/entt/entt_registry.hpp"
+#include "adapters/entt/entt_registry.hpp"
 
 namespace core::ecs {
 

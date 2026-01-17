@@ -13,12 +13,10 @@ namespace game::skyguard::presentation {
         const sf::Texture& texture = resources.getTexture(textureId).get();
         mTexture = &texture;
         mTextureSize = texture.getSize();
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
         // Контракт: повторяемость должна настраиваться в ресурсном лоадере/реестре.
         // Если фон не тайлится — первым делом проверить repeated=true в resources.json и loader.
          assert(texture.isRepeated() && 
              "Background texture must be repeated (setRepeated(true) in loader).");
-#endif
     }
 
     void BackgroundRenderer::update(const sf::View& worldView) noexcept {

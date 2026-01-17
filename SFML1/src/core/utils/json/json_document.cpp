@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "core/log/log_macros.h"
-#include "third_party/json/json_silent.hpp"
+#include "adapters/json/json_silent.hpp"
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -55,23 +55,22 @@ namespace {
                 break;
 
             case Json::parse_event_t::object_end:
-#if !defined(NDEBUG)
                 assert(mDepth > 0);
-#endif
                 --mDepth;
                 break;
 
             case Json::parse_event_t::key: {
                 const auto* keyPtr = parsed.get_ptr<const std::string*>();
-#if !defined(NDEBUG)
                 assert(keyPtr != nullptr);
                 assert(!mObjectKeyStack.empty());
-#endif
                 mObjectKeyStack[mDepth - 1].insertOrThrow(*keyPtr);
                 break;
             }
 
-            default:
+                // Нам не нужны для детектора дубликатов — но перечисляем, чтобы switch был полным.
+                case Json::parse_event_t::array_start:
+                case Json::parse_event_t::array_end:
+                case Json::parse_event_t::value:
                 break;
             }
 
@@ -225,8 +224,8 @@ namespace core::utils::json {
     }
 
     std::optional<json> parseAndValidateNonCritical(const std::string& fileContent,
-                                                    std::string_view path,
-                                                    std::string_view moduleTag,
+                                                    [[maybe_unused]] std::string_view path,
+                                                    [[maybe_unused]] std::string_view moduleTag,
                                                     std::span<const JsonValidator::KeyRule> rules,
                                                     JsonParseOptions options) {
         json data;
@@ -239,14 +238,14 @@ namespace core::utils::json {
             data = ::parseJsonWithPolicies(fileContent, options.duplicateKeys);
         } catch (const std::bad_alloc&) {
             throw;
-        } catch (const DuplicateKeyError& e) {
+        } catch ([[maybe_unused]] const DuplicateKeyError& e) {
             LOG_DEBUG(core::log::cat::Config,
                       "[{}] JSON содержит дублирующийся ключ '{}' в файле '{}'",
                       moduleTag,
                       e.key(),
                       path);
             return std::nullopt;
-        } catch (const json::exception& e) {
+        } catch ([[maybe_unused]] const json::exception& e) {
             LOG_DEBUG(core::log::cat::Config,
                       "[{}] Не удалось разобрать JSON в файле '{}': {}",
                       moduleTag,
@@ -268,7 +267,7 @@ namespace core::utils::json {
         if (options.schema == SchemaPolicy::Validate) {
             try {
                 JsonValidator::validate(data, rules);
-            } catch (const std::exception& e) {
+            } catch ([[maybe_unused]] const std::exception& e) {
                 LOG_DEBUG(core::log::cat::Config,
                           "[{}] Неверная структура JSON в файле '{}': {}",
                           moduleTag,

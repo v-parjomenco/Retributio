@@ -1,5 +1,7 @@
 // IntelliSense / browse database only (не участвует в реальной компиляции)
 
+void __declspec(noreturn) __cdecl log_panic_stub();
+
 #define LOG_TRACE(...)    ((void)0)
 #define LOG_DEBUG(...)    ((void)0)
 #define LOG_INFO(...)     ((void)0)
@@ -7,5 +9,5 @@
 #define LOG_ERROR(...)    ((void)0)
 #define LOG_CRITICAL(...) ((void)0)
 
-// Важно: чтобы IntelliSense понимал "noreturn"-смысл и не строил кривой CFG.
-#define LOG_PANIC(...)    __assume(0)
+// Важно: без __assume(0) — меньше шансов уронить browse engine.
+#define LOG_PANIC(...)    log_panic_stub()

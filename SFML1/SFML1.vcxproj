@@ -128,40 +128,40 @@
     <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
     <ClangTidyChecks>
     </ClangTidyChecks>
-    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2\include;$(ProjectDir)include\third_party;</ExternalIncludePath>
+    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2\include;$(SolutionDir)third_party;</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugTests|Win32'">
     <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
     <ClangTidyChecks />
-    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2\include;$(ProjectDir)include\third_party;</ExternalIncludePath>
+    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2\include;$(SolutionDir)third_party;</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
-    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2\include;$(ProjectDir)include\third_party;</ExternalIncludePath>
+    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2\include;$(SolutionDir)third_party;</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|Win32'">
     <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
-    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2\include;$(ProjectDir)include\third_party;</ExternalIncludePath>
+    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2\include;$(SolutionDir)third_party;</ExternalIncludePath>
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
     <ClangTidyChecks>
     </ClangTidyChecks>
-    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2-64\include;$(ProjectDir)include\third_party;</ExternalIncludePath>
+    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2-64\include;$(SolutionDir)third_party;</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'">
     <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
     <ClangTidyChecks />
-    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2-64\include;$(ProjectDir)include\third_party;</ExternalIncludePath>
+    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2-64\include;$(SolutionDir)third_party;</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
-    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2-64\include;$(ProjectDir)include\third_party;</ExternalIncludePath>
+    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2-64\include;$(SolutionDir)third_party;</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">
     <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
-    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2-64\include;$(ProjectDir)include\third_party;</ExternalIncludePath>
+    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2-64\include;$(SolutionDir)third_party;</ExternalIncludePath>
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -172,7 +172,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)SFML1\include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
@@ -199,7 +199,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)SFML1\include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
@@ -228,7 +228,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)SFML1\include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
@@ -257,7 +257,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)SFML1\include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
@@ -287,7 +287,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)SFML1\include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
@@ -314,7 +314,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)SFML1\include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
@@ -343,7 +343,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)SFML1\include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
@@ -372,7 +372,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)SFML1\include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
@@ -400,7 +400,8 @@
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir);$(SolutionDir)SFML1\include;$(SolutionDir)third_party</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'">$(SolutionDir);$(SolutionDir)SFML1\include;$(SolutionDir)third_party</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir);$(SolutionDir)SFML1\include;$(SolutionDir)third_party</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir);$(SolutionDir)SFML1\include;$(SolutionDir)third_party</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">$(SolutionDir);$(SolutionDir)SFML1\include;$(SolutionDir)third_party</AdditionalIncludeDirectories>      
+	  <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir);$(SolutionDir)SFML1\include;$(SolutionDir)third_party</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='DebugTests|Win32'">$(SolutionDir);$(SolutionDir)SFML1\include;$(SolutionDir)third_party</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir);$(SolutionDir)SFML1\include;$(SolutionDir)third_party</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Profile|Win32'">$(SolutionDir);$(SolutionDir)SFML1\include;$(SolutionDir)third_party</AdditionalIncludeDirectories>
@@ -501,6 +502,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\third_party\xxhash\upstream\xxhash.h" />
+    <ClInclude Include="include\adapters\entt\entt_fwd.hpp" />
+    <ClInclude Include="include\adapters\entt\entt_registry.hpp" />
+    <ClInclude Include="include\adapters\json\json_fwd.hpp" />
+    <ClInclude Include="include\adapters\json\json_silent.hpp" />
+    <ClInclude Include="include\adapters\xxhash\xxhash.h" />
     <ClInclude Include="include\core\compiler\platform\windows.h" />
     <ClInclude Include="include\core\compiler\warnings.h" />
     <ClInclude Include="include\core\config\blueprints\debug_overlay_blueprint.h" />
@@ -603,11 +609,6 @@
     <ClInclude Include="include\game\skyguard\presentation\window_mode_manager.h" />
     <ClInclude Include="include\game\skyguard\utils\debug_format.h" />
     <ClInclude Include="include\pch.h" />
-    <ClInclude Include="include\third_party\entt\entt_fwd.hpp" />
-    <ClInclude Include="include\third_party\entt\entt_registry.hpp" />
-    <ClInclude Include="include\third_party\json\json_fwd.hpp" />
-    <ClInclude Include="include\third_party\json\json_silent.hpp" />
-    <ClInclude Include="include\third_party\xxhash\xxhash.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="assets\core\config\debug_overlay.json" />

@@ -252,10 +252,8 @@ namespace {
 
         const auto it = map.find(id);
 
-#ifndef NDEBUG
         // Debug: ловим программистскую ошибку максимально рано и дёшево.
         assert(it != map.end() && "Resource ID must be registered in resources.json");
-#endif
 
         if (it == map.end()) {
             // Release/Profile: даём полный контекст и падаем согласно политике.
