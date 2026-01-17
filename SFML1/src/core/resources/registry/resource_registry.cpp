@@ -307,7 +307,7 @@ namespace core::resources {
 
                 const std::string_view path = requireStringField(value, "path", key, "Texture");
 
-                if (!FileLoader::fileExists(std::string(path))) {
+                if (!FileLoader::fileExists(path)) {
                     panic("[ResourceRegistry] Texture file '{}' not found for '{}'.", path, key);
                 }
 
@@ -346,7 +346,7 @@ namespace core::resources {
 
                 const std::string_view path = requireStringField(value, "path", key, "Font");
 
-                if (!FileLoader::fileExists(std::string(path))) {
+                if (!FileLoader::fileExists(path)) {
                     panic("[ResourceRegistry] Font file '{}' not found for '{}'.", path, key);
                 }
 
@@ -393,7 +393,7 @@ namespace core::resources {
 
                 const std::string_view path = *pathOpt;
 
-                if (!FileLoader::fileExists(std::string(path))) {
+                if (!FileLoader::fileExists(path)) {
                     LOG_WARN(core::log::cat::Resources,
                              "[ResourceRegistry] Sound file '{}' not found for '{}'. Skipping.",
                              path,

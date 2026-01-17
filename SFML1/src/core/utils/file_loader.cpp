@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "core/utils/file_loader.h"
 
+#include <cassert>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -184,6 +185,24 @@ namespace core::utils {
 
     std::optional<std::vector<std::uint8_t>> FileLoader::loadBinaryFile(const std::string& path) {
         return loadBinaryFile(std::filesystem::path(path));
+    }
+
+    bool FileLoader::fileExists(const char* const path) {
+        assert(path != nullptr);
+        return fileExists(std::string_view(path));
+    }
+
+    bool FileLoader::isReadable(const char* const path) {
+        assert(path != nullptr);
+        return isReadable(std::string_view(path));
+    }
+
+    bool FileLoader::fileExists(const std::string_view path) {
+        return fileExists(std::filesystem::path(path.begin(), path.end()));
+    }
+
+    bool FileLoader::isReadable(const std::string_view path) {
+        return isReadable(std::filesystem::path(path.begin(), path.end()));
     }
 
     bool FileLoader::fileExists(const std::string& path) {

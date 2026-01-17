@@ -41,6 +41,10 @@ namespace core::utils {
         loadBinaryFile(const std::string& path);
 
         // Утилиты
+        [[nodiscard]] static bool fileExists(const char* path);
+        [[nodiscard]] static bool isReadable(const char* path);
+        [[nodiscard]] static bool fileExists(std::string_view path);
+        [[nodiscard]] static bool isReadable(std::string_view path);
         [[nodiscard]] static bool fileExists(const std::string& path);
         [[nodiscard]] static bool isReadable(const std::string& path);
 
