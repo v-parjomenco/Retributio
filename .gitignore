@@ -107,3 +107,5 @@ Thumbs.db
 
 # SFML cache/
 .sfml/
+
+desktop.ini
