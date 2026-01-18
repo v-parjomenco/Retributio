@@ -13,7 +13,7 @@
 #include <SFML/System/Vector2.hpp>
 
 #include "core/resources/resource_manager.h"
-#include "core/resources/ids/resource_ids.h"
+#include "core/resources/keys/resource_key.h"
 
 namespace game::skyguard::presentation {
 
@@ -35,7 +35,7 @@ namespace game::skyguard::presentation {
             float parallaxFactor{1.0f};
         };
         void init(core::resources::ResourceManager& resources,
-                  core::resources::ids::TextureID textureId);
+                  core::resources::TextureKey texture);
 
         void update(const sf::View& worldView) noexcept;
         void draw(sf::RenderWindow& window) const;

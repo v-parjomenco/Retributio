@@ -118,6 +118,9 @@ namespace core::resources {
         /// Найти ключ текстуры по каноническому имени (O(log N), для тулов/конфигов).
         [[nodiscard]] TextureKey findTexture(std::string_view canonicalName) const;
 
+        /// Найти ключ шрифта по каноническому имени (O(log N), для тулов/конфигов).
+        [[nodiscard]] FontKey findFont(std::string_view canonicalName) const;
+
         /// Доступ к реестру key-world (для тулов/лоадеров).
         [[nodiscard]] const ResourceRegistry& registry() const noexcept;
 

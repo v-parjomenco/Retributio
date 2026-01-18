@@ -2,13 +2,13 @@
 // File: core/config/properties/sprite_properties.h
 // Purpose: Data-only sprite configuration brick (texture id + scale)
 // Used by: PlayerBlueprint, future entity blueprints
-// Related headers: core/resources/ids/resource_ids.h
+// Related headers: core/resources/keys/resource_key.h
 // ================================================================================================
 #pragma once
 
 #include <SFML/System/Vector2.hpp>
 
-#include "core/resources/ids/resource_ids.h"
+#include "core/resources/keys/resource_key.h"
 
 namespace core::config::properties {
 
@@ -23,14 +23,12 @@ namespace core::config::properties {
         /**
      * @brief Идентификатор текстуры.
      *
-     * Здесь хранится только логический ID (enum TextureID), а не путь к файлу.
-     * Реальный путь вытаскивается через ResourcePaths + ResourceManager.
+     * Здесь хранится RuntimeKey32 текстуры, а не путь к файлу.
+     * Реальный путь вытаскивается через ResourceRegistry + ResourceManager.
      *
-     * Сейчас по умолчанию используется TextureID::Player, так как первый клиент —
-     * конфигурация игрока. Позже можно будет задавать общий дефолт или вообще
-     * требовать явного указания ID в JSON.
+     * Ключ задаётся на этапе загрузки конфига (validate-on-write).
      */
-        core::resources::ids::TextureID textureId = core::resources::ids::TextureID::Player;
+        core::resources::TextureKey texture{};
 
         /**
      * @brief Базовый масштаб спрайта по осям X и Y.

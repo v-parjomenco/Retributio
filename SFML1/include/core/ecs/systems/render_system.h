@@ -17,10 +17,11 @@
 
 #include "core/ecs/entity.h"
 #include "core/ecs/system.h"
-#include "core/resources/ids/resource_ids.h"
+#include "core/resources/keys/resource_key.h"
 
 namespace sf {
     class RenderWindow;
+    class Texture;
 } // namespace sf
 
 namespace core::resources {
@@ -40,7 +41,7 @@ namespace core::ecs {
      *
      * АРХИТЕКТУРА:
      *  - Spatial culling через SpatialIndex (grid-based, O(visible cells))
-     *  - Сортировка по zOrder → textureId → entityId (детерминизм + batching)
+     *  - Сортировка по zOrder → texture → entityId (детерминизм + batching)
      *  - Vertex batching: один draw call на группу (zOrder, texture)
      *  - Zero-allocation hot path (pre-allocated buffers)
      *
@@ -129,6 +130,11 @@ namespace core::ecs {
         [[nodiscard]] const FrameStats& getLastFrameStatsRef() const noexcept;
 
       private:
+
+        void beginFrame() noexcept;
+        [[nodiscard]] const sf::Texture* getTextureCached(core::resources::TextureKey key,
+                                                          std::size_t* resourceLookupsThisFrame);
+
         // ------------------------------------------------------------------------------------
         // Внешние зависимости (не владеем, lifetime managed externally)
         // ------------------------------------------------------------------------------------
@@ -136,7 +142,7 @@ namespace core::ecs {
         /// Spatial index для view-frustum culling (read-only, cell-level candidates)
         const core::spatial::SpatialIndex* mSpatialIndex{nullptr};
 
-        /// Resource manager для резолва TextureID → sf::Texture.
+        /// Resource manager для резолва TextureKey → sf::Texture.
         /// НЕ const: getTexture() использует lazy loading и обновляет внутренние кэши.
         core::resources::ResourceManager* mResources{nullptr};
 
@@ -147,12 +153,12 @@ namespace core::ecs {
         /**
          * @brief Ключ сортировки для детерминированного batching.
          *
-         * Порядок сортировки: zOrder → textureId → tieBreak (entity ID).
+         * Порядок сортировки: zOrder → texture → tieBreak (entity ID).
          * Минимизирует texture switches и гарантирует детерминизм.
          */
         struct RenderKey {
             float zOrder;                              ///< Слой отрисовки
-            core::resources::ids::TextureID textureId; ///< ID текстуры для batching
+            core::resources::TextureKey texture;       ///< Key текстуры для batching
             std::uint32_t tieBreak;                    ///< Entity ID для стабильной сортировки
             std::uint32_t packetIndex;                 ///< Индекс в mPackets (uint32_t достаточно)
         };
@@ -172,17 +178,6 @@ namespace core::ecs {
             float cachedSin;
             float cachedCos;
             bool isRotated;
-        };
-
-        /**
-         * @brief Per-frame кэш: TextureID → sf::Texture*.
-         *
-         * Избегаем повторных обращений к ResourceManager за один кадр.
-         * Очищается в начале каждого render().
-         */
-        struct TextureCacheEntry {
-            core::resources::ids::TextureID id{core::resources::ids::TextureID::Unknown};
-            const sf::Texture* texture{nullptr};
         };
 
         // ------------------------------------------------------------------------------------
@@ -210,8 +205,10 @@ namespace core::ecs {
         std::unique_ptr<sf::Vertex[]> mVertexBuffer{};
         std::size_t mVertexBufferCapacity{0};
 
-        /// Per-frame texture cache (очищается каждый кадр)
-        std::vector<TextureCacheEntry> mTextureCache;
+        /// Per-frame texture cache (epoch arrays)
+        std::vector<const sf::Texture*> mFrameTexturePtr;
+        std::vector<std::uint32_t> mFrameTextureStamp;
+        std::uint32_t mFrameId = 0;
 
         /// Hint для amortized growth (последнее количество visible)
         std::size_t mLastVisibleCount{0};

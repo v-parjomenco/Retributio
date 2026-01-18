@@ -120,7 +120,7 @@ namespace core::resources {
             }
         }
 
-        [[nodiscard]] void panicKeyWorldNotInitialized(std::string_view where) {
+        [[noreturn]] void panicKeyWorldNotInitialized(std::string_view where) {
             LOG_PANIC(core::log::cat::Resources,
                       "[ResourceManager::{}] Key-world API вызван до initialize().", where);
         }
@@ -203,6 +203,13 @@ namespace core::resources {
             panicKeyWorldNotInitialized("findTexture");
         }
         return mRegistry.findTextureByName(canonicalName);
+    }
+
+    FontKey ResourceManager::findFont(std::string_view canonicalName) const {
+        if (!mInitialized) {
+            panicKeyWorldNotInitialized("findFont");
+        }
+        return mRegistry.findFontByName(canonicalName);
     }
 
     // --------------------------------------------------------------------------------------------

@@ -1,20 +1,29 @@
 {
+  "version": 1,
   "textures": {
-    "Player": {
-      "path": "assets/game/skyguard/images/0000su-57.png",
+    "core.texture.missing": {
+      "path": "assets/core/textures/placeholders/missing_texture.png",
+      "smooth": false,
+      "repeated": false,
+      "mipmap": false
+    },
+    "skyguard.sprite.player": {
+      "path": "assets/game/skyguard/textures/0000su-57.png",
       "smooth": true,
       "repeated": false,
       "mipmap": false
     },
-    "BackgroundDesert": {
-      "path": "assets/game/skyguard/images/backgrounds/desert.png",
+    "skyguard.background.desert": {
+      "path": "assets/game/skyguard/textures/backgrounds/desert.png",
       "smooth": true,
       "repeated": true,
       "mipmap": false
     }
   },
   "fonts": {
-    "Default": "assets/core/fonts/Wolgadeutsche.otf"
+    "core.font.default": {
+      "path": "assets/core/fonts/Wolgadeutsche.otf"
+    }
   },
   "sounds": {}
 }

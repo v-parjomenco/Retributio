@@ -2,6 +2,7 @@
 
 #include "game/skyguard/presentation/background_renderer.h"
 
+#include <cassert>
 #include <cmath>
 
 #include <SFML/Graphics/RenderStates.hpp>
@@ -9,14 +10,21 @@
 namespace game::skyguard::presentation {
 
     void BackgroundRenderer::init(core::resources::ResourceManager& resources,
-                                  const core::resources::ids::TextureID textureId) {
-        const sf::Texture& texture = resources.getTexture(textureId).get();
+                                  const core::resources::TextureKey textureKey) {
+        const sf::Texture& texture = resources.getTexture(textureKey).get();
         mTexture = &texture;
         mTextureSize = texture.getSize();
-        // Контракт: повторяемость должна настраиваться в ресурсном лоадере/реестре.
-        // Если фон не тайлится — первым делом проверить repeated=true в resources.json и loader.
-         assert(texture.isRepeated() && 
-             "Background texture must be repeated (setRepeated(true) in loader).");
+
+        // Контракт: повторяемость должна настраиваться в ресурсном реестре/лоадере.
+        // Если фон не тайлится, первым делом проверь: repeated=true и loader setRepeated(true).
+        assert(texture.isRepeated() &&
+               "Background texture must be repeated (setRepeated(true) in loader).");
+
+        // КРИТИЧНО: sf::Vertex value-init -> прозрачный цвет {0,0,0,0}.
+        // Белый tint — дефолтное ожидаемое поведение.
+        for (auto& v : mQuad) {
+            v.color = sf::Color::White;
+        }
     }
 
     void BackgroundRenderer::update(const sf::View& worldView) noexcept {
@@ -67,8 +75,7 @@ namespace game::skyguard::presentation {
         mStats.tilesCovered = tilesX * tilesY;
         mStats.drawCalls = 1;
         mStats.tileSize = mTextureSize;
-        mStats.visibleRect = sf::FloatRect({topLeft.x, topLeft.y}, 
-                                           {size.x, size.y});
+        mStats.visibleRect = sf::FloatRect({topLeft.x, topLeft.y}, {size.x, size.y});
         mStats.parallaxFactor = 1.0f;
 #endif
     }

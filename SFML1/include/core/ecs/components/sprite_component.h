@@ -2,13 +2,13 @@
 // File: core/ecs/components/sprite_component.h
 // Purpose: ID-based sprite component for production ECS (hot path, 40 bytes)
 // Used by: RenderSystem, SpatialIndexSystem, ScalingSystem (all hot paths)
-// Related headers: transform_component.h, resource_ids.h, sprite_scaling_data_component.h
+// Related headers: transform_component.h, resource_key.h, sprite_scaling_data_component.h
 // ================================================================================================
 #pragma once
 #include <SFML/Graphics/Rect.hpp>
 #include <SFML/System/Vector2.hpp>
 
-#include "core/resources/ids/resource_ids.h"
+#include "core/resources/keys/resource_key.h"
 
 namespace core::ecs {
     /**
@@ -16,11 +16,11 @@ namespace core::ecs {
      *
      * АРХИТЕКТУРНОЕ РЕШЕНИЕ:
      *  - Компонент хранит ТОЛЬКО данные (no sf::Sprite, no methods)
-     *  - RenderSystem разрешает TextureID → sf::Texture через ResourceManager
+     *  - RenderSystem разрешает TextureKey → sf::Texture через ResourceManager
      *  - Размер: 40 байт (умещается в 1 cache line = 64 байт)
      *
      * ПОЛЯ (детерминированная модель):
-     *  - textureId:   enum ID текстуры (4 байта)
+     *  - texture:     RuntimeKey32 текстуры (4 байта)
      *  - textureRect: область текстуры для sprite sheets (16 байт)
      *  - scale:       текущий масштаб = baseScale * uniformFactor (8 байт, MUTABLE)
      *  - origin:      точка привязки для anchor'ов (8 байт)
@@ -46,8 +46,8 @@ namespace core::ecs {
      *  - Z-ordering: готовность к слоистому рендерингу
      */
     struct SpriteComponent {
-        /// ID текстуры из enum (резолвится через ResourceManager)
-        core::resources::ids::TextureID textureId{core::resources::ids::TextureID::Unknown};
+        /// RuntimeKey32 текстуры (резолвится через ResourceManager)
+        core::resources::TextureKey texture{};
 
         /// Область текстуры для отрисовки (должна быть явно задана, с положительными размерами)
         sf::IntRect textureRect{};

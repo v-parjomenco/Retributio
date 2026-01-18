@@ -4,19 +4,14 @@
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <exception>
-#include <limits>
-#include <string>
-#include <string_view>
 #include <system_error>
-#include <type_traits>
-#include <utility>
 #include <vector>
 
 #include <SFML/Graphics/Rect.hpp>
@@ -30,38 +25,6 @@
 #include "core/resources/resource_manager.h"
 
 namespace {
-
-    [[nodiscard]] std::string readEnvString(const char* name) {
-        if (name == nullptr || *name == '\0') {
-            return {};
-        }
-
-    #ifdef _WIN32
-        std::size_t required = 0;
-        if (::getenv_s(&required, nullptr, 0, name) != 0) {
-            return {};
-        }
-        if (required == 0) {
-            return {};
-        }
-
-        std::string value(required, '\0'); // required включает '\0'
-        if (::getenv_s(&required, value.data(), value.size(), name) != 0) {
-            return {};
-        }
-
-        if (!value.empty() && value.back() == '\0') {
-            value.pop_back();
-        }
-        return value;
-    #else
-        const char* s = std::getenv(name);
-        if (s == nullptr || *s == '\0') {
-            return {};
-        }
-        return std::string(s);
-    #endif
-    }
 
     [[nodiscard]] std::size_t readEnvSize(const char* name,
                                           const std::size_t defaultValue,
@@ -115,118 +78,28 @@ namespace {
         }
     };
 
-    [[nodiscard]] bool tryValidateTexture(core::resources::ResourceManager& resources,
-                                          const core::resources::ids::TextureID id) noexcept {
-        try {
-            (void)resources.getTexture(id).get();
-            return true;
-        } catch (const std::exception& e) {
-            LOG_WARN(core::log::cat::Performance,
-                     "Stress scene: invalid TextureID={} (ResourceManager threw: {}). Skipping.",
-                     static_cast<std::underlying_type_t<core::resources::ids::TextureID>>(id),
-                     e.what());
-            return false;
-        } catch (...) {
-            LOG_WARN(core::log::cat::Performance,
-                     "Stress scene: invalid TextureID={} (non-std exception). Skipping.",
-                     static_cast<std::underlying_type_t<core::resources::ids::TextureID>>(id));
-            return false;
-        }
-    }
-
-    [[nodiscard]] std::vector<core::resources::ids::TextureID> buildTextureListFromEnv(
+    [[nodiscard]] std::vector<core::resources::TextureKey> buildTextureListFromEnv(
         core::resources::ResourceManager& resources,
-        const core::resources::ids::TextureID fallbackTextureId) {
+        const core::resources::TextureKey fallbackTexture) {
 
         using TextureID = core::resources::ids::TextureID;
-        std::vector<TextureID> out;
+        std::vector<core::resources::TextureKey> out;
 
-        // 1) Предпочтительный вариант: явный перечень.
-        const std::string csv = readEnvString("SKYGUARD_STRESS_TEXTURE_IDS");
         const std::size_t requestedCount =
             readEnvSize("SKYGUARD_STRESS_TEXTURE_COUNT", /*default*/ 1, /*max*/ 64);
-#if defined(SFML1_PROFILE)
-        // Только для PROFILE-сборки: резрешить "виртуальные" значения TextureID, путём дублирования
-        // fallback-текстуры.
-        // Это оставляет Debug/Release чистыми и не требует добавлять мусорные данные в
-        // TextureID/resources.json.
-        if (!csv.empty() || requestedCount > 1) {
-            resources.enableProfileStressTextureDuplication(fallbackTextureId);
-        }
-#endif
-        if (!csv.empty()) {
-            // Парсим CSV чисел: "0,1,2,10" (числа — это underlying значения TextureID).
-            std::size_t pos = 0;
-            while (pos < csv.size()) {
-                while (pos < csv.size() && (csv[pos] == ' ' || csv[pos] == '\t' ||
-                       csv[pos] == ',')) {
-                    ++pos;
-                }
-                if (pos >= csv.size()) {
-                    break;
-                }
-
-                const char* begin = csv.data() + pos;
-                const char* end = csv.data() + csv.size();
-
-                std::uint64_t value = 0;
-                const auto [ptr, ec] = std::from_chars(begin, end, value);
-                if (ec != std::errc{}) {
-                    break;
-                }
-
-                pos = static_cast<std::size_t>(ptr - csv.data());
-
-                if (value > static_cast<std::uint64_t>(
-                                std::numeric_limits<std::underlying_type_t<TextureID>>::max())) {
-                    continue;
-                }
-
-                const auto id = static_cast<TextureID>(
-                    static_cast<std::underlying_type_t<TextureID>>(value));
-
-                // Sentinel: не используем Unknown как "боевой" ID в стресс-сцене.
-                if (id == TextureID::Unknown) {
-                    continue;
-                }
-
-                if (tryValidateTexture(resources, id)) {
-                    out.push_back(id);
-                }
-            }
+        const std::size_t registryCount = resources.registry().textureCount();
+        const std::size_t count = std::min(requestedCount, registryCount);
+        out.reserve(count);
+        for (std::size_t i = 0; i < count; ++i) {
+            out.push_back(core::resources::TextureKey::make(static_cast<std::uint32_t>(i)));
         }
 
-        // 2) Fallback: последовтальные ID, начиная с fallbackTextureId (без гарантий).
-        // ВАЖНО: это работает только если enum TextureID плотный (0..N-1 без дыр).
-        // Если enum с "дырками" — нужно использовать SKYGUARD_STRESS_TEXTURE_IDS.
         if (out.empty()) {
-            if (requestedCount > 1) {
-                using U = std::underlying_type_t<TextureID>;
-                const U base = static_cast<U>(fallbackTextureId);
-
-                for (std::size_t i = 0; i < requestedCount; ++i) {
-                    const U candidate = static_cast<U>(base + static_cast<U>(i));
-                    const auto id = static_cast<TextureID>(candidate);
-
-                    if (!tryValidateTexture(resources, id)) {
-                        // Остановимся на первом провале: это сигнал, что enum не плотный.
-                        break;
-                    }
-
-                    out.push_back(id);
-                }
-            }
-        }
-
-        // 3) Финальный fallback: только одна гарантированно известная текстура.
-        if (out.empty()) {
-            if (tryValidateTexture(resources, fallbackTextureId)) {
-                out.push_back(fallbackTextureId);
+            if (fallbackTexture.valid()) {
+                out.push_back(fallbackTexture);
             } else {
-                // Если даже fallbackTextureId невалиден — дальше бессмысленно продолжать.
-                // Не падаем, просто выключаем стресс-сцену.
                 LOG_WARN(core::log::cat::Performance,
-                         "Stress scene disabled: fallback TextureID is invalid.");
+                         "Stress scene disabled: fallback TextureKey is invalid.");
             }
         }
 
@@ -234,7 +107,7 @@ namespace {
     }
 
     struct SpawnDesc {
-        core::resources::ids::TextureID textureId{};
+        core::resources::TextureKey texture{};
         float zOrder = 0.f;
         int rectSizePx = 8; // rect != 1x1 гарантированно
     };
@@ -242,7 +115,7 @@ namespace {
     void spawnStressSprites(core::ecs::World& world,
                             const std::size_t count,
                             const std::size_t zLayers,
-                            const std::vector<core::resources::ids::TextureID>& textures) {
+                            const std::vector<core::resources::TextureKey>& textures) {
         if (count == 0 || zLayers == 0 || textures.empty()) {
             return;
         }
@@ -266,7 +139,7 @@ namespace {
             const std::size_t rIdx = (i % rectVariantCount);
 
             SpawnDesc d{};
-            d.textureId = textures[tIdx];
+            d.texture = textures[tIdx];
             // Важно для UX: стресс-сетка должна быть "фоном", а не перекрывать реальную сцену.
             // Делаем отрицательную базу, чтобы оказаться позади любого обычного контента (zOrder >= 0).
             constexpr float kStressZBase = -10'000.0f;
@@ -319,7 +192,7 @@ namespace {
             const SpawnDesc& d = descs[i];
 
             core::ecs::SpriteComponent sp{};
-            sp.textureId = d.textureId;
+            sp.texture = d.texture;
 
             // rect != 1x1: реалистичнее, чем 1x1, но остаёмся CPU-ориентированными.
             sp.textureRect = sf::IntRect(sf::Vector2i{0, 0},
@@ -345,7 +218,7 @@ namespace game::skyguard::dev {
 
     void trySpawnStressSpritesFromEnv(core::ecs::World& world,
                                      core::resources::ResourceManager& resources,
-                                     const core::resources::ids::TextureID fallbackTextureId) {
+                                     const core::resources::TextureKey fallbackTexture) {
         constexpr std::size_t kMaxStressSprites = 1'000'000;
 
         const std::size_t stressCount =
@@ -358,7 +231,7 @@ namespace game::skyguard::dev {
         const std::size_t zLayers =
             readEnvSize("SKYGUARD_STRESS_Z_LAYERS", /*default*/ 5, /*max*/ 256);
 
-        auto textures = buildTextureListFromEnv(resources, fallbackTextureId);
+        auto textures = buildTextureListFromEnv(resources, fallbackTexture);
         if (textures.empty()) {
             return;
         }

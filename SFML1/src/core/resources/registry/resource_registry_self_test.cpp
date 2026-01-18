@@ -119,7 +119,7 @@ namespace core::resources::registry::self_test {
 
         void testLoadValidJson() {
             const auto dir = makeTempDir("valid");
-            const auto texturePath = dir / "missing.png";
+            const auto texturePath = dir / "missing_texture.png";
             const auto fontPath = dir / "default.ttf";
             const auto soundPath = dir / "click.wav";
 
@@ -177,7 +177,7 @@ namespace core::resources::registry::self_test {
 
         void testDuplicateWithinSourcePanics() {
             const auto dir = makeTempDir("dup_source");
-            const auto texturePath = dir / "missing.png";
+            const auto texturePath = dir / "missing_texture.png";
             const auto fontPath = dir / "default.ttf";
 
             writeTextFileOrFail(texturePath, "texture");
@@ -287,7 +287,7 @@ namespace core::resources::registry::self_test {
 
         void testInvalidCanonicalKeyPanics() {
             const auto dir = makeTempDir("invalid_key");
-            const auto texturePath = dir / "missing.png";
+            const auto texturePath = dir / "missing_texture.png";
             const auto fontPath = dir / "default.ttf";
 
             writeTextFileOrFail(texturePath, "texture");
@@ -353,7 +353,7 @@ namespace core::resources::registry::self_test {
         // Детерминизм не должен зависеть от порядка ключей в JSON.
         void testDeterminismIgnoresJsonKeyOrder() {
             const auto dir = makeTempDir("determinism_order");
-            const auto texMissing = dir / "missing.png";
+            const auto texMissing = dir / "missing_texture.png";
             const auto texSecondary = dir / "secondary.png";
             const auto fontPath = dir / "default.ttf";
 

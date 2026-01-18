@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 
 #include <SFML/Window/Keyboard.hpp>
@@ -23,6 +24,7 @@
 #include "core/ecs/systems/render_system.h"
 #include "core/ecs/systems/spatial_index_system.h"
 #include "core/log/log_macros.h"
+#include "core/resources/registry/resource_registry.h"
 #include "core/time/time_config.h"
 
 #include "game/skyguard/config/config_paths.h"
@@ -152,32 +154,26 @@ namespace game::skyguard {
     }
 
     void Game::initResources() {
-        // Загружаем реестр ресурсов из JSON.
-        // Это критичный конфиг: если он сломан — игра не имеет смысла продолжать.
-        mResources.loadRegistryFromJson(skycfg_paths::RESOURCES);
+        // Инициализация key-world реестра ресурсов (v1).
+        // Критичный конфиг: если он сломан — нет смысла продолжать игру.
+        const std::array<core::resources::ResourceSource, 1> sources{
+            core::resources::ResourceSource{
+                std::string(skycfg_paths::RESOURCES),
+                0,
+                0,
+                "skyguard"
+            }
+        };
+        mResources.initialize(sources);
 
-        // Настраиваем fallback-ресурсы на уровне ResourceManager.
-        // Сейчас гарантированно есть только один игровой шрифт — FontID::Default.
-        // Его и используем как "последний рубеж" на случай битых путей или ошибочных ID.
-        mResources.setMissingFontFallback(core::resources::ids::FontID::Default);
-
-        // -  Для текстур и звуков пока специально не выставляем fallback,
-        //    пока не появится отдельная текстура-заглушка (фиолетовый квадрат)
-        //    с собственным TextureID;
-        //  - звуки в текущем билде не используются.
-        //
-        // Как только появится отдельная fallback-текстура:
-        //  1) добавляем её в enum TextureID (например, TextureID::MissingTexture);
-        //  2) регистрируем в resources.json;
-        //  3) включаем строку ниже:
-        //
-        // mResources.setMissingTextureFallback(core::resources::ids::TextureID::MissingTexture);
+        // Fallback-ключи (core.texture.missing, core.font.default) валидируются
+        // автоматически в ResourceManager::initialize().
     }
 
     // initWorld() без try/catch — все исключения уходят наверх в main()
     void Game::initWorld() {
         // Загружаем blueprint игрока (data-driven).
-        auto playerCfg = skycfg::ConfigLoader::loadPlayerConfig(skycfg_paths::PLAYER);
+        auto playerCfg = skycfg::ConfigLoader::loadPlayerConfig(mResources, skycfg_paths::PLAYER);
         const float playerFloorY = mViewManager.getWorldLogicalSize().y;
 
         std::vector<game::skyguard::config::blueprints::PlayerBlueprint> players;
@@ -216,7 +212,13 @@ namespace game::skyguard {
         // Привязываем оверлей к сервису времени и шрифту (через ResourceManager).
         // Важно: ресурсы резолвим один раз при старте, не в hot-path.
         {
-            const sf::Font& font = mResources.getFont(core::resources::ids::FontID::Default).get();
+            const core::resources::FontKey fontKey =
+                mResources.findFont("core.font.default");
+            if (!fontKey.valid()) {
+                LOG_PANIC(core::log::cat::Config,
+                          "Game::initWorld: missing font key 'core.font.default'.");
+            }
+            const sf::Font& font = mResources.getFont(fontKey).get();
 
             mDebugOverlay->bind(mTime, font);
             mDebugOverlay->setRenderSystem(mRenderSystem);
@@ -238,12 +240,24 @@ namespace game::skyguard {
             mDebugOverlay->setEnabled(overlayCfg.enabled && dbg::SHOW_FPS_OVERLAY);
         }
 
-        mBackgroundRenderer.init(mResources, core::resources::ids::TextureID::BackgroundDesert);
+        const core::resources::TextureKey backgroundKey =
+            mResources.findTexture("skyguard.background.desert");
+        if (!backgroundKey.valid()) {
+            LOG_PANIC(core::log::cat::Config,
+                      "Game::initWorld: missing background texture 'skyguard.background.desert'.");
+        }
+        mBackgroundRenderer.init(mResources, backgroundKey);
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         // Только DEV/PROFILE: стресс-сцена через ENV.
+        const core::resources::TextureKey playerKey =
+            mResources.findTexture("skyguard.sprite.player");
+        if (!playerKey.valid()) {
+            LOG_PANIC(core::log::cat::Config,
+                      "Game::initWorld: missing player texture 'skyguard.sprite.player'.");
+        }
         game::skyguard::dev::trySpawnStressSpritesFromEnv(
-            mWorld, mResources, core::resources::ids::TextureID::Player);
+            mWorld, mResources, playerKey);
 #endif
     }
 
@@ -492,7 +506,8 @@ namespace game::skyguard {
         if (mDebugOverlay) {
 
     #if !defined(NDEBUG) || defined(SFML1_PROFILE)
-            // Важно для Profile: если overlay выключен — не тратим CPU на форматирование extra-строк.
+            // Важно для Profile: если overlay выключен — 
+            // не тратим CPU на форматирование extra-строк.
             if (mDebugOverlay->isEnabled()) {
                 mDebugOverlay->clearExtraText();
 
@@ -500,7 +515,9 @@ namespace game::skyguard {
                 std::array<char, 256> extraBuffer{};
                 const auto& bgStats = mBackgroundRenderer.getLastFrameStats();
                 const std::size_t extraSize =
-                    utils::formatBackgroundStatsLine(extraBuffer.data(), extraBuffer.size(), bgStats);
+                    utils::formatBackgroundStatsLine(extraBuffer.data(),
+                                                     extraBuffer.size(),
+                                                     bgStats);
 
                 // Если обрезали строку — увеличь буфер или сократи формат.
                 // (extraSize == cap) означает, что места могло не хватить)

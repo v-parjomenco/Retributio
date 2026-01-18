@@ -75,7 +75,7 @@ namespace game::skyguard::ecs {
                           core::ecs::toUint(entity), i);
 #endif
 
-                const auto& textureResource = mResources.getTexture(cfg.sprite.textureId);
+                const auto& textureResource = mResources.getTexture(cfg.sprite.texture);
                 const sf::Texture& texture = textureResource.get();
                 const sf::Vector2u textureSize = texture.getSize();
 
@@ -86,7 +86,7 @@ namespace game::skyguard::ecs {
                 // HOT COMPONENT: SpriteComponent (40 bytes, читается каждый кадр)
                 // --------------------------------------------------------------------------------
                 core::ecs::SpriteComponent spriteComp{};
-                spriteComp.textureId = cfg.sprite.textureId;
+                spriteComp.texture = cfg.sprite.texture;
                 spriteComp.textureRect =
                     sf::IntRect(sf::Vector2i{0, 0},
                                 sf::Vector2i{static_cast<int>(textureSize.x),

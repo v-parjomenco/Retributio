@@ -10,7 +10,7 @@
 #include <SFML/Window/Keyboard.hpp>
 
 #include "core/log/log_macros.h"
-#include "core/resources/ids/resource_id_utils.h"
+#include "core/resources/resource_manager.h"
 #include "core/utils/file_loader.h"
 #include "core/utils/json/json_document.h"
 #include "core/utils/json/json_parsers.h"
@@ -23,7 +23,6 @@ namespace {
 
     namespace keys       = game::skyguard::config::keys;
     namespace json_utils = core::utils::json;
-    namespace rids       = core::resources::ids;
 
     using Json = json_utils::json;
 
@@ -140,7 +139,7 @@ namespace {
                                                         parsed.turnLeft,
                                                         parsed.turnRight);
 
-         // Контракт: любые ошибки (тип/имя/дубликаты) -> полный откат к default controls.
+        // Контракт: любые ошибки (тип/имя/дубликаты) -> полный откат к default controls.
         if (hasHardError || layoutIssue.kind != ControlsLayoutIssue::Kind::None) {
             const char* reason = "неизвестная причина";
 
@@ -190,7 +189,9 @@ namespace {
 
 namespace game::skyguard::config {
 
-    blueprints::PlayerBlueprint ConfigLoader::loadPlayerConfig(const std::string& path) {
+    blueprints::PlayerBlueprint ConfigLoader::loadPlayerConfig(
+        core::resources::ResourceManager& resources,
+        const std::string& path) {
 
         // ----------------------------------------------------------------------------------------
         // Низкоуровневое чтение файла
@@ -226,21 +227,28 @@ namespace game::skyguard::config {
         blueprints::PlayerBlueprint cfg{};
 
         // ----------------------------------------------------------------------------------------
-        // Текстура: строковый ID → enum TextureID (строго, тип А)
+        // Текстура: строковый ID → TextureKey (строго, тип А)
         // ----------------------------------------------------------------------------------------
         {
-            const auto res = json_utils::parseEnumWithIssue(
-                data,
-                keys::Player::TEXTURE,
-                rids::TextureID::Unknown,
-                rids::fromString<rids::TextureID>);
+            const auto textureName =
+                json_utils::parseStringViewWithIssue(data, keys::Player::TEXTURE);
 
-            using Kind = json_utils::EnumParseIssue::Kind;
-            switch (res.issue.kind) {
-            case Kind::None:
-                cfg.sprite.textureId = res.value;
+            using Kind = json_utils::StringViewParseIssue::Kind;
+            switch (textureName.issue.kind) {
+            case Kind::None: {
+                const core::resources::TextureKey key =
+                    resources.findTexture(textureName.value);
+                if (!key.valid()) {
+                    LOG_PANIC(core::log::cat::Config,
+                              "[ConfigLoader] Неизвестная текстура '{}': "
+                              "поле '{}' не найдено в реестре. file={}",
+                              textureName.value,
+                              keys::Player::TEXTURE,
+                              path);
+                }
+                cfg.sprite.texture = key;
                 break;
-
+            }
             case Kind::MissingKey:
                 LOG_PANIC(core::log::cat::Config,
                           "[ConfigLoader] Обязательное поле '{}' отсутствует. file={}",
@@ -250,16 +258,7 @@ namespace game::skyguard::config {
 
             case Kind::WrongType:
                 LOG_PANIC(core::log::cat::Config,
-                          "[ConfigLoader] Некорректное поле '{}': {}. file={}",
-                          keys::Player::TEXTURE,
-                          json_utils::describe(res.issue),
-                          path);
-                break;
-
-            case Kind::UnknownValue:
-                LOG_PANIC(core::log::cat::Config,
-                          "[ConfigLoader] Неизвестный texture ID '{}' (key='{}', file={})",
-                          res.issue.raw,
+                          "[ConfigLoader] Некорректное поле '{}': ожидается строка. file={}",
                           keys::Player::TEXTURE,
                           path);
                 break;

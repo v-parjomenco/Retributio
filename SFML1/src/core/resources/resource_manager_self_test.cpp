@@ -127,7 +127,7 @@ namespace core::resources::self_test {
             TestEnv env{};
             env.dir = makeTempDir(name);
 
-            env.missingTexturePath = env.dir / "missing.png";
+            env.missingTexturePath = env.dir / "missing_texture.png";
             env.secondaryTexturePath = env.dir / "secondary.png";
             env.defaultFontPath = env.dir / "default.ttf";
             env.soundOkPath = env.dir / "click.wav";

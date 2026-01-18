@@ -46,6 +46,41 @@ namespace core::utils::json {
 
     [[nodiscard]] std::string_view describe(const EnumParseIssue& issue) noexcept;
 
+    // --------------------------------------------------------------------------------------------
+    // Диагностический парсер string_view (без логов, без исключений, без аллокаций)
+    // --------------------------------------------------------------------------------------------
+
+    struct StringViewParseIssue {
+        enum class Kind : std::uint8_t { None, MissingKey, WrongType };
+        Kind kind{Kind::None};
+    };
+
+    struct StringViewParseResult {
+        std::string_view value{};
+        StringViewParseIssue issue{};
+    };
+
+    /**
+     * @brief Парсит string из JSON без аллокаций (возвращает view в JSON).
+     *
+     * КОНТРАКТ:
+     *  - Возвращённый string_view валиден только пока жив исходный json объект.
+     *  - Никаких аллокаций, никаких исключений.
+     *  - Для использования в validate-on-write границах (config loaders).
+     *
+     * @param data JSON объект (должен быть lvalue)
+     * @param key Ключ для поиска
+     * @return StringViewParseResult с value (если успешно) или issue (если ошибка)
+     */
+    [[nodiscard]] StringViewParseResult parseStringViewWithIssue(
+        const json& data,
+        std::string_view key) noexcept;
+
+    // Защита от rvalue JSON (view станет dangling)
+    StringViewParseResult parseStringViewWithIssue(
+        const json&&,
+        std::string_view) noexcept = delete;
+
     namespace detail {
 
         // ----------------------------------------------------------------------------------------
@@ -80,15 +115,8 @@ namespace core::utils::json {
             return nullptr;
         }
 
-        struct StringViewParseIssue {
-            enum class Kind : std::uint8_t { None, MissingKey, WrongType };
-            Kind kind{Kind::None};
-        };
-
-        struct StringViewParseResult {
-            std::string_view value{};
-            StringViewParseIssue issue{};
-        };
+        using StringViewParseIssue = ::core::utils::json::StringViewParseIssue;
+        using StringViewParseResult = ::core::utils::json::StringViewParseResult;
 
         [[nodiscard]] StringViewParseResult parseStringViewWithIssue(
             const json& data,
@@ -102,6 +130,13 @@ namespace core::utils::json {
 
     } // namespace detail
 
+    [[nodiscard]] inline StringViewParseResult parseStringViewWithIssue(
+        const json& data,
+        std::string_view key) noexcept {
+        return detail::parseStringViewWithIssue(data, key);
+    }
+
+
     template <typename Enum, typename Mapper>
     [[nodiscard]] EnumParseResult<Enum> parseEnumWithIssue(
         const json& data,
@@ -113,7 +148,7 @@ namespace core::utils::json {
         r.value = defaultValue;
 
         const auto s = detail::parseStringViewWithIssue(data, key);
-        using SK = detail::StringViewParseIssue::Kind;
+        using SK = StringViewParseIssue::Kind;
 
         if (s.issue.kind == SK::MissingKey) {
             r.issue.kind = EnumParseIssue::Kind::MissingKey;

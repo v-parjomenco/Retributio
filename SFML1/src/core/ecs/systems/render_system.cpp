@@ -183,6 +183,39 @@ namespace core::ecs {
 #endif
     }
 
+    void RenderSystem::beginFrame() noexcept {
+        ++mFrameId;
+        if (mFrameId == 0) {
+            std::fill(mFrameTextureStamp.begin(), mFrameTextureStamp.end(), 0u);
+            mFrameId = 1;
+        }
+    }
+
+    const sf::Texture* RenderSystem::getTextureCached(core::resources::TextureKey key,
+                                                      std::size_t* resourceLookupsThisFrame) {
+        assert(mResources != nullptr);
+
+        if (!key.valid()) {
+            key = mResources->missingTextureKey();
+        }
+
+        std::uint32_t index = key.index();
+        if (index >= mFrameTexturePtr.size()) {
+            key = mResources->missingTextureKey();
+            index = key.index();
+        }
+
+        if (mFrameTextureStamp[index] != mFrameId) {
+            mFrameTexturePtr[index] = &mResources->getTexture(key).get();
+            mFrameTextureStamp[index] = mFrameId;
+            if (resourceLookupsThisFrame != nullptr) {
+                ++(*resourceLookupsThisFrame);
+            }
+        }
+
+        return mFrameTexturePtr[index];
+    }
+
     // --------------------------------------------------------------------------------------------
     // КРИТИЧНО: render() намеренно НЕ noexcept.
     // sf::RenderWindow::draw() может выбросить исключение (GPU errors, driver issues).
@@ -203,11 +236,12 @@ namespace core::ecs {
         std::uint64_t drawUs = 0;
 #endif
 
+        std::size_t resourceLookupsThisFrame = 0;
+
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         std::size_t totalCandidates = 0;
         std::size_t culled = 0;
         std::size_t textureSwitches = 0;
-        std::size_t resourceLookupsThisFrame = 0;
         mUniqueTexturePointers.clear();
 #endif
 
@@ -237,7 +271,7 @@ namespace core::ecs {
         mVisibleEntities.clear();
         mKeys.clear();
         mPackets.clear();
-        mTextureCache.clear();
+        beginFrame();
 
         mSpatialIndex->query(viewAabb, mVisibleEntities);
 
@@ -260,48 +294,10 @@ namespace core::ecs {
             mVertexBufferCapacity = newCapacity;
         }
 
-        // Per-frame cache: TextureID → sf::Texture*.
-        // Fast-path: после сортировки по textureId большинство sprites имеют одинаковую текстуру.
-        // Храним TextureID + индекс вместо указателя (указатели инвалидируются при реаллокации).
-        core::resources::ids::TextureID lastTextureId = core::resources::ids::TextureID::Unknown;
-        std::size_t lastTextureIndex = 0;
-
-        const auto getTextureEntryCached =
-            [&](core::resources::ids::TextureID id) -> const TextureCacheEntry& {
-            // Fast-path: проверка последней текстуры за O(1).
-            // ВАЖНО: проверка !mTextureCache.empty() нужна для защиты от UB, 
-            // если id совпадает с начальным lastTextureId до первого добавления.
-            if (!mTextureCache.empty() && 
-                core::resources::ids::toUnderlying(id) ==
-                core::resources::ids::toUnderlying(lastTextureId)) {
-                return mTextureCache[lastTextureIndex];
-            }
-
-            // Поиск в существующем кэше.
-            for (std::size_t i = 0; i < mTextureCache.size(); ++i) {
-                if (core::resources::ids::toUnderlying(mTextureCache[i].id) ==
-                    core::resources::ids::toUnderlying(id)) {
-                    lastTextureId = id;
-                    lastTextureIndex = i;
-                    return mTextureCache[i];
-                }
-            }
-
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
-            ++resourceLookupsThisFrame;
-#endif
-
-            const sf::Texture& tex = mResources->getTexture(id).get();
-            TextureCacheEntry entry{};
-            entry.id = id;
-            entry.texture = &tex;
-            mTextureCache.push_back(entry);
-
-            lastTextureId = id;
-            lastTextureIndex = mTextureCache.size() - 1;
-
-            return mTextureCache.back();
-        };
+        if (mFrameTexturePtr.size() != mResources->registry().textureCount()) {
+            mFrameTexturePtr.assign(mResources->registry().textureCount(), nullptr);
+            mFrameTextureStamp.assign(mFrameTexturePtr.size(), 0u);
+        }
 
         auto ecsView = world.view<TransformComponent, SpriteComponent, SpatialHandleComponent>();
 
@@ -370,7 +366,7 @@ namespace core::ecs {
                    "RenderSystem: packetIndex overflow");
 
             mKeys.push_back(RenderKey{.zOrder = spr.zOrder,
-                                      .textureId = spr.textureId,
+                                      .texture = spr.texture,
                                       .tieBreak = core::ecs::toUint(entity),
                                       .packetIndex = static_cast<std::uint32_t>(packetIdx)});
         }
@@ -385,7 +381,7 @@ namespace core::ecs {
 #endif
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
-        ensureCapacity(mUniqueTexturePointers, mTextureCache.size());
+        ensureCapacity(mUniqueTexturePointers, mFrameTexturePtr.size());
 #endif
 
         if (mKeys.empty()) {
@@ -398,7 +394,7 @@ namespace core::ecs {
             stats.batchDrawCalls = 0;
             stats.textureSwitches = 0;
             stats.uniqueTexturePointers = 0;
-            stats.textureCacheSize = mTextureCache.size();
+            stats.textureCacheSize = mFrameTexturePtr.size();
             stats.resourceLookupsThisFrame = resourceLookupsThisFrame;
             mLastStats = stats;
 #endif
@@ -421,8 +417,8 @@ namespace core::ecs {
                 return false;
             }
 
-            const auto aTex = core::resources::ids::toUnderlying(a.textureId);
-            const auto bTex = core::resources::ids::toUnderlying(b.textureId);
+            const auto aTex = a.texture.sortKey();
+            const auto bTex = b.texture.sortKey();
             if (aTex < bTex) {
                 return true;
             }
@@ -442,7 +438,7 @@ namespace core::ecs {
 #endif
 
         // ------------------------------------------------------------------------------------
-        // Шаг 3: Draw — Vertex batching. Flush на смене zOrder или textureId.
+        // Шаг 3: Draw — Vertex batching. Flush на смене zOrder или texture.
         // ------------------------------------------------------------------------------------
 
 #if defined(SFML1_PROFILE)
@@ -453,12 +449,12 @@ namespace core::ecs {
 
         sf::RenderStates states;
 
-        core::resources::ids::TextureID currentTextureId = mKeys.front().textureId;
+        core::resources::TextureKey currentTexture = mKeys.front().texture;
         float currentZ = mKeys.front().zOrder;
         // Lazy per-frame cache
-        const TextureCacheEntry& firstEntry = getTextureEntryCached(currentTextureId);
-        const sf::Texture* currentTexture = firstEntry.texture;
-        states.texture = currentTexture;
+        const sf::Texture* currentTexturePtr =
+            getTextureCached(currentTexture, &resourceLookupsThisFrame);
+        states.texture = currentTexturePtr;
 
         std::size_t batchDrawCalls = 0;
 
@@ -471,7 +467,7 @@ namespace core::ecs {
             }
             mUniqueTexturePointers.push_back(tex);
         };
-        trackUniqueTexturePtr(currentTexture);
+        trackUniqueTexturePtr(currentTexturePtr);
 #endif
 
         const auto flush = [&]() {
@@ -499,9 +495,7 @@ namespace core::ecs {
             const RenderPacket& packet = mPackets[key.packetIndex];
 
             const bool zChanged = floatNotEqual(key.zOrder, currentZ);
-            const bool textureChanged =
-                (core::resources::ids::toUnderlying(key.textureId) !=
-                 core::resources::ids::toUnderlying(currentTextureId));
+            const bool textureChanged = (key.texture != currentTexture);
 
             if (zChanged || textureChanged) {
                 flush();
@@ -509,14 +503,13 @@ namespace core::ecs {
                 currentZ = key.zOrder;
 
                 if (textureChanged) {
-                    currentTextureId = key.textureId;
-                    const TextureCacheEntry& entry = getTextureEntryCached(currentTextureId);
-                    currentTexture = entry.texture;
-                    states.texture = currentTexture;
+                    currentTexture = key.texture;
+                    currentTexturePtr = getTextureCached(currentTexture, &resourceLookupsThisFrame);
+                    states.texture = currentTexturePtr;
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
                     ++textureSwitches;
-                    trackUniqueTexturePtr(currentTexture);
+                    trackUniqueTexturePtr(currentTexturePtr);
 #endif
                 }
             }
@@ -549,7 +542,7 @@ namespace core::ecs {
         stats.batchDrawCalls = batchDrawCalls;
         stats.textureSwitches = textureSwitches;
         stats.uniqueTexturePointers = mUniqueTexturePointers.size();
-        stats.textureCacheSize = mTextureCache.size();
+        stats.textureCacheSize = mFrameTexturePtr.size();
         stats.resourceLookupsThisFrame = resourceLookupsThisFrame;
 
 #if defined(SFML1_PROFILE)
