@@ -238,8 +238,7 @@ namespace game::skyguard::dev {
 #if defined(SFML1_PROFILE)
         const char* note =
             (textures.size() < 2)
-                ? " TexSwitches may stay 0: add more via SKYGUARD_STRESS_TEXTURE_IDS or "
-                  "SKYGUARD_STRESS_TEXTURE_COUNT."
+                ? " TexSwitches may stay 0: add more via SKYGUARD_STRESS_TEXTURE_COUNT."
                 : "";
         LOG_INFO(core::log::cat::Performance,
                  "Stress scene enabled: spawning {} sprites (zLayers={}, textures={}).{}",
