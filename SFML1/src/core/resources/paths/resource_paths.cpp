@@ -149,7 +149,7 @@ namespace {
     //
     //  "textures": {
     //      "Player": {
-    //          "path": "assets/game/skyguard/textures/su-57.png",
+    //          "path": "assets/game/skyguard/textures/su57.png",
     //          "smooth": true,
     //          "repeated": false,
     //          "mipmap": false

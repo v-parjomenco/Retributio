@@ -5,7 +5,11 @@
 #include <cassert>
 #include <cmath>
 
+#include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Graphics/RenderStates.hpp>
+#include <SFML/Graphics/View.hpp>
+
+#include "core/resources/resource_manager.h"
 
 namespace game::skyguard::presentation {
 
@@ -75,7 +79,8 @@ namespace game::skyguard::presentation {
         mStats.tilesCovered = tilesX * tilesY;
         mStats.drawCalls = 1;
         mStats.tileSize = mTextureSize;
-        mStats.visibleRect = sf::FloatRect({topLeft.x, topLeft.y}, {size.x, size.y});
+        mStats.visibleRect = sf::FloatRect({topLeft.x, topLeft.y}, 
+                                           {size.x, size.y});
         mStats.parallaxFactor = 1.0f;
 #endif
     }

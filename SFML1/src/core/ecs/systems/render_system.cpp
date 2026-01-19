@@ -1,7 +1,6 @@
 #include "pch.h"
 
 #include "core/ecs/systems/render_system.h"
-
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -17,9 +16,9 @@
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/world.h"
 #include "core/log/log_macros.h"
-#include "core/resources/resource_manager.h"  // mResources->getTexture()
+#include "core/resources/resource_manager.h" // mResources->getTexture()
 #include "core/spatial/aabb2.h"
-#include "core/spatial/spatial_index.h"       // mSpatialIndex->query()
+#include "core/spatial/spatial_index.h" // mSpatialIndex->query()
 #include "core/utils/math_constants.h"
 
 namespace {
@@ -53,8 +52,7 @@ namespace {
 
     void writeSpriteTriangles(sf::Vertex* out,
                               const sf::Vector2f& position,
-                              const sf::Vector2f& origin,
-                              const sf::Vector2f& scale,
+                              const sf::Vector2f& origin, const sf::Vector2f& scale,
                               const sf::IntRect& rect) noexcept {
         const float w = static_cast<float>(rect.size.x);
         const float h = static_cast<float>(rect.size.y);
@@ -183,8 +181,83 @@ namespace core::ecs {
 #endif
     }
 
+    void RenderSystem::bind(const core::spatial::SpatialIndex* spatialIndex,
+                            core::resources::ResourceManager* resources) {
+        const bool hasIndex = (spatialIndex != nullptr);
+        const bool hasRes = (resources != nullptr);
+
+        // Контракт: либо оба nullptr (unbind), либо оба валидны.
+        if (hasIndex != hasRes) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "RenderSystem::bind: partial bind is forbidden "
+                      "(spatialIndex={}, resources={})",
+                      static_cast<const void*>(spatialIndex),
+                      static_cast<const void*>(resources));
+        }
+
+        mSpatialIndex = spatialIndex;
+        mResources = resources;
+
+        // Unbind: bind(nullptr, nullptr).
+        if (mResources == nullptr) {
+            mFrameTexturePtr.clear();
+            mFrameTextureStamp.clear();
+            mFrameId = 0;
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            mUniqueTexturesThisFrame = 0;
+#endif
+            return;
+        }
+
+        const std::size_t count = mResources->registry().textureCount();
+        if (count == 0) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "RenderSystem::bind: empty texture registry (textureCount == 0)");
+        }
+
+        const auto fallback = mResources->missingTextureKey();
+        if (!fallback.valid()) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "RenderSystem::bind: invalid missingTextureKey (registry misconfigured)");
+        }
+
+        // valid() гарантирует безопасный вызов index().
+        const std::uint32_t fallbackIndex = fallback.index();
+        if (fallbackIndex >= count) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "RenderSystem::bind: missingTextureKey index is out of bounds "
+                      "(idx={}, count={})",
+                      fallbackIndex,
+                      count);
+        }
+
+        resizeEpochArrays(count);
+    }
+
+    void RenderSystem::resizeEpochArrays(const std::size_t textureCount) {
+        // Без лишних аллокаций: если размер не менялся — только clear-by-fill.
+        if (mFrameTexturePtr.size() != textureCount) {
+            mFrameTexturePtr.assign(textureCount, nullptr);
+        } else {
+            std::fill(mFrameTexturePtr.begin(), mFrameTexturePtr.end(), nullptr);
+        }
+
+        if (mFrameTextureStamp.size() != textureCount) {
+            mFrameTextureStamp.assign(textureCount, 0u);
+        } else {
+            std::fill(mFrameTextureStamp.begin(), mFrameTextureStamp.end(), 0u);
+        }
+        // После resizeEpochArrays следующий beginFrame() даст mFrameId == 1.
+        mFrameId = 0;
+    }
+
     void RenderSystem::beginFrame() noexcept {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        mUniqueTexturesThisFrame = 0;
+#endif
         ++mFrameId;
+
         if (mFrameId == 0) {
             std::fill(mFrameTextureStamp.begin(), mFrameTextureStamp.end(), 0u);
             mFrameId = 1;
@@ -195,6 +268,9 @@ namespace core::ecs {
                                                       std::size_t* resourceLookupsThisFrame) {
         assert(mResources != nullptr);
 
+        // Контракт: epoch-массивы должны быть подготовлены в bind().
+        assert(!mFrameTexturePtr.empty() && mFrameTexturePtr.size() == mFrameTextureStamp.size());
+
         if (!key.valid()) {
             key = mResources->missingTextureKey();
         }
@@ -203,11 +279,20 @@ namespace core::ecs {
         if (index >= mFrameTexturePtr.size()) {
             key = mResources->missingTextureKey();
             index = key.index();
+
+            // Контракт bind(): missingTextureKey.index() < textureCount.
+            assert(index < mFrameTexturePtr.size() &&
+                   "RenderSystem: missingTextureKey is out of bounds "
+                   "(bind() not called or registry broken)");
         }
 
         if (mFrameTextureStamp[index] != mFrameId) {
             mFrameTexturePtr[index] = &mResources->getTexture(key).get();
             mFrameTextureStamp[index] = mFrameId;
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            ++mUniqueTexturesThisFrame;
+#endif
             if (resourceLookupsThisFrame != nullptr) {
                 ++(*resourceLookupsThisFrame);
             }
@@ -217,16 +302,21 @@ namespace core::ecs {
     }
 
     // --------------------------------------------------------------------------------------------
-    // КРИТИЧНО: render() намеренно НЕ noexcept.
-    // sf::RenderWindow::draw() может выбросить исключение (GPU errors, driver issues).
-    // Исключения пробрасываются в Game layer для корректной обработки.
+    // Примечание:
+    //  - render() намеренно НЕ noexcept: sf::RenderWindow::draw() не гарантирует noexcept.
+    //  - Исключения (если они вообще возможны в текущей конфигурации) пробрасываются в Game layer.
     // --------------------------------------------------------------------------------------------
 
     void RenderSystem::render(World& world, sf::RenderWindow& window) {
+        // Release: trust-on-read (bind контракт обязателен). Debug/Profile: ловим misuse заранее.
         assert(window.getView().getRotation() == sf::Angle::Zero &&
                "RenderSystem: view rotation is not supported (view.getRotation() must be 0).");
         assert(mSpatialIndex != nullptr && "RenderSystem: bind() не вызван — mSpatialIndex null");
         assert(mResources != nullptr && "RenderSystem: bind() не вызван — mResources null");
+        assert(mFrameTexturePtr.size() == mResources->registry().textureCount() &&
+               "RenderSystem: epoch cache size mismatch (call bind() after registry reload).");
+        assert(mFrameTextureStamp.size() == mResources->registry().textureCount() &&
+               "RenderSystem: epoch stamp size mismatch (call bind() after registry reload).");
 
         // View-culling в world-space координатах текущего view.
         const core::spatial::Aabb2 viewAabb = makeViewAabb(window.getView());
@@ -242,7 +332,6 @@ namespace core::ecs {
         std::size_t totalCandidates = 0;
         std::size_t culled = 0;
         std::size_t textureSwitches = 0;
-        mUniqueTexturePointers.clear();
 #endif
 
 #if defined(SFML1_PROFILE)
@@ -252,9 +341,9 @@ namespace core::ecs {
         const auto gatherStart = std::chrono::steady_clock::now();
 #endif
 
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
         // Шаг 1: Gather + Culling — собираем ключи только для видимых спрайтов.
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
 
         // Amortized growth: reserve(count + max(count/2, 256)).
         // Избегаем повторных реаллокаций при постепенном увеличении visible count.
@@ -281,11 +370,11 @@ namespace core::ecs {
         ensureCapacity(mKeys, visibleCount);
         ensureCapacity(mPackets, visibleCount);
 
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
         // КРИТИЧНАЯ ОПТИМИЗАЦИЯ: Vertex buffer без инициализации.
         // std::vector<sf::Vertex>::resize(N) зануляет ~7MB при 50k sprites.
         // std::make_unique_for_overwrite<sf::Vertex[]> (C++20) = zero init cost.
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
         const std::size_t maxVertices = visibleCount * 6;
         if (maxVertices > mVertexBufferCapacity) {
             const std::size_t grow = std::max(maxVertices / 2, std::size_t{1536});
@@ -294,20 +383,15 @@ namespace core::ecs {
             mVertexBufferCapacity = newCapacity;
         }
 
-        if (mFrameTexturePtr.size() != mResources->registry().textureCount()) {
-            mFrameTexturePtr.assign(mResources->registry().textureCount(), nullptr);
-            mFrameTextureStamp.assign(mFrameTexturePtr.size(), 0u);
-        }
-
         auto ecsView = world.view<TransformComponent, SpriteComponent, SpatialHandleComponent>();
 
         // Итерация по mVisibleEntities (уже отфильтровано SpatialIndex).
-        // Если число видимых сущностей будет постоянно превышать 50k, поменять на: 
+        // Если число видимых сущностей будет постоянно превышать 50k, поменять на:
         //  packed iteration через view.each() + inline culling.
 
         for (const Entity entity : mVisibleEntities) {
-            assert(ecsView.contains(entity) &&
-                   "RenderSystem: SpatialIndex вернул entity без (Transform, Sprite, SpatialHandle)");
+            assert(ecsView.contains(entity) && "RenderSystem: SpatialIndex вернул entity без "
+                                               "(Transform, Sprite, SpatialHandle)");
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
             ++totalCandidates;
 #endif
@@ -380,10 +464,6 @@ namespace core::ecs {
         }
 #endif
 
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
-        ensureCapacity(mUniqueTexturePointers, mFrameTexturePtr.size());
-#endif
-
         if (mKeys.empty()) {
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
             FrameStats stats{};
@@ -401,9 +481,9 @@ namespace core::ecs {
             return;
         }
 
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
         // Шаг 2: Sort — детерминированно и batching-friendly.
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
 
 #if defined(SFML1_PROFILE)
         const auto sortStart = std::chrono::steady_clock::now();
@@ -437,9 +517,9 @@ namespace core::ecs {
         }
 #endif
 
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
         // Шаг 3: Draw — Vertex batching. Flush на смене zOrder или texture.
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
 
 #if defined(SFML1_PROFILE)
         const auto drawPhaseStart = std::chrono::steady_clock::now();
@@ -447,28 +527,16 @@ namespace core::ecs {
 
         std::size_t vertexWrite = 0;
 
-        sf::RenderStates states;
+        sf::RenderStates states{}; // value-init: детерминированные дефолты
 
         core::resources::TextureKey currentTexture = mKeys.front().texture;
         float currentZ = mKeys.front().zOrder;
-        // Lazy per-frame cache
+
         const sf::Texture* currentTexturePtr =
             getTextureCached(currentTexture, &resourceLookupsThisFrame);
         states.texture = currentTexturePtr;
 
         std::size_t batchDrawCalls = 0;
-
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
-        const auto trackUniqueTexturePtr = [&](const sf::Texture* tex) {
-            for (const sf::Texture* existing : mUniqueTexturePointers) {
-                if (existing == tex) {
-                    return;
-                }
-            }
-            mUniqueTexturePointers.push_back(tex);
-        };
-        trackUniqueTexturePtr(currentTexturePtr);
-#endif
 
         const auto flush = [&]() {
             if (vertexWrite == 0) {
@@ -509,7 +577,6 @@ namespace core::ecs {
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
                     ++textureSwitches;
-                    trackUniqueTexturePtr(currentTexturePtr);
 #endif
                 }
             }
@@ -529,9 +596,9 @@ namespace core::ecs {
 
         flush();
 
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
         // Диагностика (метрики) — Debug/Profile. Тайминги — только Profile.
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         FrameStats stats{};
@@ -541,7 +608,7 @@ namespace core::ecs {
         stats.vertexCount = stats.spriteCount * 6;
         stats.batchDrawCalls = batchDrawCalls;
         stats.textureSwitches = textureSwitches;
-        stats.uniqueTexturePointers = mUniqueTexturePointers.size();
+        stats.uniqueTexturePointers = mUniqueTexturesThisFrame;
         stats.textureCacheSize = mFrameTexturePtr.size();
         stats.resourceLookupsThisFrame = resourceLookupsThisFrame;
 

@@ -1,6 +1,6 @@
 // ================================================================================================
 // File: core/config/properties/sprite_properties.h
-// Purpose: Data-only sprite configuration brick (texture id + scale)
+// Purpose: Data-only sprite configuration brick (texture key + scale)
 // Used by: PlayerBlueprint, future entity blueprints
 // Related headers: core/resources/keys/resource_key.h
 // ================================================================================================
@@ -21,7 +21,7 @@ namespace core::config::properties {
  */
     struct SpriteProperties {
         /**
-     * @brief Идентификатор текстуры.
+     * @brief Ключ текстуры.
      *
      * Здесь хранится RuntimeKey32 текстуры, а не путь к файлу.
      * Реальный путь вытаскивается через ResourceRegistry + ResourceManager.

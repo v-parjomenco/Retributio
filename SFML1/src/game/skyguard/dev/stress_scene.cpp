@@ -82,7 +82,6 @@ namespace {
         core::resources::ResourceManager& resources,
         const core::resources::TextureKey fallbackTexture) {
 
-        using TextureID = core::resources::ids::TextureID;
         std::vector<core::resources::TextureKey> out;
 
         const std::size_t requestedCount =

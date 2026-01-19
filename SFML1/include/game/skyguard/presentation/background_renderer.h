@@ -8,12 +8,20 @@
 #include <cstdint>
 
 #include <SFML/Graphics/Rect.hpp>
-#include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Graphics/Vertex.hpp>
 #include <SFML/System/Vector2.hpp>
 
-#include "core/resources/resource_manager.h"
 #include "core/resources/keys/resource_key.h"
+
+namespace sf {
+    class RenderWindow;
+    class Texture;
+    class View;
+} // namespace sf
+
+namespace core::resources {
+    class ResourceManager;
+}
 
 namespace game::skyguard::presentation {
 

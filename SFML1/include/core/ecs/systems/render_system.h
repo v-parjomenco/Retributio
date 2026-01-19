@@ -39,22 +39,16 @@ namespace core::ecs {
     /**
      * @brief Высокопроизводительная система рендеринга спрайтов с batching и culling.
      *
-     * АРХИТЕКТУРА:
-     *  - Spatial culling через SpatialIndex (grid-based, O(visible cells))
-     *  - Сортировка по zOrder → texture → entityId (детерминизм + batching)
-     *  - Vertex batching: один draw call на группу (zOrder, texture)
-     *  - Zero-allocation hot path (pre-allocated buffers)
+     * АРХИТЕКТУРА И ПРОИЗВОДИТЕЛЬНОСТЬ:
+     *  - Spatial culling через SpatialIndex (grid-based, O(visible cells)).
+     *  - Детерминированная сортировка: zOrder -> texture -> entityId (batching + стабильность).
+     *  - Vertex batching: один draw call на группу (zOrder, texture).
+     *  - Zero-allocation hot path: буферы переиспользуются (amortized growth).
+     *  - Per-frame cache текстур: epoch-массивы по key.index() (O(1), без map/хешей).
      *
-     * ПРОИЗВОДИТЕЛЬНОСТЬ (target: 500k entities, 50k visible):
-     *  - Gather + cull: ~1ms
-     *  - Sort: ~0.5ms
-     *  - Build vertices: ~0.5ms
-     *  - Draw calls: зависит от GPU, обычно <1ms при batching
-     *
-     * КРИТИЧНЫЕ ОПТИМИЗАЦИИ:
-     *  - mVertexBuffer: raw array без инициализации (make_unique_for_overwrite)
-     *  - Amortized growth: capacity растёт с headroom (+50%)
-     *  - Per-frame texture cache: избегаем повторных ResourceManager lookups
+     * КОНТРАКТ:
+     *  - Разрешение TextureKey -> sf::Texture выполняется через ResourceManager.
+     *  - Missing texture key должен быть валиден.
      */
     class RenderSystem final : public ISystem {
       public:
@@ -65,15 +59,15 @@ namespace core::ecs {
          * Release builds: возвращается zeroed struct (zero overhead).
          */
         struct FrameStats {
-            std::size_t totalSpriteCount{0};         ///< Кандидаты от SpatialIndex
-            std::size_t culledSpriteCount{0};        ///< Отсечено fine culling
-            std::size_t spriteCount{0};              ///< Фактически отрисовано
-            std::size_t vertexCount{0};              ///< spriteCount × 6
-            std::size_t batchDrawCalls{0};           ///< Количество draw calls
-            std::size_t textureSwitches{0};          ///< Смены текстуры
-            std::size_t uniqueTexturePointers{0};    ///< Уникальные sf::Texture*
-            std::size_t textureCacheSize{0};         ///< Размер per-frame кэша
-            std::size_t resourceLookupsThisFrame{0}; ///< Обращений к ResourceManager
+            std::size_t totalSpriteCount{0};      ///< Кандидаты от SpatialIndex
+            std::size_t culledSpriteCount{0};     ///< Отсечено fine culling
+            std::size_t spriteCount{0};           ///< Фактически отрисовано
+            std::size_t vertexCount{0};           ///< spriteCount * 6
+            std::size_t batchDrawCalls{0};        ///< Количество draw calls
+            std::size_t textureSwitches{0};       ///< Смены текстуры (batched flush)
+            std::size_t uniqueTexturePointers{0}; ///< Уникальные текстуры за кадр (по epoch cache)
+            std::size_t textureCacheSize{0};      ///< Размер per-frame epoch cache
+            std::size_t resourceLookupsThisFrame{0}; ///< Обращений к ResourceManager::getTexture
 
             std::uint64_t cpuTotalUs{0};  ///< Общее время render() (только SFML1_PROFILE)
             std::uint64_t cpuDrawUs{0};   ///< Время в window.draw() (только SFML1_PROFILE)
@@ -92,20 +86,26 @@ namespace core::ecs {
         RenderSystem& operator=(RenderSystem&&) = delete;
 
         /**
-         * @brief Привязать внешние зависимости (обязательно вызвать перед render).
+         * @brief Привязать внешние зависимости (обязательно вызвать перед render()).
          *
-         * LIFETIME CONTRACT:
-         *  - spatialIndex и resources должны жить дольше RenderSystem
-         *  - Нарушение = dangling pointer, use-after-free
+         * Контракт времени жизни:
+         *  - spatialIndex и resources должны жить дольше RenderSystem.
          *
-         * @param spatialIndex Указатель на spatial index (не владеем, read-only)
-         * @param resources Указатель на resource manager (не владеем, mutable для lazy loading)
+         * Контракт инициализации (fail-fast):
+         *  - resources уже инициализирован (key-world): registry загружен и валиден.
+         *  - resources->registry().textureCount() > 0
+         *  - resources->missingTextureKey().valid()
+         *  - resources->missingTextureKey().index() < textureCount
+         *
+         * bind() подготавливает epoch-массивы под текущий размер registry.
+         * При hot-reload registry bind() должен быть вызван повторно.
+         *
+         * Дополнительно:
+         *  - bind(nullptr, nullptr) допустим как явный "unbind" (сбрасывает кэш и состояние).
+         *  - bind(spatialIndex, nullptr) / bind(nullptr, resources) — misuse -> (LOG_PANIC).
          */
         void bind(const core::spatial::SpatialIndex* spatialIndex,
-                  core::resources::ResourceManager* resources) noexcept {
-            mSpatialIndex = spatialIndex;
-            mResources = resources;
-        }
+                  core::resources::ResourceManager* resources);
 
         /**
          * @brief Логическое обновление (не используется, рендер-only система).
@@ -118,7 +118,7 @@ namespace core::ecs {
         /**
          * @brief Отрисовка всех видимых спрайтов с batching.
          *
-         * НЕ noexcept: sf::RenderWindow::draw() может выбросить исключение.
+         * НЕ noexcept: sf::RenderWindow::draw() не гарантирует noexcept.
          */
         void render(World& world, sf::RenderWindow& window) override;
 
@@ -130,45 +130,43 @@ namespace core::ecs {
         [[nodiscard]] const FrameStats& getLastFrameStatsRef() const noexcept;
 
       private:
-
         void beginFrame() noexcept;
+
         [[nodiscard]] const sf::Texture* getTextureCached(core::resources::TextureKey key,
                                                           std::size_t* resourceLookupsThisFrame);
 
-        // ------------------------------------------------------------------------------------
+        void resizeEpochArrays(std::size_t textureCount);
+
+        // ----------------------------------------------------------------------------------------
         // Внешние зависимости (не владеем, lifetime managed externally)
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
 
         /// Spatial index для view-frustum culling (read-only, cell-level candidates)
         const core::spatial::SpatialIndex* mSpatialIndex{nullptr};
 
-        /// Resource manager для резолва TextureKey → sf::Texture.
-        /// НЕ const: getTexture() использует lazy loading и обновляет внутренние кэши.
+        /// Resource manager. НЕ const, так как getTexture использует lazy loading и обновляет кэши.
         core::resources::ResourceManager* mResources{nullptr};
 
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
         // Внутренние структуры (горячий путь)
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
 
         /**
          * @brief Ключ сортировки для детерминированного batching.
-         *
-         * Порядок сортировки: zOrder → texture → tieBreak (entity ID).
-         * Минимизирует texture switches и гарантирует детерминизм.
+         * Порядок: zOrder -> texture -> tieBreak (entity ID).
+         * Минимизирует переключения текстур и гарантирует стабильность кадра.
          */
         struct RenderKey {
-            float zOrder;                              ///< Слой отрисовки
-            core::resources::TextureKey texture;       ///< Key текстуры для batching
-            std::uint32_t tieBreak;                    ///< Entity ID для стабильной сортировки
-            std::uint32_t packetIndex;                 ///< Индекс в mPackets (uint32_t достаточно)
+            float zOrder;
+            core::resources::TextureKey texture;
+            std::uint32_t tieBreak;
+            std::uint32_t packetIndex;
         };
         static_assert(sizeof(RenderKey) == 16, "RenderKey must be 16 bytes for cache efficiency");
 
         /**
          * @brief Данные для генерации вершин одного спрайта.
-         *
-         * Собираются один раз при gather, используются при build vertices.
-         * Sin/cos кэшируются чтобы не считать дважды.
+         * Собираются один раз при gather, используются при build. Sin/cos кэшируются.
          */
         struct RenderPacket {
             sf::Vector2f position;
@@ -180,27 +178,21 @@ namespace core::ecs {
             bool isRotated;
         };
 
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
         // Буферы (amortized growth, переиспользуются между кадрами)
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
 
-        /// Результат SpatialIndex::query() — кандидаты на рендеринг
         std::vector<Entity> mVisibleEntities;
-
-        /// Ключи сортировки (по одному на visible sprite)
         std::vector<RenderKey> mKeys;
-
-        /// Данные для генерации вершин (по одному на visible sprite)
         std::vector<RenderPacket> mPackets;
 
         /**
          * @brief Vertex buffer (raw array, NO initialization).
          *
          * КРИТИЧНАЯ ОПТИМИЗАЦИЯ:
-         *  - std::vector<sf::Vertex>::resize() зануляет память
-         *  - std::unique_ptr<sf::Vertex[]> + make_unique_for_overwrite = zero init cost
-         *  - Записываем напрямую в mVertexBuffer.get() + offset
-         *  - sf::RenderWindow::draw() принимает raw pointer + count
+         *  - std::vector<sf::Vertex>::resize() зануляет память (~7MB на 50k спрайтов).
+         *  - std::unique_ptr<sf::Vertex[]> + make_unique_for_overwrite = zero init cost.
+         *  - sf::RenderWindow::draw() принимает raw pointer + count.
          */
         std::unique_ptr<sf::Vertex[]> mVertexBuffer{};
         std::size_t mVertexBufferCapacity{0};
@@ -208,42 +200,30 @@ namespace core::ecs {
         /// Per-frame texture cache (epoch arrays)
         std::vector<const sf::Texture*> mFrameTexturePtr;
         std::vector<std::uint32_t> mFrameTextureStamp;
-        std::uint32_t mFrameId = 0;
+        std::uint32_t mFrameId{0};
 
         /// Hint для amortized growth (последнее количество visible)
         std::size_t mLastVisibleCount{0};
 
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
         // Статистика (Debug/Profile only)
-        // ------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         FrameStats mLastStats{};
-
-        /// Для подсчёта уникальных sf::Texture* за кадр
-        std::vector<const sf::Texture*> mUniqueTexturePointers;
+        std::size_t mUniqueTexturesThisFrame{0};
 #endif
-
-        // ------------------------------------------------------------------------------------
-        // Debug logging state (члены класса вместо static — избегаем race condition)
-        // ------------------------------------------------------------------------------------
 
 #if !defined(NDEBUG)
         /**
          * @brief Счётчик кадров для throttled debug logging.
          *
          * ВАЖНО: не static!
-         *  - static в функции живёт вечно, shared между всеми instances
-         *  - При многопоточности (будущее) = data race
-         *  - Член класса = isolated per-instance state
-         *
-         * std::uint64_t вместо int:
-         *  - Signed overflow = UB (компилятор может "оптимизировать")
-         *  - uint64 overflow через триллионы лет
+         *  - static в функции создаёт shared state между всеми экземплярами (data race).
+         *  - Член класса обеспечивает изоляцию.
+         *  - uint64 для защиты от переполнения.
          */
         std::uint64_t mDebugFrameCount{0};
-
-        /// Последнее залогированное количество visible (для change detection)
         std::size_t mDebugLastLoggedCount{static_cast<std::size_t>(-1)};
 #endif
     };

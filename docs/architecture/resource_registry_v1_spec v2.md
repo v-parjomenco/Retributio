@@ -1040,6 +1040,36 @@ core/resources/watcher/file_watcher_linux.cpp
 
 **Time:** 2-3 days
 
+PR8 — Texture color space flag (sRGB)
+
+Причина: в RRv1 примере для текстур есть smooth/repeated/mipmap, но нет srgb; а в Texture Standard sRGB — non-negotiable.
+Суть:
+
+добавить bool srgb в TextureResourceConfig
+
+расширить resources.json ("srgb": true/false, default = true для color textures в SkyGuard)
+
+загрузчик: sf::Texture::loadFromFile(path, {srgb}) (или эквивалентный вызов SFML 3)
+
+Почему это не конфликтует с RRv1: это просто расширение config’а; ключи/StableKey/RuntimeKey остаются прежними. RRv1 принцип “validate-on-write” сохраняется. 
+
+resource_registry_v1_spec v2
+
+PR9 — Arrays sharding + capability-driven fallback (engine backend)
+
+Причина: убрать магические пороги вида “<2048 → fallback” и перейти на “need vs supported”.
+Суть:
+
+backend выбирается по capabilities
+
+arrays шардируются по maxLayers
+
+multi-atlas остаётся гарантированным fallback (и forced-test)
+
+(Это согласуется с вашим RoadMap, где multi-atlas already primary, arrays optional; мы лишь делаем arrays “primary where applicable” без потери fallback.) 
+
+SFML1_SkyGuard_RoadMap_v2.3
+
 ---
 
 ## 12. Validation Checklist

@@ -441,6 +441,9 @@
     <ClCompile Include="..\third_party\xxhash\upstream\xxhash.c">
       <Filter>third_party\xxhash\upstream</Filter>
     </ClCompile>
+    <ClCompile Include="src\game\skyguard\ecs\systems\player_init_system.cpp">
+      <Filter>src\game\skyguard\ecs\systems</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\resources\resource_manager.h">

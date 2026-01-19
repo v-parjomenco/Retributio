@@ -8,13 +8,13 @@
       "mipmap": false
     },
     "skyguard.sprite.player": {
-      "path": "assets/game/skyguard/textures/0000su-57.png",
+      "path": "assets/game/skyguard/textures/0000su57.png",
       "smooth": true,
       "repeated": false,
       "mipmap": false
     },
     "skyguard.background.desert": {
-      "path": "assets/game/skyguard/textures/backgrounds/desert.png",
+      "path": "assets/game/skyguard/textures/backgrounds/desert_tile.png",
       "smooth": true,
       "repeated": true,
       "mipmap": false
