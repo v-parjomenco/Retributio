@@ -1,7 +1,9 @@
 // ================================================================================================
 // File: core/ui/anchor_utils.h
 // Purpose: Anchor type definitions and utility functions
-// Used by: AnchorPolicy, AnchorProperties, PlayerInitSystem
+// Used by: AnchorPolicy, AnchorProperties
+// Notes:
+//  - NOT used in SkyGuard, but provided for engine completeness.
 // ================================================================================================
 #pragma once
 

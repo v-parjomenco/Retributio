@@ -1,8 +1,10 @@
 // ================================================================================================
 // File: core/ecs/components/lock_behavior_component.h
 // Purpose: Per-entity state for lock behavior on window resize
-// Used by: LockSystem, PlayerInitSystem
-// Related headers: core/ui/lock_behavior.h, game/skyguard/ecs/systems/player_init_system.h
+// Used by: LockSystem
+// Related headers: core/ui/lock_behavior.h
+// Notes:
+//  - NOT used in SkyGuard (no LockSystem in SkyGuard), but provided for engine completeness.
 // ================================================================================================
 #pragma once
 

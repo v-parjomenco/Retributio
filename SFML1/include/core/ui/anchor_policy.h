@@ -1,7 +1,9 @@
 // ================================================================================================
 // File: core/ui/anchor_policy.h
 // Purpose: Anchor policy for sprite origin/position
-// Used by: PlayerInitSystem, future UI/layout systems
+// Used by: Future UI/layout systems
+// Notes:
+//  - NOT used in SkyGuard, but provided for engine completeness.
 // ================================================================================================
 #pragma once
 

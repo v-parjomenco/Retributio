@@ -1,8 +1,10 @@
 // ================================================================================================
 // File: core/ecs/components/scaling_behavior_component.h
 // Purpose: Per-entity scaling behavior settings for resize handling
-// Used by: ScalingSystem, PlayerInitSystem
-// Related headers: core/ui/scaling_behavior.h, game\skyguard\ecs\systems\player_init_system.h
+// Used by: ScalingSystem
+// Related headers: core/ui/scaling_behavior.h
+// Notes:
+//  - NOT used in SkyGuard (no ScalingSystem in SkyGuard), but provided for engine completeness.
 // ================================================================================================
 #pragma once
 

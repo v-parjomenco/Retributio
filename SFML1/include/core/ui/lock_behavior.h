@@ -3,6 +3,8 @@
 // Purpose: Lock behavior types and helpers for resize handling
 // Used by: AnchorProperties, LockBehaviorComponent, LockSystem
 // Related headers: core/ui/ids/ui_id_utils.h
+// Notes:
+//  - NOT used in SkyGuard (no LockSystem in SkyGuard), but provided for engine completeness.
 // ================================================================================================
 #pragma once
 

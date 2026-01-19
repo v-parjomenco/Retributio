@@ -3,6 +3,8 @@
 // Purpose: Scaling behavior types and helper functions for resize handling
 // Used by: AnchorProperties, ScalingBehaviorComponent, ScalingSystem
 // Related headers: core/ui/ids/ui_id_utils.h
+// Notes:
+//  - NOT used in SkyGuard (no ScalingSystem in SkyGuard), but provided for engine completeness.
 // ================================================================================================
 #pragma once
 

@@ -80,7 +80,8 @@ namespace game::skyguard::ecs {
                 sf::Vector2i{0, 0},
                 sf::Vector2i{static_cast<int>(textureSize.x), static_cast<int>(textureSize.y)});
 
-            // Масштаб задаётся конфигом (не меняется в рантайме без ScalingSystem).
+            // Масштаб задаётся конфигом и для SkyGuard считается константой;
+            // изменение окна обрабатывается camera/view (letterbox/fit), без ScalingSystem.
             spriteComp.scale = cfg.sprite.scale;
             spriteComp.origin = origin;
             spriteComp.zOrder = 0.f;

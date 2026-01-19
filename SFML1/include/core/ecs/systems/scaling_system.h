@@ -1,9 +1,11 @@
 // ================================================================================================
 // File: core/ecs/systems/scaling_system.h
 // Purpose: Apply per-entity scaling behavior on window/view resize (deterministic, absolute-based)
-// Used by: Game resize handling, World/SystemManager
+// Used by: Future game resize handling
 // Related headers: scaling_behavior_component.h, sprite_component.h, 
 //                  sprite_scaling_data_component.h, core/ui/scaling_behavior.h
+// Notes:
+//  - NOT used in SkyGuard (no ScalingSystem in SkyGuard), but provided for engine completeness.
 // ================================================================================================
 #pragma once
 #include <SFML/Graphics/View.hpp>

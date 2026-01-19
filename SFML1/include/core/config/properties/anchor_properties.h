@@ -1,8 +1,10 @@
 // ================================================================================================
 // File: core/config/properties/anchor_properties.h
 // Purpose: Data-only anchor/resize/lock configuration brick
-// Used by: PlayerBlueprint, future UI/world-anchored blueprints
+// Used by: Future UI/world-anchored blueprints
 // Related headers: core/ui/ids/ui_id_utils.h
+// Notes:
+//  - NOT used in SkyGuard, but provided for engine completeness.
 // ================================================================================================
 #pragma once
 

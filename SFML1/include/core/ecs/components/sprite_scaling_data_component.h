@@ -1,8 +1,10 @@
 // ================================================================================================
 // File: core/ecs/components/sprite_scaling_data_component.h
 // Purpose: Cold-path sprite scaling configuration data (resize-only, 8 bytes)
-// Used by: ScalingSystem (onResize), PlayerInitSystem (one-shot write)
+// Used by: ScalingSystem (onResize)
 // Related headers: sprite_component.h, scaling_system.h
+// Notes:
+//  - NOT used in SkyGuard (no ScalingSystem in SkyGuard), but provided for engine completeness.
 // ================================================================================================
 #pragma once
 #include <SFML/System/Vector2.hpp>
@@ -18,7 +20,7 @@ namespace core::ecs {
      *
      * КОНТРАКТ:
      *  - baseScale — IMMUTABLE конфигурационное значение из JSON
-     *  - Задаётся один раз при инициализации (PlayerInitSystem)
+     *  - Задаётся один раз при инициализаци, если используется ScalingSystem
      *  - Валидируется в config_loader (> 0), здесь trust-on-read
      *  - ScalingSystem пересчитывает: sprite.scale = baseScale * uniformFactor
      *
@@ -28,7 +30,7 @@ namespace core::ecs {
      *  - Масштабируемость: при 500k sprites экономим 4 MB cache bandwidth/frame
      *
      * ПРИМЕР ИСПОЛЬЗОВАНИЯ:
-     *  // Init (one-shot):
+     *  // Init (one-shot, only if ScalingSystem is enabled):
      *  world.addComponent<SpriteScalingDataComponent>(entity, {.baseScale = {0.12f, 0.12f}});
      *
      *  // Resize (rare):

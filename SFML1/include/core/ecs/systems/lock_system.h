@@ -3,6 +3,8 @@
 // Purpose: Apply per-entity lock behavior on window/view resize (EnTT backend)
 // Used by: Game resize handling, World/SystemManager
 // Related headers: lock_behavior_component.h, transform_component.h
+// Notes:
+//  - NOT used in SkyGuard, but provided for engine completeness.
 // ================================================================================================
 #pragma once
 
