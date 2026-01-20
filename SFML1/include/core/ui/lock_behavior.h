@@ -1,10 +1,10 @@
 // ================================================================================================
 // File: core/ui/lock_behavior.h
-// Purpose: Lock behavior types and helpers for resize handling
-// Used by: AnchorProperties, LockBehaviorComponent, LockSystem
+// Purpose: Lock behavior types and helpers for resize handling (presentation-level)
+// Used by: Optional UI/layout bricks (AnchorProperties), LockBehaviorComponent, LockSystem
 // Related headers: core/ui/ids/ui_id_utils.h
 // Notes:
-//  - NOT used in SkyGuard (no LockSystem in SkyGuard), but provided for engine completeness.
+//  - Not used by SkyGuard. Kept for potential usage in future games/tools.
 // ================================================================================================
 #pragma once
 

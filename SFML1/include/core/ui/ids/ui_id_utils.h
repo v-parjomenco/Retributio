@@ -2,9 +2,11 @@
 // File: core/ui/ids/ui_id_utils.h
 // Purpose: String <-> enum helpers for UI IDs
 //          (AnchorType, ScalingBehaviorKind, LockBehaviorKind)
-// Used by: Config loaders, debug tools, UI / ECS systems
+// Used by: Optional config loaders, debug tools, UI/editor tooling
 // Related headers: core/ui/anchor_utils.h, core/ui/scaling_behavior.h,
 //                  core/ui/lock_behavior.h
+// Notes:
+//  - Not used by SkyGuard. Kept for potential usage in future games/tools.
 // ================================================================================================
 #pragma once
 
@@ -48,7 +50,7 @@ namespace core::ui::ids {
                    LockBehaviorKind defaultKind = LockBehaviorKind::World) noexcept;
 
     // --------------------------------------------------------------------------------------------
-    // Унифицированный idToString для UI-идентификаторов (в духе resource_id_utils)
+    // Унифицированный idToString для UI-идентификаторов.
     // --------------------------------------------------------------------------------------------
 
     /**

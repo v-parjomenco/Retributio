@@ -1,10 +1,10 @@
 // ================================================================================================
 // File: core/config/properties/anchor_properties.h
-// Purpose: Data-only anchor/resize/lock configuration brick
-// Used by: Future UI/world-anchored blueprints
+// Purpose: Data-only anchor/resize/lock configuration brick (optional UI/layout)
+// Used by: Optional UI/HUD blueprints, tools/editors, future games
 // Related headers: core/ui/ids/ui_id_utils.h
 // Notes:
-//  - NOT used in SkyGuard, but provided for engine completeness.
+//  - Not used by SkyGuard. Kept for potential usage in future games/tools.
 // ================================================================================================
 #pragma once
 
@@ -31,7 +31,7 @@ namespace core::config::properties {
     struct AnchorProperties {
 
         /**
-         * @brief Тип якоря, полученный из строки "anchor" в ConfigLoader.
+         * @brief Тип якоря (обычно парсится лоадером из строкового поля вроде "anchor").
          *
          * AnchorType::None означает "нет якоря" (объект живёт в startPosition).
          *
@@ -49,8 +49,8 @@ namespace core::config::properties {
         /**
          * @brief Тип политики масштабирования при изменении размера экрана.
          *
-         * В JSON это строка "resize_scaling", которая конвертируется в enum через
-         * core::ui::ids::scalingFromString(...).
+         * Обычно парсится лоадером из строкового поля (например "resize_scaling")
+         * с помощью core::ui::ids::scalingFromString(...).
          *
          * ScalingBehaviorKind::None    — без дополнительного масштабирования;
          * ScalingBehaviorKind::Uniform — равномерное масштабирование.
@@ -60,8 +60,8 @@ namespace core::config::properties {
         /**
          * @brief Тип политики фиксации при resize.
          *
-         * В JSON это строка "lock_behavior", которая конвертируется в enum через
-         * core::ui::ids::lockFromString(...).
+         * Обычно парсится лоадером из строкового поля (например "lock_behavior")
+         * с помощью core::ui::ids::lockFromString(...).
          *
          * LockBehaviorKind::World  — жить в мировых координатах;
          * LockBehaviorKind::Screen — фиксировать относительное положение на экране.

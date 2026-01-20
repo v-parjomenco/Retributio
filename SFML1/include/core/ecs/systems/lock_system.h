@@ -1,10 +1,10 @@
 // ================================================================================================
 // File: core/ecs/systems/lock_system.h
-// Purpose: Apply per-entity lock behavior on window/view resize (EnTT backend)
-// Used by: Game resize handling, World/SystemManager
+// Purpose: Apply per-entity lock behavior on window/view resize (EnTT backend, optional)
+// Used by: Optional UI/layout resize handling.
 // Related headers: lock_behavior_component.h, transform_component.h
 // Notes:
-//  - NOT used in SkyGuard, but provided for engine completeness.
+//  - Not used by SkyGuard. Kept for potential usage in future games/tools.
 // ================================================================================================
 #pragma once
 
@@ -33,7 +33,8 @@ namespace core::ecs {
      * Validate on write, trust on read:
      *  - newViewSize проверяется здесь (runtime guard для OS-данных);
      *  - previousViewSize защищён в computeScreenLockPosition (fallback при invalid);
-     *  - newPosition ГАРАНТИРОВАННО finite и valid → проверки НЕТ.
+     *  - newPosition предполагается корректным при условии, что входной Transform.position finite.
+     *    Если Transform.position уже повреждён (NaN/Inf), система это не лечит (и не должна).
      */
     class LockSystem final : public ISystem {
       public:

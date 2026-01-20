@@ -58,18 +58,6 @@
     <Filter Include="src\core\resources\holders">
       <UniqueIdentifier>{5f532b5a-92af-4508-b13a-61858f1bcf8f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\core\resources\ids">
-      <UniqueIdentifier>{67498e49-76ff-4496-a99f-53f1678b3282}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="include\core\resources\ids">
-      <UniqueIdentifier>{e536589b-0f4c-491c-8a35-403651eb424c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="include\core\resources\paths">
-      <UniqueIdentifier>{c797904b-153c-4ae3-90ac-7245c8f3172b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="src\core\resources\paths">
-      <UniqueIdentifier>{400b6695-47c4-4b82-8675-01310e29e35a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="src\core\resources\types">
       <UniqueIdentifier>{d4ca4076-c66c-4cc4-b3f7-1ae99773109d}</UniqueIdentifier>
     </Filter>
@@ -339,9 +327,6 @@
     <ClCompile Include="src\core\ecs\systems\render_system.cpp">
       <Filter>src\core\ecs\systems</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\resources\paths\resource_paths.cpp">
-      <Filter>src\core\resources\paths</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\time\time_service.cpp">
       <Filter>src\core\time</Filter>
     </ClCompile>
@@ -497,12 +482,6 @@
     <ClInclude Include="include\core\resources\holders\resource_holder.h">
       <Filter>include\core\resources\holders</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\resources\ids\resource_ids.h">
-      <Filter>include\core\resources\ids</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resources\paths\resource_paths.h">
-      <Filter>include\core\resources\paths</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\resources\types\font_resource.h">
       <Filter>include\core\resources\types</Filter>
     </ClInclude>
@@ -526,9 +505,6 @@
     </ClInclude>
     <ClInclude Include="include\core\utils\json\json_validator.h">
       <Filter>include\core\utils\json</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resources\ids\resource_id_utils.h">
-      <Filter>include\core\resources\ids</Filter>
     </ClInclude>
     <ClInclude Include="include\core\time\time_service.h">
       <Filter>include\core\time</Filter>

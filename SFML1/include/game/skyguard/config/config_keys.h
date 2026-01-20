@@ -1,7 +1,7 @@
 // ================================================================================================
 // File: game/skyguard/config/config_keys.h
 // Purpose: Game-specific JSON keys for SkyGuard configuration.
-// Used by: ConfigLoader (player.json), ResourcePaths (resources.json) and other SkyGuard loaders
+// Used by: ConfigLoader (player.json), ResourceRegistry (resources.json) and other SkyGuard loaders
 // Related headers: core/config/config_keys.h
 // ================================================================================================
 #pragma once

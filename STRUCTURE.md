@@ -48,9 +48,9 @@ High-level layout of the SFML1 / SkyGuard repository.
    │  │  ├─ log/                 # Logging API, levels, categories, macros
    │  │  ├─ resources/
    │  │  │  ├─ config/           # Per-resource-type config structures
-   │  │  │  ├─ holders/          # Generic ResourceHolder
-   │  │  │  ├─ ids/              # Strong resource IDs and helpers
-   │  │  │  ├─ paths/            # ResourcePaths registry (internal to resource layer)
+   │  │  │  ├─ holders/          # Generic ResourceHolder (dynamic paths/tools)
+   │  │  │  ├─ keys/             # RuntimeKey32 types and helpers
+   │  │  │  ├─ registry/         # ResourceRegistry (canonical keys -> configs)
    │  │  │  └─ types/            # Thin wrappers over SFML resources
    │  │  ├─ time/                # TimeService and fixed timestep config
    │  │  ├─ ui/                  # Anchor, lock and scaling behaviors

@@ -4,7 +4,7 @@
 // Used by: ScalingSystem
 // Related headers: core/ui/scaling_behavior.h
 // Notes:
-//  - NOT used in SkyGuard (no ScalingSystem in SkyGuard), but provided for engine completeness.
+//  - Not used by SkyGuard. Kept for potential usage in future games/tools.
 // ================================================================================================
 #pragma once
 

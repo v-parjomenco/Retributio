@@ -3,6 +3,8 @@
 // Purpose: Manage WorldView and UiView for SkyGuard (letterbox + UI separation).
 // Used by: game::skyguard::Game.
 // Related headers: game/skyguard/config/view_config.h, core/ui/viewport_utils.h
+// Notes:
+//  - SkyGuard: canonical resize path = ViewManager only. Do NOT wire ScalingSystem/LockSystem here.
 // ================================================================================================
 #pragma once
 

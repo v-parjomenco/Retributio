@@ -20,7 +20,7 @@ A high-performance, modular 2D game engine built with **C++20 + SFML 3.0.2**, de
 - **Strict Layered Architecture** — Reusable engine core (`core/`) cleanly separated from game-specific code (`game/skyguard/`)
 - **Data-Driven Design** — All gameplay, configs, and resources defined in JSON; zero hardcoded magic constants
 - **Entity–Component–System (ECS)** — Performance-focused ECS with EnTT backend, designed for 100K+ entities
-- **ID-Based Resource Management** — Type-safe resource IDs, centralized registry, automatic caching and validation
+- **Key-Based Resource Management** — RuntimeKey32 handles, centralized registry, automatic caching and validation
 - **Resolution-Independent UI** — Anchor policies, scaling behaviors, and lock systems for adaptive layouts
 - **Deterministic Simulation** — Fixed timestep, stable iteration order, seeded RNG for replay and multiplayer support
 - **Production-Grade Tooling** — Structured logging, debug overlay, profiling hooks, and hot-reload infrastructure
@@ -50,16 +50,16 @@ A high-performance, modular 2D game engine built with **C++20 + SFML 3.0.2**, de
 ```
 ResourceManager (façade)
     ↓
-ResourcePaths (ID → Config registry from resources.json)
+ResourceRegistry (CanonicalKey → Config + RuntimeKey32)
     ↓
-ResourceHolder<T, ID> (per-type cache)
+Vector caches (per-type, indexed by RuntimeKey32)
     ↓
 *Resource wrappers (Texture, Font, SoundBuffer)
     ↓
 SFML primitives
 ```
 
-**Key Principle:** Resources accessed via strongly-typed IDs (`TextureID::PlayerShip`), never raw strings or SFML types in gameplay code.
+**Key Principle:** Resources accessed via RuntimeKey32 handles (`TextureKey`, `FontKey`, `SoundKey`), never raw strings or SFML types in gameplay code.
 
 ### Configuration Pipeline
 ```
@@ -199,15 +199,20 @@ clang-format -i $(git ls-files *.h *.cpp)
    ```json
    {
      "textures": {
-       "PlayerShip": "assets/game/skyguard/images/ship.png"
+       "skyguard.sprite.player": {
+         "path": "assets/game/skyguard/images/aircraft.png",
+         "smooth": true,
+         "repeated": false,
+         "mipmap": false
+       }
      }
    }
    ```
 
 3. **Use in code**
    ```cpp
-   auto& texture = resourceManager.getTexture(TextureID::PlayerShip);
-   sprite.setTexture(texture.get());
+   const auto key = resourceManager.findTexture("skyguard.sprite.player");
+   auto& texture = resourceManager.getTexture(key);
    ```
 
 ### Creating a New ECS Component

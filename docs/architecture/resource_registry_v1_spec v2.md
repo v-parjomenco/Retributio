@@ -774,13 +774,15 @@ docs/
 └── SFML1_SkyGuard_Requirements_Guide.pdf  // Updated sections
 ```
 
-### 10.3 Deleted Files
+### 10.3 Deleted Files and Folders
 
 ```
 core/resources/ids/resource_ids.h
 core/resources/ids/resource_id_utils.h
 core/resources/paths/resource_paths.h
 core/resources/paths/resource_paths.cpp
+core/resources/ids/        // legacy enum IDs + helpers
+core/resources/paths/      // legacy ResourcePaths registry
 ```
 
 ---
@@ -974,6 +976,8 @@ core/resources/ids/resource_ids.h
 core/resources/ids/resource_id_utils.h
 core/resources/paths/resource_paths.h
 core/resources/paths/resource_paths.cpp
+core/resources/ids/        // legacy enum IDs + helpers
+core/resources/paths/      // legacy ResourcePaths registry
 ```
 
 **Remove from code:**
@@ -984,6 +988,7 @@ core/resources/paths/resource_paths.cpp
 **Acceptance Criteria:**
 - [ ] `grep -r "TextureID\|FontID\|SoundID" core/` = 0 results
 - [ ] `grep -r "resource_ids.h\|resource_paths.h" .` = 0 results
+- [ ] `grep -r "legacy resource ids/paths" .` = 0 results
 - [ ] Compiles without warnings
 - [ ] All tests pass
 
@@ -1083,6 +1088,9 @@ SFML1_SkyGuard_RoadMap_v2.3
 - [ ] `grep -r "resource_paths.h" .` = 0 results
 - [ ] `grep -r "fromString.*Texture" .` = 0 results
 - [ ] `grep -r "toString.*Texture" .` = 0 results
+- [ ] `grep -r "legacy resource id headers" .` = 0 results
+- [ ] `grep -r "legacy resource paths headers" .` = 0 results
+- [ ] `grep -r "legacy enum string converters" .` = 0 results
 
 ### 12.2 Performance Validation
 
@@ -1347,6 +1355,7 @@ if (id == TextureID::Unknown) {
     LOG_PANIC(...);
 }
 out.textureId = id;
+// Legacy enum-based parsing from string (removed in PR5).
 
 // NEW (config_loader.cpp)
 std::string textureKeyStr;

@@ -1,10 +1,9 @@
 // ================================================================================================
 // File: core/resources/resource_manager.h
 // Purpose: High-level interface for loading and caching engine resources
-//          (textures, fonts, sounds) on top of ResourceHolder + ResourcePaths.
+//          (textures, fonts, sounds) on top of ResourceHolder + ResourceRegistry.
 // Used by: Game, ECS systems (PlayerInitSystem, DebugOverlaySystem, UI, etc.)
-// Related headers: texture_resource.h, font_resource.h, soundbuffer_resource.h, resource_holder.h,
-//                  resource_ids.h
+// Related headers: texture_resource.h, font_resource.h, soundbuffer_resource.h, resource_holder.h
 // Notes:
 //  - Must be called once at boot.
 // ================================================================================================
@@ -19,7 +18,6 @@
 #include <vector>
 
 #include "core/resources/holders/resource_holder.h"
-#include "core/resources/ids/resource_ids.h"
 #include "core/resources/keys/resource_key.h"
 #include "core/resources/registry/resource_registry.h"
 #include "core/resources/types/font_resource.h"
@@ -30,17 +28,9 @@ namespace core::resources {
 
     /**
      * @brief Высокоуровневый фасад ресурсного слоя.
-     *
-     * Основная линия развития (Resource Registry v1):
+     * 
      *  - Key-world API (RuntimeKey32) — целевой путь: O(1) доступ по key.index()
      *    через векторные кэши.
-     *
-     * Совместимость (LEGACY, будет удалено в PR5):
-     *  - Enum-ID API (TextureID / FontID / SoundID) поверх ResourcePaths.
-     *
-     * Динамические строковые ID/пути:
-     *  - Оставлены как гибкий escape hatch (тулы/прототипы/утилиты).
-     *  - Для строгих настроек smooth/repeated/mipmap и детерминизма ресурс должен быть в реестре.
      */
     class ResourceManager {
       public:
@@ -51,21 +41,6 @@ namespace core::resources {
         ResourceManager& operator=(const ResourceManager&) = delete;
         ResourceManager(ResourceManager&&) = delete;
         ResourceManager& operator=(ResourceManager&&) = delete;
-
-        // ----------------------------------------------------------------------------------------
-        // Bootstrapping (реестр ресурсов, LEGACY ResourcePaths)
-        // ----------------------------------------------------------------------------------------
-
-        /**
-         * @brief Загрузить реестр ресурсов (resources.json) для LEGACY-пути ResourcePaths.
-         *
-         * Важно:
-         *  - операция инициализации; должна вызываться при старте до первого getTexture/getFont/
-         *    getSound
-         *    по enum-ID;
-         *  - ошибки считаются критическими.
-         */
-        void loadRegistryFromJson(std::string_view filename);
 
         // ----------------------------------------------------------------------------------------
         // Bootstrapping (key-world, ResourceRegistry v1)
@@ -129,52 +104,26 @@ namespace core::resources {
         [[nodiscard]] FontKey missingFontKey() const noexcept;
 
         // ----------------------------------------------------------------------------------------
-        // Текстуры (LEGACY enum-ID)
+        // Динамические пути (escape hatch)
         // ----------------------------------------------------------------------------------------
 
-        // LEGACY (будет удалено в PR5)
-        /// Получить текстуру по static enum-ID.
-        const types::TextureResource& getTexture(ids::TextureID id);
-
-        /// Получить текстуру по динамическому строковому идентификатору (временно трактуется
-        /// как путь).
+        /// Получить текстуру по динамическому строковому идентификатору.
         const types::TextureResource& getTexture(const std::string& id);
 
         /// Получить текстуру по явному пути к файлу (escape hatch).
         const types::TextureResource& getTextureByPath(const std::string& path);
 
-        // ----------------------------------------------------------------------------------------
-        // Шрифты (LEGACY enum-ID)
-        // ----------------------------------------------------------------------------------------
-
-        // LEGACY (будет удалено в PR5)
-        /// Получить шрифт по static enum-ID.
-        const types::FontResource& getFont(ids::FontID id);
-
-        /// Получить шрифт по динамическому строковому идентификатору (временно трактуется 
-        /// как путь).
+        /// Получить шрифт по динамическому строковому идентификатору.
         const types::FontResource& getFont(const std::string& id);
 
-        // ----------------------------------------------------------------------------------------
-        // Звуки (LEGACY enum-ID)
-        // ----------------------------------------------------------------------------------------
-
-        // LEGACY (будет удалено в PR5)
-        /// Получить звуковой буфер по static enum-ID (soft-fail, возвращает пустой буфер).
-        const types::SoundBufferResource& getSound(ids::SoundID id);
-
-        /// Получить звуковой буфер по динамическому строковому идентификатору 
-        /// (soft-fail, пустой буфер).
+        /// Получить звуковой буфер по динамическому строковому идентификатору.
         const types::SoundBufferResource& getSound(const std::string& id);
 
         // ----------------------------------------------------------------------------------------
-        // Fallback-ресурсы (LEGACY)
+        // Метрики
         // ----------------------------------------------------------------------------------------
 
-        void setMissingTextureFallback(ids::TextureID id);
-        void setMissingFontFallback(ids::FontID id);
-
-        /// Статистика по загруженным ресурсам (LEGACY holders).
+        /// Статистика по загруженным ресурсам.
         struct ResourceMetrics {
             std::size_t textureCount = 0;
             std::size_t dynamicTextureCount = 0;
@@ -185,19 +134,6 @@ namespace core::resources {
         };
 
         [[nodiscard]] ResourceMetrics getMetrics() const noexcept;
-
-        // ----------------------------------------------------------------------------------------
-        // Preload API (LEGACY enum-ID)
-        // ----------------------------------------------------------------------------------------
-
-        // LEGACY (будет удалено в PR5)
-        void preloadTexture(ids::TextureID id);
-        void preloadFont(ids::FontID id);
-        void preloadSound(ids::SoundID id);
-
-        void preloadAllTextures();
-        void preloadAllFonts();
-        void preloadAllSounds();
 
         // ----------------------------------------------------------------------------------------
         // Preload API (key-world, deterministic by index)
@@ -212,24 +148,13 @@ namespace core::resources {
         void preloadAllSoundsByRegistry();
 
         // ----------------------------------------------------------------------------------------
-        // Управление жизненным циклом ресурсов (LEGACY holders + key caches)
+        // Управление жизненным циклом ресурсов (key caches + dynamic holders)
         // ----------------------------------------------------------------------------------------
 
-        void unloadTexture(ids::TextureID id) noexcept;
         void unloadTexture(const std::string& id) noexcept;
-
-        void unloadFont(ids::FontID id) noexcept;
         void unloadFont(const std::string& id) noexcept;
-
-        void unloadSound(ids::SoundID id) noexcept;
         void unloadSound(const std::string& id) noexcept;
-
         void clearAll() noexcept;
-
-        #if defined(SFML1_PROFILE)
-        void enableProfileStressTextureDuplication(ids::TextureID sourceId) noexcept;
-        void disableProfileStressTextureDuplication() noexcept;
-        #endif
 
       private:
         // ----------------------------------------------------------------------------------------
@@ -254,30 +179,11 @@ namespace core::resources {
         TextureKey mMissingTextureKey{};
         FontKey mMissingFontKey{};
 
-        // Реестр ресурсов (resources.json) должен быть загружен ровно один раз на старте (LEGACY).
-        bool mRegistryLoaded = false;
-
-        // LEGACY holders (enum-ID).
-        holders::ResourceHolder<types::TextureResource, ids::TextureID> mTextures;
-        holders::ResourceHolder<types::FontResource, ids::FontID> mFonts;
-        holders::ResourceHolder<types::SoundBufferResource, ids::SoundID> mSounds;
-
         // Dynamic holders (string keys/paths).
         holders::ResourceHolder<types::TextureResource, std::string> mDynamicTextures;
         holders::ResourceHolder<types::FontResource, std::string> mDynamicFonts;
         holders::ResourceHolder<types::SoundBufferResource, std::string> mDynamicSounds;
 
-        // LEGACY fallback IDs.
-        bool mHasMissingTextureFallback = false;
-        ids::TextureID mMissingTextureID{};
-
-        bool mHasMissingFontFallback = false;
-        ids::FontID mMissingFontID{};
-
-        #if defined(SFML1_PROFILE)
-            bool mProfileStressTexturesEnabled = false;
-            ids::TextureID mProfileStressSourceTextureId{};
-        #endif
     };
 
 #if defined(SFML1_TESTS)

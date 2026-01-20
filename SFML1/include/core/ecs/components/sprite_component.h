@@ -18,7 +18,8 @@ namespace core::ecs {
      *  - texture: RuntimeKey32 текстуры (резолвится через ResourceManager).
      *  - textureRect: ДОЛЖЕН быть явно задан (width/height > 0).
      *  - scale: итоговый масштаб, который использует RenderSystem и SpatialIndexSystem.
-     *  - origin: точка привязки (anchor), вычисляется на границе создания сущности.
+     *  - origin: pivot/origin для рендера, вычисляется на границе создания сущности
+     *    (например, центр текстуры; anchor/layout — опционально, зависит от игры).
      *  - zOrder: ключ сортировки (детерминизм + batching).
      *
      * Инварианты:
@@ -29,7 +30,7 @@ namespace core::ecs {
      *  - Если используется ScalingSystem, "baseScale" хранится в отдельном
      *    SpriteScalingDataComponent и scale пересчитывается при resize.
      *  - Если ScalingSystem не используется (как в SkyGuard), 
-     *    scale остаётся authoring/runtime значением
+     *    scale остаётся authoring/runtime значением; resize обрабатывается через View/viewport.
      */
     struct SpriteComponent {
         /// RuntimeKey32 текстуры (резолвится через ResourceManager)
@@ -41,8 +42,8 @@ namespace core::ecs {
         /// Текущий масштаб (MUTABLE; при наличии ScalingSystem может пересчитываться на resize)
         sf::Vector2f scale{1.f, 1.f};
 
-        /// Точка привязки (origin) для anchor'ов
-        /// Вычисляется один раз при инициализации из anchor type
+        /// Pivot/origin для рендера.
+        /// Вычисляется один раз при инициализации (обычно центр/низ/и т.п. по контракту игры).
         sf::Vector2f origin{0.f, 0.f};
 
         /// Z-порядок отрисовки (меньше = дальше/фон, больше = ближе/передний план)

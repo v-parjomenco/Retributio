@@ -4,7 +4,7 @@
 // Used by: ScalingSystem (onResize)
 // Related headers: sprite_component.h, scaling_system.h
 // Notes:
-//  - NOT used in SkyGuard (no ScalingSystem in SkyGuard), but provided for engine completeness.
+//  - Not used by SkyGuard. Kept as an optional hot/cold split brick for other games/tools.
 // ================================================================================================
 #pragma once
 #include <SFML/System/Vector2.hpp>

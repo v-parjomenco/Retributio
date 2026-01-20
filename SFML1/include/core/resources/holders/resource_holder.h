@@ -4,7 +4,7 @@
 // Used by: ResourceManager and any engine subsystems that want per-ID resource caches.
 // Notes:
 //  - Stores resources as std::unique_ptr<Resource> to avoid accidental copies.
-//  - Identifier is typically an enum class (TextureID, FontID, SoundID) or std::string.
+//  - Identifier is typically a key type (ResourceKey) or std::string.
 //  - ResourceHolder does NOT log recoverable errors (avoids log duplication).
 //    Fallback/LOG_WARN/LOG_PANIC policies are the responsibility of the ResourceManager.
 //  - API getOrLoad(...) avoids redundant lookups: 1 lookup per hit.

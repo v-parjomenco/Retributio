@@ -1,7 +1,7 @@
 // ================================================================================================
 // File: core/resources/config/sound_resource_config.h
 // Purpose: Data-only configuration for sound buffer resources (path, future low-level flags)
-// Used by: ResourcePaths, ResourceManager, tools
+// Used by: ResourceRegistry, ResourceManager, tools
 // Notes:
 //  - Describes how to locate raw sound data (SoundBuffer-level).
 //  - Playback parameters (volume, looping, spatialization) live at a higher layer (Sound/AudioSystem).

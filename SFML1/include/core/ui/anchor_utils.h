@@ -1,9 +1,9 @@
 // ================================================================================================
 // File: core/ui/anchor_utils.h
-// Purpose: Anchor type definitions and utility functions
-// Used by: AnchorPolicy, AnchorProperties
+// Purpose: Anchor type definitions and utility helpers (no ownership, no global state)
+// Used by: Optional UI/layout bricks (AnchorPolicy, AnchorProperties), tools/editors
 // Notes:
-//  - NOT used in SkyGuard, but provided for engine completeness.
+//  - Not used by SkyGuard. Kept for potential usage in future games/tools.
 // ================================================================================================
 #pragma once
 
@@ -69,7 +69,7 @@ namespace core::ui {
         }
 
         // ========================================================================================
-        // ID-BASED ECS HELPERS (Phase 3)
+        // DATA-ONLY HELPERS (no sf::Sprite mutation)
         // ========================================================================================
 
         /**
@@ -81,7 +81,7 @@ namespace core::ui {
         };
 
         /**
-         * @brief Data-driven anchor computation (ID-based ECS version).
+         * @brief Data-only anchor computation (no sf::Sprite mutation).
          *
          * Вычисляет origin и world position БЕЗ мутации sf::Sprite.
          *

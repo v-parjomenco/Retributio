@@ -4,7 +4,7 @@
 // Used by: LockSystem
 // Related headers: core/ui/lock_behavior.h
 // Notes:
-//  - NOT used in SkyGuard (no LockSystem in SkyGuard), but provided for engine completeness.
+//  - Not used by SkyGuard. Kept for potential usage in future games/tools.
 // ================================================================================================
 #pragma once
 

@@ -54,7 +54,7 @@ namespace game::skyguard {
 
         void applyEngineSettingsToWindow() noexcept;
 
-        /// Инициализация ресурсного слоя (ResourcePaths + fallback-ресурсы ResourceManager).
+        /// Инициализация ресурсного слоя (ResourceRegistry + fallback-ресурсы ResourceManager).
         void initResources();
 
         /// Создаёт ECS-мир и инициализирует сущности SkyGuard.

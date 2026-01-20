@@ -1,9 +1,9 @@
 // ================================================================================================
 // File: core/ui/anchor_policy.h
-// Purpose: Anchor policy for sprite origin/position
-// Used by: Future UI/layout systems
+// Purpose: Sprite-based anchor helper (mutates sf::Sprite origin/position relative to a View)
+// Used by: Optional UI/prototyping code and tools (non-ECS)
 // Notes:
-//  - NOT used in SkyGuard, but provided for engine completeness.
+//  - Not used by SkyGuard. Kept for potential usage in future games/tools.
 // ================================================================================================
 #pragma once
 

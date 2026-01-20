@@ -1,11 +1,11 @@
 // ================================================================================================
 // File: core/ecs/systems/scaling_system.h
 // Purpose: Apply per-entity scaling behavior on window/view resize (deterministic, absolute-based)
-// Used by: Future game resize handling
+// Used by: Optional resize handling
 // Related headers: scaling_behavior_component.h, sprite_component.h, 
 //                  sprite_scaling_data_component.h, core/ui/scaling_behavior.h
 // Notes:
-//  - NOT used in SkyGuard (no ScalingSystem in SkyGuard), but provided for engine completeness.
+//  - Not used by SkyGuard. Kept for potential usage in future games/tools.
 // ================================================================================================
 #pragma once
 #include <SFML/Graphics/View.hpp>
@@ -38,9 +38,9 @@ namespace core::ecs {
      *
      * Validate on write, trust on read:
      *  - baseScale валидируется в config_loader (> 0);
-     *  - baseViewSize валидируется в PlayerInitSystem (> 0);
+     *  - baseViewSize валидируется на границе записи (лоадер/инициализация компонента) (> 0);
      *  - currentViewSize защищён в computeUniformFactor (fallback на 1.0 при invalid);
-     *  - newScale ГАРАНТИРОВАННО finite и valid → проверки НЕТ.
+     *  - newScale предполагается корректным при условии валидных входных данных (finite, > 0).
      */
     class ScalingSystem final : public ISystem {
       public:

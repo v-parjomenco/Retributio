@@ -1,7 +1,7 @@
 // ================================================================================================
 // File: core/resources/config/texture_resource_config.h
 // Purpose: Data-only configuration for texture resources (path + low-level GPU flags)
-// Used by: ResourcePaths, ResourceManager, tools
+// Used by: ResourceRegistry, ResourceManager, tools
 // Notes:
 //  - Describes how a texture should be loaded and configured at resource level.
 //  - High-level usage (UI, terrain, entities) lives in other layers (blueprints/properties).

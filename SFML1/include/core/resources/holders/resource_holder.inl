@@ -4,7 +4,6 @@
 #include <utility>
 
 #include "core/log/log_macros.h"
-#include "core/resources/ids/resource_id_utils.h"
 
 namespace core::resources::holders {
 
@@ -120,8 +119,7 @@ namespace core::resources::holders {
         if (!ptr) {
             // Trust-on-Read нарушен: это фатальная ошибка логики.
             LOG_PANIC(core::log::cat::Resources,
-                      "[ResourceHolder::get] Ресурс не найден (нарушение контракта). ID: {}",
-                      core::resources::ids::idToString(id));
+                      "[ResourceHolder::get] Ресурс не найден (нарушение контракта).");
         }
 
         return *ptr;
