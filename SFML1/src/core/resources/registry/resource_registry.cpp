@@ -306,11 +306,11 @@ namespace core::resources {
                 }
 
                 const std::string_view path = requireStringField(value, "path", key, "Texture");
-
+#if !defined(NDEBUG)
                 if (!FileLoader::fileExists(path)) {
                     panic("[ResourceRegistry] Texture file '{}' not found for '{}'.", path, key);
                 }
-
+#endif
                 config::TextureResourceConfig cfg{};
                 cfg.smooth = readBooleanWithDefault(value, "smooth", false, key);
                 cfg.repeated = readBooleanWithDefault(value, "repeated", false, key);
@@ -345,11 +345,11 @@ namespace core::resources {
                 }
 
                 const std::string_view path = requireStringField(value, "path", key, "Font");
-
+#if !defined(NDEBUG)
                 if (!FileLoader::fileExists(path)) {
                     panic("[ResourceRegistry] Font file '{}' not found for '{}'.", path, key);
                 }
-
+#endif
                 config::FontResourceConfig cfg{};
 
                 ResourceDefinition<config::FontResourceConfig> def{};
@@ -392,7 +392,7 @@ namespace core::resources {
                 }
 
                 const std::string_view path = *pathOpt;
-
+#if !defined(NDEBUG)
                 if (!FileLoader::fileExists(path)) {
                     LOG_WARN(core::log::cat::Resources,
                              "[ResourceRegistry] Sound file '{}' not found for '{}'. Skipping.",
@@ -400,7 +400,7 @@ namespace core::resources {
                              key);
                     continue;
                 }
-
+#endif
                 config::SoundResourceConfig cfg{};
 
                 ResourceDefinition<config::SoundResourceConfig> def{};

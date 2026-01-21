@@ -1,14 +1,14 @@
 // ================================================================================================
 // File: core/resources/types/font_resource.h
 // Purpose: Thin wrapper around sf::Font for resource management.
-// Used by: ResourceHolder, ResourceManager, ResourceLoader.
+// Used by: ResourceManager.
 // Notes:
-//  - Move-only обёртка над sf::Font без виртуального базового класса.
-//  - Сфокусирована только на загрузке и доступе к шрифту.
+//  - Move-only wrapper over sf::Font without a virtual base class.
+//  - Focused only on loading and accessing the font.
 // ================================================================================================
 #pragma once
 
-#include <string>
+#include <filesystem>
 
 #include <SFML/Graphics/Font.hpp>
 
@@ -18,7 +18,7 @@ namespace core::resources::types {
      * @brief FontResource — тонкая обёртка над sf::Font.
      *
      * Обязанности:
-     *  - предоставить loadFromFile(...) для ResourceHolder / ResourceLoader;
+     *  - предоставить loadFromFile(...) для ResourceManager;
      *  - инкапсулировать sf::Font c запретом копирования;
      *  - дать прямой доступ к sf::Font для текста/GUI.
      *
@@ -39,7 +39,7 @@ namespace core::resources::types {
         FontResource& operator=(FontResource&&) noexcept = default;
 
         /// @brief Базовая загрузка шрифта из файла.
-        [[nodiscard]] bool loadFromFile(const std::string& filename) {
+        [[nodiscard]] bool loadFromFile(const std::filesystem::path& filename) {
             return mFont.openFromFile(filename);
         }
 

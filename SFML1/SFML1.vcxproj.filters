@@ -52,12 +52,6 @@
     <Filter Include="src\core\ecs\systems">
       <UniqueIdentifier>{ee5fecaa-622f-4059-81d9-b5f2ad5e7b99}</UniqueIdentifier>
     </Filter>
-    <Filter Include="include\core\resources\holders">
-      <UniqueIdentifier>{c2fce24f-e7ac-4611-9a91-6eb19938f9b6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="src\core\resources\holders">
-      <UniqueIdentifier>{5f532b5a-92af-4508-b13a-61858f1bcf8f}</UniqueIdentifier>
-    </Filter>
     <Filter Include="src\core\resources\types">
       <UniqueIdentifier>{d4ca4076-c66c-4cc4-b3f7-1ae99773109d}</UniqueIdentifier>
     </Filter>
@@ -479,9 +473,6 @@
     <ClInclude Include="include\core\ecs\systems\input_system.h">
       <Filter>include\core\ecs\systems</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\resources\holders\resource_holder.h">
-      <Filter>include\core\resources\holders</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\resources\types\font_resource.h">
       <Filter>include\core\resources\types</Filter>
     </ClInclude>
@@ -748,9 +739,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="include\core\resources\holders\resource_holder.inl">
-      <Filter>include\core\resources\holders</Filter>
-    </None>
     <None Include="assets\core\config\debug_overlay.json">
       <Filter>assets\core\config</Filter>
     </None>

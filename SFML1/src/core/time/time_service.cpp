@@ -22,13 +22,22 @@ namespace core::time {
             rawSec = 0.f;
         }
 
-        // Ограничение максимального dt (паузы, сворачивание, лаги ОС)
-        rawSec = std::clamp(rawSec, 0.f, kMaxDeltaSeconds);
+        // ---------------------------------------------------------------------
+        // ВАЖНО: dt для метрик и dt для симуляции — разные задачи.
+        //
+        //  - FPS должен отражать реальный рендер-каденс (без искусственного clamp),
+        //    иначе после длинного кадра (Alt-Tab, сворачивание) метрика искажается.
+        //  - Симуляция (fixed-step) защищается clamp'ом, чтобы избежать spiral of death.
+        // ---------------------------------------------------------------------
+        const float rawSecForFps = rawSec;
 
-        mRawDeltaTime = sf::seconds(rawSec);
+        // Ограничение dt для симуляции (паузы, сворачивание, лаги ОС)
+        const float rawSecForSim = std::clamp(rawSec, 0.f, kMaxDeltaSeconds);
 
-        // 2. Мгновенный FPS по raw dt
-        mFps = (rawSec > 0.f) ? (1.f / rawSec) : 0.f;
+        mRawDeltaTime = sf::seconds(rawSecForSim);
+
+        // 2. Мгновенный FPS по реальному raw dt
+        mFps = (rawSecForFps > 0.f) ? (1.f / rawSecForFps) : 0.f;
 
         // Счётчик кадров и min/max FPS (если FPS > 0)
         ++mFrameCount;
@@ -51,7 +60,8 @@ namespace core::time {
         }
 
         // 4. Применяем паузу и масштаб времени
-        const float scaledSec = (mPaused || mTimeScale <= 0.f) ? 0.f : (rawSec * mTimeScale);
+        const float scaledSec =
+            (mPaused || mTimeScale <= 0.f) ? 0.f : (rawSecForSim * mTimeScale);
 
         mDeltaTime = sf::seconds(scaledSec);
 

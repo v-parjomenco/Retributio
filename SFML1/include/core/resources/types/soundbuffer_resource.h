@@ -1,16 +1,15 @@
 // ================================================================================================
 // File: core/resources/types/soundbuffer_resource.h
 // Purpose: Thin wrapper around sf::SoundBuffer for resource management.
-// Used by: ResourceHolder, ResourceManager, ResourceLoader.
+// Used by: ResourceManager.
 // Notes:
-//  - Move-only обёртка над sf::SoundBuffer.
-//  - Содержит базовые метрики (кол-во сэмплов, примерный размер в памяти).
+//  - Move-only wrapper over sf::SoundBuffer.
+//  - Contains basic metrics (number of samples, approximate memory size).
 // ================================================================================================
 #pragma once
 
-#include <cstddef>
 #include <cstdint>
-#include <string>
+#include <filesystem>
 
 #include <SFML/Audio/SoundBuffer.hpp>
 
@@ -20,7 +19,7 @@ namespace core::resources::types {
      * @brief SoundBufferResource — тонкая обёртка над sf::SoundBuffer.
      *
      * Обязанности:
-     *  - предоставить loadFromFile(...) для ResourceHolder / ResourceLoader;
+     *  - предоставить loadFromFile(...) для ResourceManager;
      *  - инкапсулировать sf::SoundBuffer с запретом копирования;
      *  - дать базовые метрики (количество сэмплов, примерный объём памяти).
      */
@@ -38,7 +37,7 @@ namespace core::resources::types {
         SoundBufferResource& operator=(SoundBufferResource&&) noexcept = default;
 
         /// @brief Базовая загрузка звукового буфера из файла.
-        [[nodiscard]] bool loadFromFile(const std::string& filename) {
+        [[nodiscard]] bool loadFromFile(const std::filesystem::path& filename) {
             return mBuffer.loadFromFile(filename);
         }
 

@@ -33,27 +33,30 @@ namespace core::resources::self_test {
 
         bool gFailSoundByPath = false;
 
-        bool textureStub(types::TextureResource&, std::string_view) {
+        bool textureStub(types::TextureResource&, const std::filesystem::path&) {
             if (gCounters != nullptr) {
                 ++gCounters->texture;
             }
             return true;
         }
 
-        bool fontStub(types::FontResource&, std::string_view) {
+        bool fontStub(types::FontResource&, const std::filesystem::path&) {
             if (gCounters != nullptr) {
                 ++gCounters->font;
             }
             return true;
         }
 
-        bool soundStub(types::SoundBufferResource&, std::string_view path) {
+        bool soundStub(types::SoundBufferResource&, const std::filesystem::path& path) {
             if (gCounters != nullptr) {
                 ++gCounters->sound;
             }
-            if (gFailSoundByPath && path.find("fail") != std::string_view::npos) {
+
+            // Тестовая семантика: именно fail.wav должен "проваливаться".
+            if (gFailSoundByPath && path.filename() == "fail.wav") {
                 return false;
             }
+
             return true;
         }
 

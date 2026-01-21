@@ -552,7 +552,6 @@
     <ClInclude Include="include\core\resources\config\font_resource_config.h" />
     <ClInclude Include="include\core\resources\config\sound_resource_config.h" />
     <ClInclude Include="include\core\resources\config\texture_resource_config.h" />
-    <ClInclude Include="include\core\resources\holders\resource_holder.h" />
     <ClInclude Include="include\core\resources\keys\resource_key.h" />
     <ClInclude Include="include\core\resources\keys\stable_key.h" />
     <ClInclude Include="include\core\resources\registry\resource_entry.h" />
@@ -613,7 +612,6 @@
     <None Include="assets\game\skyguard\config\player.json" />
     <None Include="assets\game\skyguard\config\resources.json" />
     <None Include="assets\game\skyguard\config\skyguard_game.json" />
-    <None Include="include\core\resources\holders\resource_holder.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

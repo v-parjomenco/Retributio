@@ -1,11 +1,12 @@
 #include "pch.h"
 
 #include "core/resources/resource_manager.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
-#include <string>
 #include <string_view>
 #include <vector>
 
@@ -25,17 +26,19 @@ namespace core::resources {
         using SoundLoadFn = resource_manager::test::SoundLoadFn;
 #endif
 
-        [[nodiscard]] bool loadTextureFromFile(types::TextureResource& out, std::string_view path) {
-            return out.loadFromFile(std::string(path));
+        [[nodiscard]] bool loadTextureFromFile(types::TextureResource& out,
+                                               const std::filesystem::path& path) {
+            return out.loadFromFile(path);
         }
 
-        [[nodiscard]] bool loadFontFromFile(types::FontResource& out, std::string_view path) {
-            return out.loadFromFile(std::string(path));
+        [[nodiscard]] bool loadFontFromFile(types::FontResource& out,
+                                            const std::filesystem::path& path) {
+            return out.loadFromFile(path);
         }
 
         [[nodiscard]] bool loadSoundFromFile(types::SoundBufferResource& out,
-                                             std::string_view path) {
-            return out.loadFromFile(std::string(path));
+                                             const std::filesystem::path& path) {
+            return out.loadFromFile(path);
         }
 
 #if defined(SFML1_TESTS)
@@ -44,7 +47,8 @@ namespace core::resources {
         SoundLoadFn gSoundLoadFn = &loadSoundFromFile;
 #endif
 
-        [[nodiscard]] bool loadTexture(types::TextureResource& out, std::string_view path) {
+        [[nodiscard]] bool loadTexture(types::TextureResource& out, 
+                                       const std::filesystem::path& path) {
 #if defined(SFML1_TESTS)
             return gTextureLoadFn(out, path);
 #else
@@ -52,7 +56,8 @@ namespace core::resources {
 #endif
         }
 
-        [[nodiscard]] bool loadFont(types::FontResource& out, std::string_view path) {
+        [[nodiscard]] bool loadFont(types::FontResource& out, 
+                                    const std::filesystem::path& path) {
 #if defined(SFML1_TESTS)
             return gFontLoadFn(out, path);
 #else
@@ -60,7 +65,8 @@ namespace core::resources {
 #endif
         }
 
-        [[nodiscard]] bool loadSound(types::SoundBufferResource& out, std::string_view path) {
+        [[nodiscard]] bool loadSound(types::SoundBufferResource& out, 
+                                     const std::filesystem::path& path) {
 #if defined(SFML1_TESTS)
             return gSoundLoadFn(out, path);
 #else
@@ -70,7 +76,14 @@ namespace core::resources {
 
         [[noreturn]] void panicKeyWorldNotInitialized(std::string_view where) {
             LOG_PANIC(core::log::cat::Resources,
-                      "[ResourceManager::{}] Key-world API вызван до initialize().", where);
+                      "[ResourceManager::{}] Key-world API вызван до initialize().",
+                      where);
+        }
+
+        [[nodiscard]] std::filesystem::path toPath(std::string_view pathView) {
+            // string_view -> path без промежуточного std::string.
+            // path всё равно будет владеть строкой, но мы избегаем лишней аллокации/копии.
+            return std::filesystem::path{pathView.begin(), pathView.end()};
         }
 
     } // namespace
@@ -165,15 +178,17 @@ namespace core::resources {
         }
 
         const auto& entry = mRegistry.getTexture(key);
-
-        // Контракт v1: path в Config legacy; source of truth = entry.path.
+        // Источник истины - entry.path.
         auto resource = std::make_unique<types::TextureResource>();
-        if (!loadTexture(*resource, entry.path)) {
+        const std::filesystem::path filePath = toPath(entry.path);
+
+        if (!loadTexture(*resource, filePath)) {
             // Type A: любая ошибка загрузки текстуры — фатальна.
             LOG_PANIC(core::log::cat::Resources,
                       "[ResourceManager::getTexture(TextureKey)] "
                       "Не удалось загрузить текстуру '{}'. path='{}'.",
-                      entry.name, entry.path);
+                      entry.name,
+                      entry.path);
         }
 
         resource->setSmooth(entry.config.smooth);
@@ -212,15 +227,17 @@ namespace core::resources {
         }
 
         const auto& entry = mRegistry.getFont(key);
-
-        // Контракт v1: path в Config legacy; source of truth = entry.path.
+        // Источник истины - entry.path.
         auto resource = std::make_unique<types::FontResource>();
-        if (!loadFont(*resource, entry.path)) {
+        const std::filesystem::path filePath = toPath(entry.path);
+
+        if (!loadFont(*resource, filePath)) {
             // Type A: любая ошибка загрузки шрифта — фатальна.
             LOG_PANIC(core::log::cat::Resources,
                       "[ResourceManager::getFont(FontKey)] "
                       "Не удалось загрузить шрифт '{}'. path='{}'.",
-                      entry.name, entry.path);
+                      entry.name,
+                      entry.path);
         }
 
         mFontCache[idx] = std::move(resource);
@@ -251,99 +268,30 @@ namespace core::resources {
         }
 
         const auto* entry = mRegistry.tryGetSound(key);
+        // Защита от рассинхрона ключа/реестра.
         if (entry == nullptr) {
-            // Защита от рассинхрона ключа/реестра.
             mSoundState[idx] = kStateFailed;
             return nullptr;
         }
-
-        // Контракт v1: path в Config legacy; source of truth = entry.path.
+        // Источник истины - entry.path.
         auto resource = std::make_unique<types::SoundBufferResource>();
-        if (!loadSound(*resource, entry->path)) {
+        const std::filesystem::path filePath = toPath(entry->path);
+
+        if (!loadSound(*resource, filePath)) {
             // Sounds — soft-fail: один WARN и больше не пробуем.
             mSoundState[idx] = kStateFailed;
 
             LOG_WARN(core::log::cat::Resources,
                      "[ResourceManager::tryGetSound(SoundKey)] "
                      "Не удалось загрузить звук '{}'. path='{}'.",
-                     entry->name, entry->path);
+                     entry->name,
+                     entry->path);
             return nullptr;
         }
 
         mSoundCache[idx] = std::move(resource);
         mSoundState[idx] = kStateLoaded;
         return mSoundCache[idx].get();
-    }
-
-    const types::TextureResource& ResourceManager::getTexture(const std::string& id) {
-        return getTextureByPath(id);
-    }
-
-    const types::TextureResource& ResourceManager::getTextureByPath(const std::string& path) {
-        auto [ptr, loadedNow] = mDynamicTextures.getOrLoad(path, path);
-
-        if (!ptr) {
-            if (mInitialized) {
-                LOG_WARN(core::log::cat::Resources,
-                         "[ResourceManager::getTextureByPath] "
-                         "Не удалось загрузить текстуру по пути: '{}'. Используется fallback "
-                         "key.index(): {}",
-                         path, mMissingTextureKey.index());
-                return getTexture(mMissingTextureKey);
-            }
-            LOG_PANIC(core::log::cat::Resources,
-                      "[ResourceManager::getTextureByPath] "
-                      "Не удалось загрузить текстуру по пути: '{}'. Fallback недоступен "
-                      "(key-world не инициализирован).",
-                      path);
-        }
-
-        if (loadedNow) {
-            // Политика по умолчанию для динамических текстур: smooth=true, repeated=false.
-            ptr->setSmooth(true);
-            ptr->setRepeated(false);
-        }
-
-        return *ptr;
-    }
-
-    const types::FontResource& ResourceManager::getFont(const std::string& id) {
-        auto [ptr, loadedNow] = mDynamicFonts.getOrLoad(id, id);
-        (void) loadedNow;
-
-        if (!ptr) {
-            if (mInitialized) {
-                LOG_WARN(core::log::cat::Resources,
-                         "[ResourceManager::getFont(std::string)] "
-                         "Не удалось загрузить шрифт по пути: '{}'. Используется fallback "
-                         "key.index(): {}",
-                         id, mMissingFontKey.index());
-                return getFont(mMissingFontKey);
-            }
-            LOG_PANIC(core::log::cat::Resources,
-                      "[ResourceManager::getFont(std::string)] "
-                      "Не удалось загрузить шрифт по пути: '{}'. Fallback недоступен "
-                      "(key-world не инициализирован).",
-                      id);
-        }
-
-        return *ptr;
-    }
-
-     const types::SoundBufferResource& ResourceManager::getSound(const std::string& id) {
-        auto [ptr, loadedNow] = mDynamicSounds.getOrLoad(id, id);
-        (void) loadedNow;
-
-        if (!ptr) {
-            LOG_WARN(core::log::cat::Resources,
-                     "[ResourceManager::getSound(std::string)] "
-                     "Не удалось загрузить звук по пути: '{}'. Возвращается пустой буфер.",
-                     id);
-            mDynamicSounds.insert(id, std::make_unique<types::SoundBufferResource>());
-            return mDynamicSounds.get(id);
-        }
-
-        return *ptr;
     }
 
     // --------------------------------------------------------------------------------------------
@@ -357,20 +305,19 @@ namespace core::resources {
 
         return ResourceMetrics{
             .textureCount = countLoaded(mTextureState),
-            .dynamicTextureCount = mDynamicTextures.size(),
             .fontCount = countLoaded(mFontState),
-            .dynamicFontCount = mDynamicFonts.size(),
             .soundCount = countLoaded(mSoundState),
-            .dynamicSoundCount = mDynamicSounds.size(),
         };
     }
 
     void ResourceManager::preloadTexture(TextureKey key) {
         (void) getTexture(key);
     }
+
     void ResourceManager::preloadFont(FontKey key) {
         (void) getFont(key);
     }
+
     void ResourceManager::preloadSound(SoundKey key) {
         (void) tryGetSound(key);
     }
@@ -409,26 +356,10 @@ namespace core::resources {
     }
 
     // --------------------------------------------------------------------------------------------
-    // Управление жизненным циклом ресурсов
+    // Key-world cache control
     // --------------------------------------------------------------------------------------------
 
-    void ResourceManager::unloadTexture(const std::string& id) noexcept {
-        mDynamicTextures.unload(id);
-    }
-
-    void ResourceManager::unloadFont(const std::string& id) noexcept {
-        mDynamicFonts.unload(id);
-    }
-
-    void ResourceManager::unloadSound(const std::string& id) noexcept {
-        mDynamicSounds.unload(id);
-    }
-
     void ResourceManager::clearAll() noexcept {
-        mDynamicTextures.clear();
-        mDynamicFonts.clear();
-        mDynamicSounds.clear();
-
         for (auto& entry : mTextureCache) {
             entry.reset();
         }
@@ -449,6 +380,7 @@ namespace core::resources {
         void setTextureLoadFn(TextureLoadFn fn) noexcept {
             gTextureLoadFn = fn;
         }
+
         void resetTextureLoadFn() noexcept {
             gTextureLoadFn = &loadTextureFromFile;
         }
@@ -456,6 +388,7 @@ namespace core::resources {
         void setFontLoadFn(FontLoadFn fn) noexcept {
             gFontLoadFn = fn;
         }
+
         void resetFontLoadFn() noexcept {
             gFontLoadFn = &loadFontFromFile;
         }
@@ -463,6 +396,7 @@ namespace core::resources {
         void setSoundLoadFn(SoundLoadFn fn) noexcept {
             gSoundLoadFn = fn;
         }
+
         void resetSoundLoadFn() noexcept {
             gSoundLoadFn = &loadSoundFromFile;
         }

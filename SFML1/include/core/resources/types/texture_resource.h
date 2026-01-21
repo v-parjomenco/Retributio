@@ -2,7 +2,7 @@
 // File: core/resources/types/texture_resource.h
 // Purpose: Thin wrapper around sf::Texture with a uniform loadFromFile interface
 //          and basic 4X-friendly features (mipmaps, tiling, memory metrics).
-// Used by: ResourceHolder, ResourceManager, ResourceLoader.
+// Used by: ResourceManager.
 // Notes:
 //  - Does NOT own any higher-level policy (hot-reload, streaming, etc.).
 //    Those are implemented at ResourceManager / tools level.
@@ -11,7 +11,7 @@
 #pragma once
 
 #include <cstddef>
-#include <string>
+#include <filesystem>
 
 #include <SFML/Graphics/Rect.hpp>
 #include <SFML/Graphics/Texture.hpp>
@@ -22,7 +22,7 @@ namespace core::resources::types {
      * @brief TextureResource — тонкая обёртка над sf::Texture.
      *
      * Обязанности:
-     *  - предоставить единый интерфейс loadFromFile(...) для ResourceHolder / ResourceLoader;
+     *  - предоставить единый интерфейс loadFromFile(...) для ResourceManager;
      *  - инкапсулировать тяжёлый ресурс (sf::Texture) с запретом копирования;
      *  - добавить базовые фичи, полезные для 4X (mipmap, tiling, профилирование размера).
      *
@@ -40,7 +40,7 @@ namespace core::resources::types {
         // ----------------------------------------------------------------------------------------
         // Семантика владения
         // ----------------------------------------------------------------------------------------
-        // Текстуры тяжёлые, копирование запрещено    
+        // Текстуры тяжёлые, копирование запрещено
         TextureResource(const TextureResource&) = delete;
         TextureResource& operator=(const TextureResource&) = delete;
 
@@ -56,7 +56,7 @@ namespace core::resources::types {
         ///
         /// Соответствует вызову sf::Texture::loadFromFile(path)
         /// без sRGB и без выделенного прямоугольника.
-        [[nodiscard]] bool loadFromFile(const std::string& filename) {
+        [[nodiscard]] bool loadFromFile(const std::filesystem::path& filename) {
             return mTexture.loadFromFile(filename);
         }
 
@@ -66,7 +66,8 @@ namespace core::resources::types {
         /// Полезно для:
         ///  - texture atlas / sprite sheet (area),
         ///  - управления цветовым пространством (sRgb).
-        [[nodiscard]] bool loadFromFile(const std::string& filename, bool sRgb,
+        [[nodiscard]] bool loadFromFile(const std::filesystem::path& filename, 
+                                        bool sRgb,
                                         const sf::IntRect& area) {
             return mTexture.loadFromFile(filename, sRgb, area);
         }
@@ -117,7 +118,8 @@ namespace core::resources::types {
             return mTexture.getSize();
         }
 
-        /// @brief Приблизительный размер в байтах в памяти (без учёта драйверных нюансов).
+        /// @brief Приблизительный размер в байтах в памяти 
+        /// (без учёта драйверных нюансов).
         ///
         /// Предполагаем формат RGBA8 (4 байта на пиксель).
         /// Для rough-профилирования этого достаточно.

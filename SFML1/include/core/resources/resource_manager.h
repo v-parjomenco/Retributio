@@ -1,9 +1,9 @@
 // ================================================================================================
 // File: core/resources/resource_manager.h
 // Purpose: High-level interface for loading and caching engine resources
-//          (textures, fonts, sounds) on top of ResourceHolder + ResourceRegistry.
+//          (textures, fonts, sounds) on top of ResourceRegistry.
 // Used by: Game, ECS systems (PlayerInitSystem, DebugOverlaySystem, UI, etc.)
-// Related headers: texture_resource.h, font_resource.h, soundbuffer_resource.h, resource_holder.h
+// Related headers: texture_resource.h, font_resource.h, soundbuffer_resource.h, resource_registry.h
 // Notes:
 //  - Must be called once at boot.
 // ================================================================================================
@@ -13,11 +13,13 @@
 #include <cstdint>
 #include <memory>
 #include <span>
-#include <string>
 #include <string_view>
 #include <vector>
 
-#include "core/resources/holders/resource_holder.h"
+#if defined(SFML1_TESTS)
+    #include <filesystem>
+#endif
+
 #include "core/resources/keys/resource_key.h"
 #include "core/resources/registry/resource_registry.h"
 #include "core/resources/types/font_resource.h"
@@ -28,7 +30,7 @@ namespace core::resources {
 
     /**
      * @brief Высокоуровневый фасад ресурсного слоя.
-     * 
+     *
      *  - Key-world API (RuntimeKey32) — целевой путь: O(1) доступ по key.index()
      *    через векторные кэши.
      */
@@ -104,33 +106,14 @@ namespace core::resources {
         [[nodiscard]] FontKey missingFontKey() const noexcept;
 
         // ----------------------------------------------------------------------------------------
-        // Динамические пути (escape hatch)
-        // ----------------------------------------------------------------------------------------
-
-        /// Получить текстуру по динамическому строковому идентификатору.
-        const types::TextureResource& getTexture(const std::string& id);
-
-        /// Получить текстуру по явному пути к файлу (escape hatch).
-        const types::TextureResource& getTextureByPath(const std::string& path);
-
-        /// Получить шрифт по динамическому строковому идентификатору.
-        const types::FontResource& getFont(const std::string& id);
-
-        /// Получить звуковой буфер по динамическому строковому идентификатору.
-        const types::SoundBufferResource& getSound(const std::string& id);
-
-        // ----------------------------------------------------------------------------------------
         // Метрики
         // ----------------------------------------------------------------------------------------
 
-        /// Статистика по загруженным ресурсам.
+        /// Статистика по загруженным ресурсам key-world.
         struct ResourceMetrics {
             std::size_t textureCount = 0;
-            std::size_t dynamicTextureCount = 0;
             std::size_t fontCount = 0;
-            std::size_t dynamicFontCount = 0;
             std::size_t soundCount = 0;
-            std::size_t dynamicSoundCount = 0;
         };
 
         [[nodiscard]] ResourceMetrics getMetrics() const noexcept;
@@ -148,12 +131,9 @@ namespace core::resources {
         void preloadAllSoundsByRegistry();
 
         // ----------------------------------------------------------------------------------------
-        // Управление жизненным циклом ресурсов (key caches + dynamic holders)
+        // Key-world cache control
         // ----------------------------------------------------------------------------------------
 
-        void unloadTexture(const std::string& id) noexcept;
-        void unloadFont(const std::string& id) noexcept;
-        void unloadSound(const std::string& id) noexcept;
         void clearAll() noexcept;
 
       private:
@@ -164,34 +144,30 @@ namespace core::resources {
         ResourceRegistry mRegistry;
         bool mInitialized = false;
 
+        // Примечание:
+        //  - Кэши хранят ptr для ленивой загрузки и будущего streaming/eviction.
+        //  - Если позже появится churn/фрагментация — переоценить layout (slot/pool/in-place).
         std::vector<std::unique_ptr<types::TextureResource>> mTextureCache;
         std::vector<std::unique_ptr<types::FontResource>> mFontCache;
         std::vector<std::unique_ptr<types::SoundBufferResource>> mSoundCache;
 
         // Состояния загрузки:
         //  - Texture/Font: 0 = not attempted, 1 = loaded (Type A => ошибка загрузки = PANIC).
-        //  - Sound:        0 = not attempted, 1 = loaded, 2 = failed
-        //    (soft-fail, больше не пробуем).
+        //  - Sound:        0 = not attempted, 1 = loaded, 2 = failed (soft-fail, stop retries).
         std::vector<std::uint8_t> mTextureState;
         std::vector<std::uint8_t> mFontState;
         std::vector<std::uint8_t> mSoundState;
 
         TextureKey mMissingTextureKey{};
         FontKey mMissingFontKey{};
-
-        // Dynamic holders (string keys/paths).
-        holders::ResourceHolder<types::TextureResource, std::string> mDynamicTextures;
-        holders::ResourceHolder<types::FontResource, std::string> mDynamicFonts;
-        holders::ResourceHolder<types::SoundBufferResource, std::string> mDynamicSounds;
-
     };
 
 #if defined(SFML1_TESTS)
     namespace resource_manager::test {
         // Важно: без имён параметров — меньше шанс словить макро/парсинг-коллизии.
-        using TextureLoadFn = bool (*)(types::TextureResource&, std::string_view);
-        using FontLoadFn = bool (*)(types::FontResource&, std::string_view);
-        using SoundLoadFn = bool (*)(types::SoundBufferResource&, std::string_view);
+        using TextureLoadFn = bool (*)(types::TextureResource&, const std::filesystem::path&);
+        using FontLoadFn = bool (*)(types::FontResource&, const std::filesystem::path&);
+        using SoundLoadFn = bool (*)(types::SoundBufferResource&, const std::filesystem::path&);
 
         void setTextureLoadFn(TextureLoadFn fn) noexcept;
         void resetTextureLoadFn() noexcept;

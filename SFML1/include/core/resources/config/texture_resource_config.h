@@ -1,6 +1,6 @@
 // ================================================================================================
 // File: core/resources/config/texture_resource_config.h
-// Purpose: Data-only configuration for texture resources (path + low-level GPU flags)
+// Purpose: Data-only low-level flags; file path is stored in ResourceEntry::path
 // Used by: ResourceRegistry, ResourceManager, tools
 // Notes:
 //  - Describes how a texture should be loaded and configured at resource level.
@@ -8,14 +8,11 @@
 // ================================================================================================
 #pragma once
 
-#include <string>
-
 namespace core::resources::config {
 
     /**
      * @brief Конфигурация текстурного ресурса.
      *
-     * path           — путь к файлу на диске;
      * smooth         — сглаживание (антиалиасинг, мыльность);
      * repeated       — режим повтора (tiling) для тайлов/фонов;
      * generateMipmap — нужно ли генерировать mipmap для дальних планов.
@@ -23,8 +20,6 @@ namespace core::resources::config {
      * Эти флаги относятся к уровню ресурса (sf::Texture), а не к уровню сущности/игры.
      */
     struct TextureResourceConfig {
-        std::string path;
-
         bool smooth = true;
         bool repeated = false;
         bool generateMipmap = false;
