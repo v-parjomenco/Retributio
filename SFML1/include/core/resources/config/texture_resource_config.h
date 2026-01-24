@@ -16,6 +16,7 @@ namespace core::resources::config {
      * smooth         — сглаживание (антиалиасинг, мыльность);
      * repeated       — режим повтора (tiling) для тайлов/фонов;
      * generateMipmap — нужно ли генерировать mipmap для дальних планов.
+     * srgb           — трактовать текстуру как sRGB (true для color-данных).
      *
      * Эти флаги относятся к уровню ресурса (sf::Texture), а не к уровню сущности/игры.
      */
@@ -23,6 +24,7 @@ namespace core::resources::config {
         bool smooth = true;
         bool repeated = false;
         bool generateMipmap = false;
+        bool srgb = true;
     };
 
 } // namespace core::resources::config

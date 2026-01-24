@@ -165,7 +165,8 @@ namespace core::resources {
 #if defined(SFML1_TESTS)
     namespace resource_manager::test {
         // Важно: без имён параметров — меньше шанс словить макро/парсинг-коллизии.
-        using TextureLoadFn = bool (*)(types::TextureResource&, const std::filesystem::path&);
+        using TextureLoadFn = bool (*)(types::TextureResource&, const std::filesystem::path&,
+                                       bool sRgb);
         using FontLoadFn = bool (*)(types::FontResource&, const std::filesystem::path&);
         using SoundLoadFn = bool (*)(types::SoundBufferResource&, const std::filesystem::path&);
 

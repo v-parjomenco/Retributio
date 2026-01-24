@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <utility>
 
+#include <SFML/Window/ContextSettings.hpp>
 #include <SFML/Window/VideoMode.hpp>
 
 #include "core/log/log_macros.h"
@@ -75,6 +76,21 @@ namespace game::skyguard::presentation {
             mTitle = "SkyGuard";
         }
 
+        // ВАЖНО: не запрашиваем Core Profile/атрибуты контекста — 
+        // SFML Graphics требует compatibility.
+        // Здесь просим только sRGB-capable framebuffer.
+        const sf::ContextSettings srgbContextSettings{
+            .sRgbCapable = true
+        };
+
+        const auto logSrgbAvailability = [&window]() {
+            const auto& used = window.getSettings();
+            if (!used.sRgbCapable) {
+                LOG_WARN(core::log::cat::Engine,
+                         "sRGB framebuffer not available; sRGB textures may look incorrect");
+            }
+        };
+
         // При уходе из Windowed сохраняем размер/позицию для восстановления.
         if (mMode == config::WindowMode::Windowed && newMode != config::WindowMode::Windowed) {
             mSavedWindowed.size = window.getSize();
@@ -87,7 +103,11 @@ namespace game::skyguard::presentation {
         if (newMode == config::WindowMode::BorderlessFullscreen) {
             const sf::VideoMode mode({desktop.size.x, desktop.size.y}, desktop.bitsPerPixel);
 
-            window.create(mode, mTitle, sf::Style::None, sf::State::Windowed);
+            window.create(mode,
+                          mTitle,
+                          sf::Style::None,
+                          sf::State::Windowed,
+                          srgbContextSettings);
             window.setPosition({0, 0});
 
             if (!window.isOpen()) {
@@ -98,6 +118,7 @@ namespace game::skyguard::presentation {
                 return false;
             }
 
+            logSrgbAvailability();
             mMode = newMode;
             return true;
         }
@@ -105,7 +126,11 @@ namespace game::skyguard::presentation {
         if (newMode == config::WindowMode::Fullscreen) {
             const sf::VideoMode mode({desktop.size.x, desktop.size.y}, desktop.bitsPerPixel);
 
-            window.create(mode, mTitle, sf::Style::Default, sf::State::Fullscreen);
+            window.create(mode, 
+                          mTitle, 
+                          sf::Style::Default, 
+                          sf::State::Fullscreen,
+                          srgbContextSettings);
 
             if (!window.isOpen()) {
                 LOG_ERROR(core::log::cat::Engine,
@@ -115,6 +140,7 @@ namespace game::skyguard::presentation {
                 return false;
             }
 
+            logSrgbAvailability();
             mMode = newMode;
             return true;
         }
@@ -137,7 +163,11 @@ namespace game::skyguard::presentation {
 
             const sf::VideoMode mode({clampedClient.x, clampedClient.y}, desktop.bitsPerPixel);
 
-            window.create(mode, mTitle, sf::Style::Default, sf::State::Windowed);
+            window.create(mode, 
+                          mTitle, 
+                          sf::Style::Default, 
+                          sf::State::Windowed,
+                          srgbContextSettings);
 
             if (!window.isOpen()) {
                 LOG_ERROR(core::log::cat::Engine,
@@ -147,6 +177,7 @@ namespace game::skyguard::presentation {
                 return false;
             }
 
+            logSrgbAvailability();
             // Позиционирование:
             //  - если есть сохранённая позиция — клампим её в work area;
             //  - иначе — ставим в левый верх work area.

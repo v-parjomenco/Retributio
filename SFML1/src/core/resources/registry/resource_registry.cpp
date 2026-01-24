@@ -312,9 +312,10 @@ namespace core::resources {
                 }
 #endif
                 config::TextureResourceConfig cfg{};
-                cfg.smooth = readBooleanWithDefault(value, "smooth", false, key);
+                cfg.smooth = readBooleanWithDefault(value, "smooth", true, key);
                 cfg.repeated = readBooleanWithDefault(value, "repeated", false, key);
                 cfg.generateMipmap = readBooleanWithDefault(value, "mipmap", false, key);
+                cfg.srgb = readBooleanWithDefault(value, "srgb", true, key);
 
                 ResourceDefinition<config::TextureResourceConfig> def{};
                 def.name = strings.intern(key);

@@ -60,6 +60,13 @@ namespace core::resources::types {
             return mTexture.loadFromFile(filename);
         }
 
+        /// @brief Загрузка всей текстуры из файла с управлением sRGB.
+        ///
+        /// Эквивалентно sf::Texture::loadFromFile(path, sRgb, area) с area = {}.
+        [[nodiscard]] bool loadFromFile(const std::filesystem::path& filename, bool sRgb) {
+            return loadFromFile(filename, sRgb, sf::IntRect{});
+        }
+
         /// @brief Загрузка части текстуры с управлением sRGB.
         ///
         /// Соответствует sf::Texture::loadFromFile(path, sRgb, area) в SFML 3.

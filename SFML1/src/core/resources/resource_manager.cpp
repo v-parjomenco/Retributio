@@ -27,8 +27,9 @@ namespace core::resources {
 #endif
 
         [[nodiscard]] bool loadTextureFromFile(types::TextureResource& out,
-                                               const std::filesystem::path& path) {
-            return out.loadFromFile(path);
+                                               const std::filesystem::path& path,
+                                               bool sRgb) {
+            return out.loadFromFile(path, sRgb, sf::IntRect{});
         }
 
         [[nodiscard]] bool loadFontFromFile(types::FontResource& out,
@@ -48,11 +49,12 @@ namespace core::resources {
 #endif
 
         [[nodiscard]] bool loadTexture(types::TextureResource& out, 
-                                       const std::filesystem::path& path) {
+                                       const std::filesystem::path& path,
+                                       bool sRgb) {
 #if defined(SFML1_TESTS)
-            return gTextureLoadFn(out, path);
+            return gTextureLoadFn(out, path, sRgb);
 #else
-            return loadTextureFromFile(out, path);
+            return loadTextureFromFile(out, path, sRgb);
 #endif
         }
 
@@ -182,7 +184,7 @@ namespace core::resources {
         auto resource = std::make_unique<types::TextureResource>();
         const std::filesystem::path filePath = toPath(entry.path);
 
-        if (!loadTexture(*resource, filePath)) {
+        if (!loadTexture(*resource, filePath, entry.config.srgb)) {
             // Type A: любая ошибка загрузки текстуры — фатальна.
             LOG_PANIC(core::log::cat::Resources,
                       "[ResourceManager::getTexture(TextureKey)] "

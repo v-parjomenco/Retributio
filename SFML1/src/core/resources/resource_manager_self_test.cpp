@@ -33,7 +33,9 @@ namespace core::resources::self_test {
 
         bool gFailSoundByPath = false;
 
-        bool textureStub(types::TextureResource&, const std::filesystem::path&) {
+        bool textureStub(types::TextureResource&,
+                         const std::filesystem::path&,
+                         bool) {
             if (gCounters != nullptr) {
                 ++gCounters->texture;
             }

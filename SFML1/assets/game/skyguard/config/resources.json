@@ -5,19 +5,22 @@
       "path": "assets/core/textures/placeholders/missing_texture.png",
       "smooth": false,
       "repeated": false,
-      "mipmap": false
+      "mipmap": false,
+      "srgb": true
     },
     "skyguard.sprite.player": {
       "path": "assets/game/skyguard/textures/0000su57.png",
       "smooth": true,
       "repeated": false,
-      "mipmap": false
+      "mipmap": true,
+      "srgb": true
     },
     "skyguard.background.desert": {
       "path": "assets/game/skyguard/textures/backgrounds/desert_tile.png",
       "smooth": true,
       "repeated": true,
-      "mipmap": false
+      "mipmap": false,
+      "srgb": true
     }
   },
   "fonts": {
