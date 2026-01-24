@@ -503,67 +503,67 @@ namespace game::skyguard {
 
     void Game::renderUiPass() {
         mWindow.setView(mViewManager.getUiView());
-        if (mDebugOverlay) {
+        if (!mDebugOverlay) {
+            return;
+        }
 
     #if !defined(NDEBUG) || defined(SFML1_PROFILE)
-            // Важно для Profile: если overlay выключен — 
-            // не тратим CPU на форматирование extra-строк.
-            if (mDebugOverlay->isEnabled()) {
-                mDebugOverlay->clearExtraText();
+        // Важно для Profile: если overlay выключен — не тратим CPU на форматирование extra-строк.
+        if (mDebugOverlay->isEnabled()) {
+            mDebugOverlay->clearExtraText();
 
-                // Background line (Debug/Profile)
+            // Background line (Debug/Profile)
+            {
                 std::array<char, 256> extraBuffer{};
-                const auto& bgStats = mBackgroundRenderer.getLastFrameStats();
-                const std::size_t extraSize =
-                    utils::formatBackgroundStatsLine(extraBuffer.data(),
-                                                     extraBuffer.size(),
-                                                     bgStats);
+                const std::size_t extraSize = utils::formatBackgroundStatsLine(
+                    extraBuffer.data(), extraBuffer.size(), mBackgroundRenderer);
 
                 // Если обрезали строку — увеличь буфер или сократи формат.
-                // (extraSize == cap) означает, что места могло не хватить)
                 assert(extraSize < extraBuffer.size() &&
-                       "Game::renderUiPass: background debug line truncated. Increase extraBuffer.");
+                       "Game::renderUiPass: background debug line truncated. "
+                       "Increase extraBuffer.");
+
                 if (extraSize > 0) {
                     mDebugOverlay->appendExtraLine(std::string_view(extraBuffer.data(), extraSize));
                 }
+            }
 
         #if !defined(NDEBUG)
-                // Camera line (Debug only; Profile stays release-like)
-                {
-                    auto view = mWorld.view<
-                        game::skyguard::ecs::LocalPlayerTagComponent,
-                        core::ecs::TransformComponent
-                    >();
+            // Camera line (Debug only)
+            {
+                auto view = mWorld.view<
+                    game::skyguard::ecs::LocalPlayerTagComponent,
+                    core::ecs::TransformComponent
+                >();
 
-                    const auto it = view.begin();
-                    if (it != view.end()) {
-                        const core::ecs::Entity e = *it;
-                        const auto& tr = view.get<core::ecs::TransformComponent>(e);
+                const auto it = view.begin();
+                if (it != view.end()) {
+                    const core::ecs::Entity e = *it;
+                    const auto& tr = view.get<core::ecs::TransformComponent>(e);
 
-                        std::array<char, 256> camBuf{};
-                        const auto& vw = mViewManager.getWorldView();
-                        const sf::Vector2f off = mViewManager.getCameraOffset();
+                    std::array<char, 256> camBuf{};
+                    const auto& vw = mViewManager.getWorldView();
+                    const sf::Vector2f off = mViewManager.getCameraOffset();
 
-                        const std::size_t camSize =
-                            utils::formatCameraStatsLine(camBuf.data(), camBuf.size(),
-                                                         tr.position.y,
-                                                         vw.getCenter().y,
-                                                         vw.getSize().y,
-                                                         off.y,
-                                                         mViewManager.getCameraCenterYMax());
+                    const std::size_t camSize =
+                        utils::formatCameraStatsLine(camBuf.data(), camBuf.size(),
+                                                     tr.position.y,
+                                                     vw.getCenter().y,
+                                                     vw.getSize().y,
+                                                     off.y,
+                                                     mViewManager.getCameraCenterYMax());
 
-                        if (camSize > 0) {
-                            mDebugOverlay->appendExtraLine(
-                                std::string_view(camBuf.data(), camSize));
-                        }
+                    if (camSize > 0) {
+                        mDebugOverlay->appendExtraLine(std::string_view(camBuf.data(), camSize));
                     }
                 }
-        #endif
             }
-    #endif
-            mDebugOverlay->prepareFrame(mWorld);
-            mDebugOverlay->draw(mWindow);
+        #endif
         }
+    #endif
+
+        mDebugOverlay->prepareFrame(mWorld);
+        mDebugOverlay->draw(mWindow);    
     }
 
 } // namespace game::skyguard

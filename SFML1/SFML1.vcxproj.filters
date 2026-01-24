@@ -423,6 +423,12 @@
     <ClCompile Include="src\game\skyguard\ecs\systems\player_init_system.cpp">
       <Filter>src\game\skyguard\ecs\systems</Filter>
     </ClCompile>
+    <ClCompile Include="src\game\skyguard\presentation\background_math_self_test.cpp">
+      <Filter>src\game\skyguard\presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\skyguard\utils\debug_format.cpp">
+      <Filter>src\game\skyguard\utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\resources\resource_manager.h">
@@ -736,6 +742,9 @@
     </ClInclude>
     <ClInclude Include="include\adapters\xxhash\xxhash.h">
       <Filter>include\adapters\xxhash</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\presentation\background_math.h">
+      <Filter>include\game\skyguard\presentation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

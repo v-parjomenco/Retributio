@@ -9,8 +9,11 @@
 #include <cstdint>
 #include <cstring>
 #include <string_view>
+#include <system_error> // std::errc
 
-#include "game/skyguard/presentation/background_renderer.h"
+namespace game::skyguard::presentation {
+    class BackgroundRenderer;
+}
 
 namespace game::skyguard::utils {
 
@@ -26,8 +29,7 @@ namespace game::skyguard::utils {
             return true;
         }
 
-        template <typename T>
-        inline bool appendNumber(char*& it, char* end, T value) noexcept {
+        template <typename T> inline bool appendNumber(char*& it, char* end, T value) noexcept {
             auto [ptr, ec] = std::to_chars(it, end, value);
             if (ec != std::errc{}) {
                 return false;
@@ -67,78 +69,18 @@ namespace game::skyguard::utils {
 
     } // namespace detail
 
-    [[nodiscard]] inline std::size_t formatBackgroundStatsLine(
-        char* buf,
-        std::size_t cap,
-        const presentation::BackgroundRenderer::BackgroundStats& stats) noexcept {
-        if (cap == 0) {
-            return 0;
-        }
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
 
-        char* it = buf;
-        char* end = buf + cap;
+    [[nodiscard]] std::size_t
+    formatBackgroundStatsLine(char* buf, std::size_t cap,
+                              const presentation::BackgroundRenderer& backgroundRenderer) noexcept;
 
-        if (!detail::appendLiteral(it, end, "Background: tiles ")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendNumber(it, end, stats.tilesCovered)) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, "  draws ")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendNumber(it, end, stats.drawCalls)) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, "  tile ")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendNumber(it, end, stats.tileSize.x)) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, "x")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendNumber(it, end, stats.tileSize.y)) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, "  view ")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendNumber(it, end,
-                                  static_cast<std::uint32_t>(stats.visibleRect.size.x))) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, "x")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendNumber(it, end,
-                                  static_cast<std::uint32_t>(stats.visibleRect.size.y))) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, "  pos ")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendNumber(it, end,
-                                  static_cast<std::int32_t>(stats.visibleRect.position.x))) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, ",")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendNumber(it, end,
-                                  static_cast<std::int32_t>(stats.visibleRect.position.y))) {
-            return static_cast<std::size_t>(it - buf);
-        }
-
-        return static_cast<std::size_t>(it - buf);
-    }
+#endif
 
     [[nodiscard]] inline std::size_t formatCameraStatsLine(char* buf, std::size_t cap,
                                                            float playerY, float viewCenterY,
                                                            float viewSizeY, float cameraOffsetY,
                                                            float cameraCenterYMax) noexcept {
-
         if (cap == 0) {
             return 0;
         }
@@ -146,30 +88,40 @@ namespace game::skyguard::utils {
         char* it = buf;
         char* end = buf + cap;
 
-        if (!detail::appendLiteral(it, end, "Camera: playerY "))
+        if (!detail::appendLiteral(it, end, "Camera: playerY ")) {
             return static_cast<std::size_t>(it - buf);
-        if (!detail::appendFixed2(it, end, playerY))
+        }
+        if (!detail::appendFixed2(it, end, playerY)) {
             return static_cast<std::size_t>(it - buf);
+        }
 
-        if (!detail::appendLiteral(it, end, "  centerY "))
+        if (!detail::appendLiteral(it, end, "  centerY ")) {
             return static_cast<std::size_t>(it - buf);
-        if (!detail::appendFixed2(it, end, viewCenterY))
+        }
+        if (!detail::appendFixed2(it, end, viewCenterY)) {
             return static_cast<std::size_t>(it - buf);
+        }
 
-        if (!detail::appendLiteral(it, end, "  sizeY "))
+        if (!detail::appendLiteral(it, end, "  sizeY ")) {
             return static_cast<std::size_t>(it - buf);
-        if (!detail::appendFixed2(it, end, viewSizeY))
+        }
+        if (!detail::appendFixed2(it, end, viewSizeY)) {
             return static_cast<std::size_t>(it - buf);
+        }
 
-        if (!detail::appendLiteral(it, end, "  offsetY "))
+        if (!detail::appendLiteral(it, end, "  offsetY ")) {
             return static_cast<std::size_t>(it - buf);
-        if (!detail::appendFixed2(it, end, cameraOffsetY))
+        }
+        if (!detail::appendFixed2(it, end, cameraOffsetY)) {
             return static_cast<std::size_t>(it - buf);
+        }
 
-        if (!detail::appendLiteral(it, end, "  maxY "))
+        if (!detail::appendLiteral(it, end, "  maxY ")) {
             return static_cast<std::size_t>(it - buf);
-        if (!detail::appendFixed2(it, end, cameraCenterYMax))
+        }
+        if (!detail::appendFixed2(it, end, cameraCenterYMax)) {
             return static_cast<std::size_t>(it - buf);
+        }
 
         return static_cast<std::size_t>(it - buf);
     }
