@@ -70,7 +70,13 @@ namespace core::spatial {
 
     void SpatialIndex::query(const Aabb2& area, std::vector<core::ecs::Entity>& out) const {
         const CellRange range = computeCellRange(area);
-
+        // Query-stamp дедупликация без очистки массива меток на каждый вызов:
+        // mQueryMarks[handle] == mQueryStamp => 
+        // handle уже добавляли в out в рамках текущего query().
+        // Это сохраняет hot-path O(кол-во посещённых handle), без O(N) std::fill каждый запрос.
+        //
+        // Переполнение u32 (wrap в 0): 0 зарезервирован как "не отмечено",
+        // поэтому при переходе stamp в 0 один раз очищаем все метки и продолжаем со stamp = 1.
         if (++mQueryStamp == 0) {
             std::fill(mQueryMarks.begin(), mQueryMarks.end(), 0u);
             mQueryStamp = 1;

@@ -180,6 +180,9 @@ namespace core::time {
         }
 
         /// @brief Минимальный FPS за сессию (с момента reset()).
+        ///
+        /// Если после reset() ещё не было ни одного валидного измерения (tick() не вызывался),
+        /// возвращает 0.f как "нет данных", а не как фактическую просадку FPS до нуля.
         [[nodiscard]] float getMinFps() const noexcept {
             return (mMinFps == std::numeric_limits<float>::max()) ? 0.f : mMinFps;
         }
