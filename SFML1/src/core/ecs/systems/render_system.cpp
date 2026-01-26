@@ -16,9 +16,9 @@
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/world.h"
 #include "core/log/log_macros.h"
-#include "core/resources/resource_manager.h" // mResources->getTexture()
+#include "core/resources/resource_manager.h" // resident-only access (expectTextureResident)
 #include "core/spatial/aabb2.h"
-#include "core/spatial/spatial_index.h" // mSpatialIndex->query()
+#include "core/spatial/spatial_index.h"      // mSpatialIndex->query()
 #include "core/utils/math_constants.h"
 
 namespace {

@@ -307,6 +307,12 @@
     <Filter Include="include\adapters\xxhash">
       <UniqueIdentifier>{a397930f-088c-4708-8448-509525356edf}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\game\skyguard\bootstrap">
+      <UniqueIdentifier>{640ddce0-2b32-4412-a148-ce0ca0af338e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\bootstrap">
+      <UniqueIdentifier>{b42c41e9-8b44-4037-ba98-28ff83090388}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -428,6 +434,9 @@
     </ClCompile>
     <ClCompile Include="src\game\skyguard\utils\debug_format.cpp">
       <Filter>src\game\skyguard\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\skyguard\bootstrap\scene_bootstrap.cpp">
+      <Filter>src\game\skyguard\bootstrap</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -745,6 +754,9 @@
     </ClInclude>
     <ClInclude Include="include\game\skyguard\presentation\background_math.h">
       <Filter>include\game\skyguard\presentation</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\bootstrap\scene_bootstrap.h">
+      <Filter>include\game\skyguard\bootstrap</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -28,6 +28,7 @@
 #include "core/resources/registry/resource_registry.h"
 #include "core/time/time_config.h"
 
+#include "game/skyguard/bootstrap/scene_bootstrap.h"
 #include "game/skyguard/config/config_paths.h"
 #include "game/skyguard/config/loader/app_config_loader.h"
 #include "game/skyguard/config/loader/config_loader.h"
@@ -43,7 +44,7 @@
 #include "game/skyguard/presentation/view_manager.h"
 #include "game/skyguard/utils/debug_format.h"
 
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+#if defined(SFML1_PROFILE)
     #include "game/skyguard/dev/stress_scene.h"
 #endif
 
@@ -183,68 +184,23 @@ namespace game::skyguard {
         players.emplace_back(std::move(playerCfg));
 
         // ----------------------------------------------------------------------------------------
-        // Резолвим ключи сцены и делаем preload ДО создания систем/сущностей.
-        // Это гарантирует: render никогда не делает I/O, а забытый preload ловится как PANIC.
+        // Scene bootstrap: resolve keys + preload + derived sprite data (validate-on-write).
+        // Game остаётся дирижёром: реализация подготовки сцены вынесена в bootstrap-модуль.
         // ----------------------------------------------------------------------------------------
+        game::skyguard::bootstrap::SceneBootstrapConfig bootCfg{
+            .players = std::span(players)
+        };
 
-        const core::resources::FontKey fontKey =
-            mResources.findFont("core.font.default");
-        if (!fontKey.valid()) {
-            LOG_PANIC(core::log::cat::Config,
-                      "Game::initWorld: missing font key 'core.font.default'.");
-        }
-
-        const core::resources::TextureKey backgroundKey =
-            mResources.findTexture("skyguard.background.desert");
-        if (!backgroundKey.valid()) {
-            LOG_PANIC(core::log::cat::Config,
-                      "Game::initWorld: missing background texture 'skyguard.background.desert'.");
-        }
-
-        // Сбор набора текстур для прелоада. Максимум: фон + 2 игрока + stress (DEV/PROFILE).
-        std::array<core::resources::TextureKey, 4> sceneTextures{};
-        std::size_t sceneTextureCount = 0;
-        sceneTextures[sceneTextureCount++] = backgroundKey;
-
-        // Игроки (SkyGuard max 2).
-        for (const auto& p : players) {
-            sceneTextures[sceneTextureCount++] = p.sprite.texture;
-        }
-
-        // DEV/PROFILE: стресс-сцена использует текстуру игрока.
-        // (Если ключ совпадёт — лишний preload не страшен: resident-ветка O(1)).
-        std::optional<core::resources::TextureKey> stressPlayerKey;
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
-        {
-            const core::resources::TextureKey playerKey =
-                mResources.findTexture("skyguard.sprite.player");
-            if (!playerKey.valid()) {
-                LOG_PANIC(core::log::cat::Config,
-                          "Game::initWorld: missing player texture 'skyguard.sprite.player'.");
-            }
-            stressPlayerKey = playerKey;
-
-            if (sceneTextureCount < sceneTextures.size()) {
-                sceneTextures[sceneTextureCount++] = playerKey;
-            }
-        }
-#endif
-
-        // Preload сцены (textures/fonts). Sounds в SkyGuard пока не используются.
-        mResources.preloadTextures(std::span<const core::resources::TextureKey>(
-            sceneTextures.data(), sceneTextureCount));
-        {
-            const std::array<core::resources::FontKey, 1> fonts{fontKey};
-            mResources.preloadFonts(fonts);
-        }
+        const game::skyguard::bootstrap::SceneBootstrapResult boot =
+            game::skyguard::bootstrap::preloadAndResolveInitialScene(mResources, bootCfg);
 
         // ----------------------------------------------------------------------------------------
         // Подключаем ECS-системы (порядок важен для update/render)
         // ----------------------------------------------------------------------------------------
 
         // PlayerInitSystem сам создаёт сущности на первом тике и больше не работает.
-        mWorld.addSystem<game::skyguard::ecs::PlayerInitSystem>(
-            mResources, std::move(players));
+        // ВАЖНО: система строго data-only (без ResourceManager): все derived поля уже resolved.
+        mWorld.addSystem<game::skyguard::ecs::PlayerInitSystem>(std::move(players));
 
         // ВАЖНО: AircraftControl должен обновляться ДО Movement, т.к. пишет VelocityComponent,
         // а Movement читает VelocityComponent в этом же тике.
@@ -268,10 +224,10 @@ namespace game::skyguard {
         // поэтому сохраняем указатели.
         mDebugOverlay = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
 
-        // Привязываем оверлей к сервису времени и шрифту (через ResourceManager).
+        // Привязываем оверлей к сервису времени и шрифту (resident-only).
         // Важно: ресурсы резолвим один раз при старте, не в hot-path.
         {
-            const sf::Font& font = mResources.getFont(fontKey).get();
+            const sf::Font& font = mResources.expectFontResident(boot.defaultFontKey).get();
 
             mDebugOverlay->bind(mTime, font);
             mDebugOverlay->setRenderSystem(mRenderSystem);
@@ -286,18 +242,24 @@ namespace game::skyguard {
             // Политика дефолтного состояния оверлея при старте:
             //  - overlayCfg.enabled может ОТКЛЮЧИТЬ оверлей по умолчанию;
             //  - dbg::SHOW_FPS_OVERLAY — compile-time флаг (Debug/Profile: true, Release: false).
-            // 
+            //
             // ВАЖНО: при формуле ниже JSON не может "включить оверлей в Release на старте",
             // потому что compile-time флаг сильнее. Но хоткей F3 (dbg::HOTKEY_TOGGLE_OVERLAY)
             // всё равно позволяет включить оверлей в рантайме в любой сборке.
             mDebugOverlay->setEnabled(overlayCfg.enabled && dbg::SHOW_FPS_OVERLAY);
         }
 
-        mBackgroundRenderer.init(mResources, backgroundKey);
+        // BackgroundRenderer: resident-only + generation-safe cache.
+        mBackgroundRenderer.init(mResources, boot.backgroundKey);
 
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+#if defined(SFML1_PROFILE)
         // Только DEV/PROFILE: стресс-сцена через ENV.
-        const core::resources::TextureKey playerKey = stressPlayerKey.value();
+        if (!boot.stressPlayerKey.has_value()) {
+            LOG_PANIC(core::log::cat::Config,
+                      "Game::initWorld: stressPlayerKey must be resolved in DEV/PROFILE builds.");
+        }
+
+        const core::resources::TextureKey playerKey = *boot.stressPlayerKey;
         game::skyguard::dev::trySpawnStressSpritesFromEnv(
             mWorld, mResources, playerKey);
 #endif
@@ -340,7 +302,7 @@ namespace game::skyguard {
         while (mWindow.isOpen()) {
             // Обновляем время кадра (raw dt, scaled dt, FPS/метрики).
             mTime.tick();
-            
+
             // Обрабатываем события окна и ввода.
             processEvents();
 
@@ -387,7 +349,7 @@ namespace game::skyguard {
                 //   Windowed -> BorderlessFullscreen -> Fullscreen -> Windowed.
                 //
                 // TODO (когда появится меню настроек):
-                //  - Alt+Enter оставить как Windowed <-> Borderless 
+                //  - Alt+Enter оставить как Windowed <-> Borderless
                 //    (или Windowed <-> LastFullscreenMode),
                 //  - Exclusive Fullscreen включать только через меню.
                 if (keyPressed->alt && keyPressed->code == sf::Keyboard::Key::Enter) {
@@ -397,7 +359,7 @@ namespace game::skyguard {
 
                 mAircraftControlSystem->onKeyEvent(keyPressed->code, true);
 
-                // Debug overlay toggle: хоткей работает во всех сборках (Debug/Release/Profile).
+                // Debug overlay toggle: хоткей работает во всех сборках.
                 // Политика: хоткей ВСЕГДА активен, независимо от дефолтного состояния overlay
                 // при старте.
                 if (keyPressed->code == dbg::HOTKEY_TOGGLE_OVERLAY) {
@@ -431,16 +393,16 @@ namespace game::skyguard {
                     }
                 }
 #endif
-            } 
+            }
             // Отпускание клавиш.
             else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) {
                 mAircraftControlSystem->onKeyEvent(keyReleased->code, false);
-            } 
+            }
             // Потеря фокуса: сбрасываем ввод, чтобы не залипали клавиши при Alt-Tab.
-            // Также сбрасываем состояние управления самолетом.            
+            // Также сбрасываем состояние управления самолетом.
             else if (event->is<sf::Event::FocusLost>()) {
                 mAircraftControlSystem->resetState();
-            } 
+            }
             // Изменение размера окна.
             else if (const auto* resized = event->getIf<sf::Event::Resized>()) {
                 const sf::Vector2u newSize{resized->size.x, resized->size.y};
@@ -605,7 +567,7 @@ namespace game::skyguard {
     #endif
 
         mDebugOverlay->prepareFrame(mWorld);
-        mDebugOverlay->draw(mWindow);    
+        mDebugOverlay->draw(mWindow);
     }
 
 } // namespace game::skyguard

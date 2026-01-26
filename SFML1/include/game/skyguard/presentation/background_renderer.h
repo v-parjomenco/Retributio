@@ -32,6 +32,11 @@ namespace game::skyguard::presentation {
      *  - НЕ ECS-система.
      *  - Использует повторяемую текстуру из ResourceManager.
      *  - Рисуется в world-pass до игровых сущностей.
+     *
+     * ВАЖНО (cache invalidation):
+     *  - BackgroundRenderer кэширует raw pointer на sf::Texture.
+     *  - При clearAll()/hot-reload ResourceManager может пересоздать sf::Texture,
+     *    поэтому кэш должен быть защищён cacheGeneration() (как в RenderSystem).
      */
     class BackgroundRenderer {
       public:
@@ -42,6 +47,7 @@ namespace game::skyguard::presentation {
             sf::FloatRect visibleRect{};
             float parallaxFactor{1.0f};
         };
+
         void init(core::resources::ResourceManager& resources,
                   core::resources::TextureKey texture);
 
@@ -55,6 +61,12 @@ namespace game::skyguard::presentation {
 #endif
 
       private:
+        // Внешние зависимости (lifetime managed externally)
+        const core::resources::ResourceManager* mResources{nullptr};
+        core::resources::TextureKey mTextureKey{};
+        std::uint32_t mCachedResourceGen{0};
+
+        // Кэш SFML-ресурса (invalidation через cacheGeneration()).
         const sf::Texture* mTexture{nullptr};
         sf::Vertex mQuad[6]{};
         sf::Vector2u mTextureSize{0u, 0u};

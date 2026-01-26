@@ -18,10 +18,6 @@ namespace core::ecs {
     class World;
 }
 
-namespace core::resources {
-    class ResourceManager;
-}
-
 namespace game::skyguard::ecs {
 
     /**
@@ -30,17 +26,17 @@ namespace game::skyguard::ecs {
      * Контракт:
      *  - Выполняется один раз (первый update), затем становится no-op.
      *  - Создаёт сущности игроков из переданных PlayerBlueprint.
-     *  - Использует ResourceManager только на этапе инициализации (не hot path).
+     *  - Строго data-only: НЕ зависит от ResourceManager и НЕ трогает SFML Texture.
+     *    Все derived sprite данные должны быть заполнены в scene bootstrap (validate-on-write).
      */
     class PlayerInitSystem final : public core::ecs::ISystem {
       public:
-        PlayerInitSystem(core::resources::ResourceManager& resources,
-                         std::vector<game::skyguard::config::blueprints::PlayerBlueprint> players);
+        explicit PlayerInitSystem(
+            std::vector<game::skyguard::config::blueprints::PlayerBlueprint> players);
 
         void update(core::ecs::World& world, float dt) override;
 
       private:
-        core::resources::ResourceManager& mResources;
         std::vector<game::skyguard::config::blueprints::PlayerBlueprint> mPlayers;
         bool mHasRun{false};
     };
