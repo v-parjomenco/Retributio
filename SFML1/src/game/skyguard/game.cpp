@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -139,6 +140,8 @@ namespace game::skyguard {
         // Создаём ECS-мир и игровые сущности SkyGuard
         // ----------------------------------------------------------------------------------------
         initWorld();
+        // После init/preload запрещаем любые lazy-load попытки (runtime contract).
+        mResources.setIoForbidden(true);
     }
 
     void Game::applyEngineSettingsToWindow() noexcept {
@@ -180,6 +183,62 @@ namespace game::skyguard {
         players.emplace_back(std::move(playerCfg));
 
         // ----------------------------------------------------------------------------------------
+        // Резолвим ключи сцены и делаем preload ДО создания систем/сущностей.
+        // Это гарантирует: render никогда не делает I/O, а забытый preload ловится как PANIC.
+        // ----------------------------------------------------------------------------------------
+
+        const core::resources::FontKey fontKey =
+            mResources.findFont("core.font.default");
+        if (!fontKey.valid()) {
+            LOG_PANIC(core::log::cat::Config,
+                      "Game::initWorld: missing font key 'core.font.default'.");
+        }
+
+        const core::resources::TextureKey backgroundKey =
+            mResources.findTexture("skyguard.background.desert");
+        if (!backgroundKey.valid()) {
+            LOG_PANIC(core::log::cat::Config,
+                      "Game::initWorld: missing background texture 'skyguard.background.desert'.");
+        }
+
+        // Сбор набора текстур для прелоада. Максимум: фон + 2 игрока + stress (DEV/PROFILE).
+        std::array<core::resources::TextureKey, 4> sceneTextures{};
+        std::size_t sceneTextureCount = 0;
+        sceneTextures[sceneTextureCount++] = backgroundKey;
+
+        // Игроки (SkyGuard max 2).
+        for (const auto& p : players) {
+            sceneTextures[sceneTextureCount++] = p.sprite.texture;
+        }
+
+        // DEV/PROFILE: стресс-сцена использует текстуру игрока.
+        // (Если ключ совпадёт — лишний preload не страшен: resident-ветка O(1)).
+        std::optional<core::resources::TextureKey> stressPlayerKey;
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        {
+            const core::resources::TextureKey playerKey =
+                mResources.findTexture("skyguard.sprite.player");
+            if (!playerKey.valid()) {
+                LOG_PANIC(core::log::cat::Config,
+                          "Game::initWorld: missing player texture 'skyguard.sprite.player'.");
+            }
+            stressPlayerKey = playerKey;
+
+            if (sceneTextureCount < sceneTextures.size()) {
+                sceneTextures[sceneTextureCount++] = playerKey;
+            }
+        }
+#endif
+
+        // Preload сцены (textures/fonts). Sounds в SkyGuard пока не используются.
+        mResources.preloadTextures(std::span<const core::resources::TextureKey>(
+            sceneTextures.data(), sceneTextureCount));
+        {
+            const std::array<core::resources::FontKey, 1> fonts{fontKey};
+            mResources.preloadFonts(fonts);
+        }
+
+        // ----------------------------------------------------------------------------------------
         // Подключаем ECS-системы (порядок важен для update/render)
         // ----------------------------------------------------------------------------------------
 
@@ -212,12 +271,6 @@ namespace game::skyguard {
         // Привязываем оверлей к сервису времени и шрифту (через ResourceManager).
         // Важно: ресурсы резолвим один раз при старте, не в hot-path.
         {
-            const core::resources::FontKey fontKey =
-                mResources.findFont("core.font.default");
-            if (!fontKey.valid()) {
-                LOG_PANIC(core::log::cat::Config,
-                          "Game::initWorld: missing font key 'core.font.default'.");
-            }
             const sf::Font& font = mResources.getFont(fontKey).get();
 
             mDebugOverlay->bind(mTime, font);
@@ -240,22 +293,11 @@ namespace game::skyguard {
             mDebugOverlay->setEnabled(overlayCfg.enabled && dbg::SHOW_FPS_OVERLAY);
         }
 
-        const core::resources::TextureKey backgroundKey =
-            mResources.findTexture("skyguard.background.desert");
-        if (!backgroundKey.valid()) {
-            LOG_PANIC(core::log::cat::Config,
-                      "Game::initWorld: missing background texture 'skyguard.background.desert'.");
-        }
         mBackgroundRenderer.init(mResources, backgroundKey);
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         // Только DEV/PROFILE: стресс-сцена через ENV.
-        const core::resources::TextureKey playerKey =
-            mResources.findTexture("skyguard.sprite.player");
-        if (!playerKey.valid()) {
-            LOG_PANIC(core::log::cat::Config,
-                      "Game::initWorld: missing player texture 'skyguard.sprite.player'.");
-        }
+        const core::resources::TextureKey playerKey = stressPlayerKey.value();
         game::skyguard::dev::trySpawnStressSpritesFromEnv(
             mWorld, mResources, playerKey);
 #endif

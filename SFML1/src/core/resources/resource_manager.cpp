@@ -16,10 +16,6 @@ namespace core::resources {
 
     namespace {
 
-        static constexpr std::uint8_t kStateNotAttempted = static_cast<std::uint8_t>(0);
-        static constexpr std::uint8_t kStateLoaded = static_cast<std::uint8_t>(1);
-        static constexpr std::uint8_t kStateFailed = static_cast<std::uint8_t>(2);
-
 #if defined(SFML1_TESTS)
         using TextureLoadFn = resource_manager::test::TextureLoadFn;
         using FontLoadFn = resource_manager::test::FontLoadFn;
@@ -82,6 +78,15 @@ namespace core::resources {
                       where);
         }
 
+        [[noreturn]] void panicLazyLoadForbidden(std::string_view where,
+                                                 std::string_view name,
+                                                 std::string_view path) {
+            LOG_PANIC(core::log::cat::Resources,
+                      "[ResourceManager::{}] Lazy-load запрещён после init/preload. "
+                      "Ресурс не resident (забыли preload?). name='{}' path='{}'.",
+                      where, name, path);
+        }
+
         [[nodiscard]] std::filesystem::path toPath(std::string_view pathView) {
             // string_view -> path без промежуточного std::string.
             // path всё равно будет владеть строкой, но мы избегаем лишней аллокации/копии.
@@ -94,12 +99,24 @@ namespace core::resources {
     // Bootstrapping (key-world, ResourceRegistry)
     // --------------------------------------------------------------------------------------------
 
+    void ResourceManager::bumpCacheGeneration() noexcept {
+        ++mCacheGeneration;
+        // 0 оставляем как "неожиданное wrap-around"; но чтобы сравнение было стабильным,
+        // не допускаем 0 как валидное поколение.
+        if (mCacheGeneration == 0u) {
+            mCacheGeneration = 1u;
+        }
+    }
+
     void ResourceManager::initialize(std::span<const ResourceSource> sources) {
         // Контракт: инициализация key-world выполняется ровно один раз.
         if (mInitialized) {
             LOG_PANIC(core::log::cat::Resources,
                       "[ResourceManager::initialize] Key-world реестр уже инициализирован.");
         }
+
+        // На фазе инициализации lazy-load разрешён, даже если запрет был ранее включён.
+        mIoForbidden = false;
 
         mRegistry.loadFromSources(sources);
 
@@ -115,11 +132,45 @@ namespace core::resources {
         mFontCache.resize(mRegistry.fontCount());
         mSoundCache.resize(mRegistry.soundCount());
 
-        mTextureState.assign(mTextureCache.size(), kStateNotAttempted);
-        mFontState.assign(mFontCache.size(), kStateNotAttempted);
-        mSoundState.assign(mSoundCache.size(), kStateNotAttempted);
+        mTextureState.assign(mTextureCache.size(), ResourceState::NotLoaded);
+        mFontState.assign(mFontCache.size(), ResourceState::NotLoaded);
+        mSoundState.assign(mSoundCache.size(), ResourceState::NotLoaded);
 
-        mInitialized = true;
+        mInitialized = true; // нужно для preload fallback через публичный API
+
+        // validate-on-write: missing-ключи обязаны быть в диапазоне.
+        if (mMissingTextureKey.index() >= mTextureCache.size()) {
+            LOG_PANIC(core::log::cat::Resources,
+                      "[ResourceManager::initialize] missingTextureKey index out of range "
+                      "(idx={}, count={})",
+                      mMissingTextureKey.index(),
+                      mTextureCache.size());
+        }
+        if (mMissingFontKey.index() >= mFontCache.size()) {
+            LOG_PANIC(core::log::cat::Resources,
+                      "[ResourceManager::initialize] missingFontKey index out of range "
+                      "(idx={}, count={})",
+                      mMissingFontKey.index(),
+                      mFontCache.size());
+        }
+
+        // КРИТИЧНО: fallback ресурсы должны быть resident всегда.
+        (void) getTexture(mMissingTextureKey);
+        (void) getFont(mMissingFontKey);
+
+        bumpCacheGeneration();
+
+    }
+
+    void ResourceManager::setIoForbidden(const bool enabled) noexcept {
+        mIoForbidden = enabled;
+    }
+
+    std::uint32_t ResourceManager::cacheGeneration() const noexcept {
+        if (!mInitialized) {
+            panicKeyWorldNotInitialized("cacheGeneration");
+        }
+        return mCacheGeneration;
     }
 
     const ResourceRegistry& ResourceManager::registry() const noexcept {
@@ -171,15 +222,20 @@ namespace core::resources {
         }
 
         const std::uint32_t idx = key.index();
-        const std::uint8_t state = mTextureState[idx];
+        const ResourceState state = mTextureState[idx];
 
-        if (state == kStateLoaded) {
+        if (state == ResourceState::Resident) {
             const auto* cached = mTextureCache[idx].get();
             assert(cached != nullptr);
             return *cached;
         }
 
         const auto& entry = mRegistry.getTexture(key);
+
+        if (mIoForbidden) {
+            panicLazyLoadForbidden("getTexture(TextureKey)", entry.name, entry.path);
+        }
+
         // Источник истины - entry.path.
         auto resource = std::make_unique<types::TextureResource>();
         const std::filesystem::path filePath = toPath(entry.path);
@@ -206,7 +262,7 @@ namespace core::resources {
         }
 
         mTextureCache[idx] = std::move(resource);
-        mTextureState[idx] = kStateLoaded;
+        mTextureState[idx] = ResourceState::Resident;
         return *mTextureCache[idx];
     }
 
@@ -220,15 +276,20 @@ namespace core::resources {
         }
 
         const std::uint32_t idx = key.index();
-        const std::uint8_t state = mFontState[idx];
+        const ResourceState state = mFontState[idx];
 
-        if (state == kStateLoaded) {
+        if (state == ResourceState::Resident) {
             const auto* cached = mFontCache[idx].get();
             assert(cached != nullptr);
             return *cached;
         }
 
         const auto& entry = mRegistry.getFont(key);
+
+        if (mIoForbidden) {
+            panicLazyLoadForbidden("getFont(FontKey)", entry.name, entry.path);
+        }
+
         // Источник истины - entry.path.
         auto resource = std::make_unique<types::FontResource>();
         const std::filesystem::path filePath = toPath(entry.path);
@@ -243,7 +304,7 @@ namespace core::resources {
         }
 
         mFontCache[idx] = std::move(resource);
-        mFontState[idx] = kStateLoaded;
+        mFontState[idx] = ResourceState::Resident;
         return *mFontCache[idx];
     }
 
@@ -257,31 +318,37 @@ namespace core::resources {
         }
 
         const std::uint32_t idx = key.index();
-        const std::uint8_t state = mSoundState[idx];
+        const ResourceState state = mSoundState[idx];
 
-        if (state == kStateLoaded) {
+        if (state == ResourceState::Resident) {
             const auto* cached = mSoundCache[idx].get();
             assert(cached != nullptr);
             return cached;
         }
 
-        if (state == kStateFailed) {
+        if (state == ResourceState::Failed) {
             return nullptr;
         }
 
         const auto* entry = mRegistry.tryGetSound(key);
         // Защита от рассинхрона ключа/реестра.
         if (entry == nullptr) {
-            mSoundState[idx] = kStateFailed;
+            mSoundState[idx] = ResourceState::Failed;
             return nullptr;
         }
+
+        if (mIoForbidden) {
+            // Sounds всё равно soft-fail, но I/O после init/preload запрещён как класс.
+            panicLazyLoadForbidden("tryGetSound(SoundKey)", entry->name, entry->path);
+        }
+
         // Источник истины - entry.path.
         auto resource = std::make_unique<types::SoundBufferResource>();
         const std::filesystem::path filePath = toPath(entry->path);
 
         if (!loadSound(*resource, filePath)) {
             // Sounds — soft-fail: один WARN и больше не пробуем.
-            mSoundState[idx] = kStateFailed;
+            mSoundState[idx] = ResourceState::Failed;
 
             LOG_WARN(core::log::cat::Resources,
                      "[ResourceManager::tryGetSound(SoundKey)] "
@@ -292,7 +359,78 @@ namespace core::resources {
         }
 
         mSoundCache[idx] = std::move(resource);
-        mSoundState[idx] = kStateLoaded;
+        mSoundState[idx] = ResourceState::Resident;
+        return mSoundCache[idx].get();
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Resident-only API (NO I/O)
+    // --------------------------------------------------------------------------------------------
+
+    const types::TextureResource& ResourceManager::expectTextureResident(TextureKey key) const {
+        if (!mInitialized) {
+            panicKeyWorldNotInitialized("expectTextureResident(TextureKey)");
+        }
+
+        if (!key.valid() || key.index() >= mTextureCache.size()) {
+            key = mMissingTextureKey;
+        }
+
+        const std::uint32_t idx = key.index();
+        const ResourceState state = mTextureState[idx];
+        if (state != ResourceState::Resident) {
+            const auto& entry = mRegistry.getTexture(key);
+            LOG_PANIC(core::log::cat::Resources,
+                      "[ResourceManager::expectTextureResident(TextureKey)] "
+                      "Texture is not resident (forgot preload?). name='{}' path='{}'.",
+                      entry.name,
+                      entry.path);
+        }
+
+        const auto* cached = mTextureCache[idx].get();
+        assert(cached != nullptr);
+        return *cached;
+    }
+
+    const types::FontResource& ResourceManager::expectFontResident(FontKey key) const {
+        if (!mInitialized) {
+            panicKeyWorldNotInitialized("expectFontResident(FontKey)");
+        }
+
+        if (!key.valid() || key.index() >= mFontCache.size()) {
+            key = mMissingFontKey;
+        }
+
+        const std::uint32_t idx = key.index();
+        const ResourceState state = mFontState[idx];
+        if (state != ResourceState::Resident) {
+            const auto& entry = mRegistry.getFont(key);
+            LOG_PANIC(core::log::cat::Resources,
+                      "[ResourceManager::expectFontResident(FontKey)] "
+                      "Font is not resident (forgot preload?). name='{}' path='{}'.",
+                      entry.name,
+                      entry.path);
+        }
+
+        const auto* cached = mFontCache[idx].get();
+        assert(cached != nullptr);
+        return *cached;
+    }
+
+    const types::SoundBufferResource* ResourceManager::tryGetSoundResident(SoundKey key) const noexcept {
+        if (!mInitialized) {
+            panicKeyWorldNotInitialized("tryGetSoundResident(SoundKey)");
+        }
+
+        if (!key.valid() || key.index() >= mSoundCache.size()) {
+            return nullptr;
+        }
+
+        const std::uint32_t idx = key.index();
+        if (mSoundState[idx] != ResourceState::Resident) {
+            return nullptr;
+        }
+
         return mSoundCache[idx].get();
     }
 
@@ -301,17 +439,40 @@ namespace core::resources {
     // --------------------------------------------------------------------------------------------
 
     ResourceManager::ResourceMetrics ResourceManager::getMetrics() const noexcept {
-        const auto countLoaded = [](const std::vector<std::uint8_t>& states) -> std::size_t {
-            return static_cast<std::size_t>(std::count(states.begin(), states.end(), kStateLoaded));
+        const auto countResident = 
+            [](const std::vector<ResourceState>& states) noexcept -> std::size_t {
+            return static_cast<std::size_t>(
+                std::count(states.begin(), states.end(), ResourceState::Resident));
         };
 
         return ResourceMetrics{
-            .textureCount = countLoaded(mTextureState),
-            .fontCount = countLoaded(mFontState),
-            .soundCount = countLoaded(mSoundState),
+            .textureCount = countResident(mTextureState),
+            .fontCount = countResident(mFontState),
+            .soundCount = countResident(mSoundState),
         };
     }
 
+    // --------------------------------------------------------------------------------------------
+    // Batch preload
+    // --------------------------------------------------------------------------------------------
+
+    void ResourceManager::preloadTextures(std::span<const TextureKey> keys) {
+        for (const TextureKey k : keys) {
+            preloadTexture(k);
+        }
+    }
+
+    void ResourceManager::preloadFonts(std::span<const FontKey> keys) {
+        for (const FontKey k : keys) {
+            preloadFont(k);
+        }
+    }
+
+    void ResourceManager::preloadSounds(std::span<const SoundKey> keys) {
+        for (const SoundKey k : keys) {
+            preloadSound(k);
+        }
+    }
     void ResourceManager::preloadTexture(TextureKey key) {
         (void) getTexture(key);
     }
@@ -361,21 +522,81 @@ namespace core::resources {
     // Key-world cache control
     // --------------------------------------------------------------------------------------------
 
-    void ResourceManager::clearAll() noexcept {
-        for (auto& entry : mTextureCache) {
-            entry.reset();
-        }
-        for (auto& entry : mFontCache) {
-            entry.reset();
-        }
-        for (auto& entry : mSoundCache) {
-            entry.reset();
-        }
-
-        std::fill(mTextureState.begin(), mTextureState.end(), kStateNotAttempted);
-        std::fill(mFontState.begin(), mFontState.end(), kStateNotAttempted);
-        std::fill(mSoundState.begin(), mSoundState.end(), kStateNotAttempted);
+void ResourceManager::clearAll() noexcept {
+    if (!mInitialized) {
+        LOG_PANIC(core::log::cat::Resources,
+                  "[ResourceManager::clearAll] Key-world API вызван до initialize().");
     }
+
+    // Инвариант: missing texture/font обязаны быть resident в любой момент после initialize().
+    if (!mMissingTextureKey.valid()) {
+        LOG_PANIC(core::log::cat::Resources,
+                  "[ResourceManager::clearAll] invalid missingTextureKey (invariant broken).");
+    }
+    if (!mMissingFontKey.valid()) {
+        LOG_PANIC(core::log::cat::Resources,
+                  "[ResourceManager::clearAll] invalid missingFontKey (invariant broken).");
+    }
+
+    const std::uint32_t missingTexIdx = mMissingTextureKey.index();
+    const std::uint32_t missingFontIdx = mMissingFontKey.index();
+
+    if (missingTexIdx >= mTextureCache.size() || missingTexIdx >= mTextureState.size()) {
+        LOG_PANIC(core::log::cat::Resources,
+                  "[ResourceManager::clearAll] missingTextureKey index out of range "
+                  "(idx={}, texCache={}, texState={}).",
+                  missingTexIdx, mTextureCache.size(), mTextureState.size());
+    }
+    if (missingFontIdx >= mFontCache.size() || missingFontIdx >= mFontState.size()) {
+        LOG_PANIC(core::log::cat::Resources,
+                  "[ResourceManager::clearAll] missingFontKey index out of range "
+                  "(idx={}, fontCache={}, fontState={}).",
+                  missingFontIdx, mFontCache.size(), mFontState.size());
+    }
+
+    const bool missingTexResident =
+        (mTextureState[missingTexIdx] == ResourceState::Resident) &&
+        (mTextureCache[missingTexIdx] != nullptr);
+
+    const bool missingFontResident =
+        (mFontState[missingFontIdx] == ResourceState::Resident) &&
+        (mFontCache[missingFontIdx] != nullptr);
+
+    if (!missingTexResident) {
+        LOG_PANIC(core::log::cat::Resources,
+                  "[ResourceManager::clearAll] missing texture is not resident "
+                  "(invariant broken).");
+    }
+    if (!missingFontResident) {
+        LOG_PANIC(core::log::cat::Resources,
+                  "[ResourceManager::clearAll] missing font is not resident "
+                  "(invariant broken).");
+    }
+
+    // Очищаем всё, кроме missing (они должны оставаться resident).
+    for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(mTextureCache.size()); ++i) {
+        if (i == missingTexIdx) {
+            continue;
+        }
+        mTextureCache[i].reset();
+        mTextureState[i] = ResourceState::NotLoaded;
+    }
+
+    for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(mFontCache.size()); ++i) {
+        if (i == missingFontIdx) {
+            continue;
+        }
+        mFontCache[i].reset();
+        mFontState[i] = ResourceState::NotLoaded;
+    }
+
+    for (auto& entry : mSoundCache) {
+        entry.reset();
+    }
+    std::fill(mSoundState.begin(), mSoundState.end(), ResourceState::NotLoaded);
+
+    bumpCacheGeneration();
+}
 
 #if defined(SFML1_TESTS)
     namespace resource_manager::test {

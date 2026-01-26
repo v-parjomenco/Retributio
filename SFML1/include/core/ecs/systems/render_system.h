@@ -59,15 +59,15 @@ namespace core::ecs {
          * Release builds: возвращается zeroed struct (zero overhead).
          */
         struct FrameStats {
-            std::size_t totalSpriteCount{0};      ///< Кандидаты от SpatialIndex
-            std::size_t culledSpriteCount{0};     ///< Отсечено fine culling
-            std::size_t spriteCount{0};           ///< Фактически отрисовано
-            std::size_t vertexCount{0};           ///< spriteCount * 6
-            std::size_t batchDrawCalls{0};        ///< Количество draw calls
-            std::size_t textureSwitches{0};       ///< Смены текстуры (batched flush)
-            std::size_t uniqueTexturePointers{0}; ///< Уникальные текстуры за кадр (по epoch cache)
-            std::size_t textureCacheSize{0};      ///< Размер per-frame epoch cache
-            std::size_t resourceLookupsThisFrame{0}; ///< Обращений к ResourceManager::getTexture
+            std::size_t totalSpriteCount{0};         ///< Кандидаты от SpatialIndex
+            std::size_t culledSpriteCount{0};        ///< Отсечено fine culling
+            std::size_t spriteCount{0};              ///< Фактически отрисовано
+            std::size_t vertexCount{0};              ///< spriteCount * 6
+            std::size_t batchDrawCalls{0};           ///< Количество draw calls
+            std::size_t textureSwitches{0};          ///< Смены текстуры (batched flush)
+            std::size_t uniqueTexturePointers{0};    ///< Уникальные текстуры за кадр по epoch cache
+            std::size_t textureCacheSize{0};         ///< Размер per-frame epoch cache
+            std::size_t resourceLookupsThisFrame{0}; ///< Уникальные resident-fetch по texture key
 
             std::uint64_t cpuTotalUs{0};  ///< Общее время render() (только SFML1_PROFILE)
             std::uint64_t cpuDrawUs{0};   ///< Время в window.draw() (только SFML1_PROFILE)
@@ -105,7 +105,7 @@ namespace core::ecs {
          *  - bind(spatialIndex, nullptr) / bind(nullptr, resources) — misuse -> (LOG_PANIC).
          */
         void bind(const core::spatial::SpatialIndex* spatialIndex,
-                  core::resources::ResourceManager* resources);
+                  const core::resources::ResourceManager* resources);
 
         /**
          * @brief Логическое обновление (не используется, рендер-only система).
@@ -144,8 +144,8 @@ namespace core::ecs {
         /// Spatial index для view-frustum culling (read-only, cell-level candidates)
         const core::spatial::SpatialIndex* mSpatialIndex{nullptr};
 
-        /// Resource manager. НЕ const, так как getTexture использует lazy loading и обновляет кэши.
-        core::resources::ResourceManager* mResources{nullptr};
+        /// Resource manager (resident-only access in render; NO lazy-load allowed).
+        const core::resources::ResourceManager* mResources{nullptr};
 
         // ----------------------------------------------------------------------------------------
         // Внутренние структуры (горячий путь)
@@ -201,6 +201,7 @@ namespace core::ecs {
         std::vector<const sf::Texture*> mFrameTexturePtr;
         std::vector<std::uint32_t> mFrameTextureStamp;
         std::uint32_t mFrameId{0};
+        std::uint32_t mCachedResourceGen{0};
 
         /// Hint для amortized growth (последнее количество visible)
         std::size_t mLastVisibleCount{0};

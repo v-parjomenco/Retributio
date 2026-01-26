@@ -138,7 +138,7 @@ namespace core::resources::self_test {
             env.soundOkPath = env.dir / "click.wav";
             env.soundFailPath = env.dir / "fail.wav";
 
-            // Registry v1 тесты традиционно создают файлы, 
+            // Registry v1 тесты традиционно создают файлы,
             // чтобы пройти validate-on-write/IO checks.
             writeTextFileOrFail(env.missingTexturePath, "tex_missing");
             writeTextFileOrFail(env.secondaryTexturePath, "tex_secondary");
@@ -153,13 +153,13 @@ namespace core::resources::self_test {
                 env.secondaryTexturePath.generic_string() + "\"}}";
 
             const std::string fonts =
-                "{\"core.font.default\":{\"path\":\"" + 
+                "{\"core.font.default\":{\"path\":\"" +
                 env.defaultFontPath.generic_string() + "\"}}";
 
             const std::string sounds =
-                "{\"core.sound.click\":{\"path\":\"" + 
+                "{\"core.sound.click\":{\"path\":\"" +
                 env.soundOkPath.generic_string() +
-                "\"},\"core.sound.fail\":{\"path\":\"" + 
+                "\"},\"core.sound.fail\":{\"path\":\"" +
                 env.soundFailPath.generic_string() + "\"}}";
 
             env.jsonPath = env.dir / "resources.json";
@@ -192,6 +192,11 @@ namespace core::resources::self_test {
             // Public getters must be consistent after initialize().
             assert(manager.missingTextureKey() == reg.missingTextureKey());
             assert(manager.missingFontKey() == reg.missingFontKey());
+
+            // Контракт после PR: missing texture/font становятся resident прямо в initialize().
+            assert(counters.texture == 1);
+            assert(counters.font == 1);
+            assert(counters.sound == 0);
         }
 
         void testLoadOnceTextureAndFont() {
@@ -207,7 +212,11 @@ namespace core::resources::self_test {
             const std::array<ResourceSource, 1> sources{makeSource(env.jsonPath, 0, 0, "core")};
             manager.initialize(sources);
 
-            // Texture: load once
+            // Контракт: missing texture/font уже resident после initialize().
+            assert(counters.texture == 1);
+            assert(counters.font == 1);
+
+            // Texture: load once (не должно догружать повторно)
             const TextureKey missingKey = manager.missingTextureKey();
             const auto& t1 = manager.getTexture(missingKey);
             const auto& t2 = manager.getTexture(missingKey);
@@ -225,7 +234,7 @@ namespace core::resources::self_test {
             (void) manager.getTexture(TextureKey{});
             assert(counters.texture == beforeTex);
 
-            // Font: load once
+            // Font: load once (не должно догружать повторно)
             const FontKey missingFont = manager.missingFontKey();
             const auto& f1 = manager.getFont(missingFont);
             const auto& f2 = manager.getFont(missingFont);
@@ -261,6 +270,10 @@ namespace core::resources::self_test {
             const std::array<ResourceSource, 1> sources{makeSource(env.jsonPath, 0, 0, "core")};
             manager.initialize(sources);
 
+            // Контракт: missing texture уже resident после initialize().
+            const int baselineTexLoads = counters.texture;
+            assert(baselineTexLoads == 1);
+
             const TextureKey secondary = manager.findTexture("core.texture.secondary");
             assert(secondary.valid());
 
@@ -268,9 +281,8 @@ namespace core::resources::self_test {
             const auto& b = manager.getTexture(secondary);
             assert(&a == &b);
 
-            // Должна быть ровно одна загрузка: secondary грузится один раз, 
-            // второй вызов берётся из кэша.
-            assert(counters.texture == 1);
+            // secondary должен загрузиться ровно один раз поверх baseline.
+            assert(counters.texture == baselineTexLoads + 1);
         }
 
         void testNoRetryAfterSoundFail() {

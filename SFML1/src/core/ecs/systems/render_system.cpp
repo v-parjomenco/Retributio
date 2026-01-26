@@ -182,7 +182,7 @@ namespace core::ecs {
     }
 
     void RenderSystem::bind(const core::spatial::SpatialIndex* spatialIndex,
-                            core::resources::ResourceManager* resources) {
+                            const core::resources::ResourceManager* resources) {
         const bool hasIndex = (spatialIndex != nullptr);
         const bool hasRes = (resources != nullptr);
 
@@ -203,6 +203,7 @@ namespace core::ecs {
             mFrameTexturePtr.clear();
             mFrameTextureStamp.clear();
             mFrameId = 0;
+            mCachedResourceGen = 0;
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
             mUniqueTexturesThisFrame = 0;
@@ -233,6 +234,7 @@ namespace core::ecs {
         }
 
         resizeEpochArrays(count);
+        mCachedResourceGen = mResources->cacheGeneration();
     }
 
     void RenderSystem::resizeEpochArrays(const std::size_t textureCount) {
@@ -256,6 +258,17 @@ namespace core::ecs {
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         mUniqueTexturesThisFrame = 0;
 #endif
+
+        // Инвалидируем per-frame pointer cache, если ResourceManager сбросил/перестроил кэши.
+        if (mResources != nullptr) {
+            const std::uint32_t gen = mResources->cacheGeneration();
+            if (gen != mCachedResourceGen) {
+                std::fill(mFrameTexturePtr.begin(), mFrameTexturePtr.end(), nullptr);
+                std::fill(mFrameTextureStamp.begin(), mFrameTextureStamp.end(), 0u);
+                mFrameId = 0;
+                mCachedResourceGen = gen;
+            }
+        }
         ++mFrameId;
 
         if (mFrameId == 0) {
@@ -287,7 +300,7 @@ namespace core::ecs {
         }
 
         if (mFrameTextureStamp[index] != mFrameId) {
-            mFrameTexturePtr[index] = &mResources->getTexture(key).get();
+            mFrameTexturePtr[index] = &mResources->expectTextureResident(key).get();
             mFrameTextureStamp[index] = mFrameId;
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)

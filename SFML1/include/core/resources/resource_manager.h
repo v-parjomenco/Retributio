@@ -58,6 +58,22 @@ namespace core::resources {
          */
         void initialize(std::span<const ResourceSource> sources);
 
+        /**
+         * @brief Запретить lazy-load после фазы инициализации/прелоада.
+         *
+         * Контракт:
+         *  - Должно быть включено после того, как сцена/ресурсный набор подготовлены.
+         *  - Любая попытка загрузить ресурс через loading API после этого — programmer error.
+         */
+        void setIoForbidden(bool enabled) noexcept;
+
+        /**
+         * @brief Поколение кэша ресурсов (для инвалидирования внешних pointer-кэшей).
+         *
+         * Инкрементируется при initialize()/clearAll() и будущих reload/eviction действиях.
+         */
+        [[nodiscard]] std::uint32_t cacheGeneration() const noexcept;
+
         // ----------------------------------------------------------------------------------------
         // Key-based API (RuntimeKey32) — целевой путь
         // ----------------------------------------------------------------------------------------
@@ -92,6 +108,36 @@ namespace core::resources {
          */
         [[nodiscard]] const types::SoundBufferResource* tryGetSound(SoundKey key);
 
+        // ----------------------------------------------------------------------------------------
+        // Resident-only API (NO I/O, NO decoding, NO allocations)
+        // ----------------------------------------------------------------------------------------
+
+        /**
+         * @brief Получить resident текстуру. НИКОГДА не делает I/O.
+         *
+         * Контракт:
+         *  - invalid/out-of-range => missingTextureKey (missing гарантированно resident).
+         *  - если ресурс не resident => LOG_PANIC (programmer error: забыли preload).
+         */
+        [[nodiscard]] const types::TextureResource& expectTextureResident(TextureKey key) const;
+
+        /**
+         * @brief Получить resident шрифт. НИКОГДА не делает I/O.
+         *
+         * Контракт:
+         *  - invalid/out-of-range => missingFontKey (missing гарантированно resident).
+         *  - если ресурс не resident => LOG_PANIC (programmer error: забыли preload).
+         */
+        [[nodiscard]] const types::FontResource& expectFontResident(FontKey key) const;
+
+        /**
+         * @brief Получить resident звук, если он есть. НИКОГДА не делает I/O.
+         *
+         * Политика: sounds soft-fail (nullptr означает "нет звука/не загружен/сломался").
+         */
+        [[nodiscard]] const types::SoundBufferResource* 
+            tryGetSoundResident(SoundKey key) const noexcept;
+
         /// Найти ключ текстуры по каноническому имени (O(log N), для тулов/конфигов).
         [[nodiscard]] TextureKey findTexture(std::string_view canonicalName) const;
 
@@ -118,6 +164,11 @@ namespace core::resources {
 
         [[nodiscard]] ResourceMetrics getMetrics() const noexcept;
 
+        // Batch preload (scene-level)
+        void preloadTextures(std::span<const TextureKey> keys);
+        void preloadFonts(std::span<const FontKey> keys);
+        void preloadSounds(std::span<const SoundKey> keys);
+
         // ----------------------------------------------------------------------------------------
         // Preload API (key-world, deterministic by index)
         // ----------------------------------------------------------------------------------------
@@ -137,12 +188,24 @@ namespace core::resources {
         void clearAll() noexcept;
 
       private:
+
+        enum class ResourceState : std::uint8_t {
+            NotLoaded = 0,
+            Resident  = 1,
+            Failed    = 2
+            // NOTE: extend with Loading/Unloaded when async loading / eviction lands.
+        };
+
+        void bumpCacheGeneration() noexcept;
+
         // ----------------------------------------------------------------------------------------
         // Key-world registry + O(1) vector caches (PR3)
         // ----------------------------------------------------------------------------------------
 
         ResourceRegistry mRegistry;
         bool mInitialized = false;
+        bool mIoForbidden = false;
+        std::uint32_t mCacheGeneration = 0;
 
         // Примечание:
         //  - Кэши хранят ptr для ленивой загрузки и будущего streaming/eviction.
@@ -151,12 +214,12 @@ namespace core::resources {
         std::vector<std::unique_ptr<types::FontResource>> mFontCache;
         std::vector<std::unique_ptr<types::SoundBufferResource>> mSoundCache;
 
-        // Состояния загрузки:
-        //  - Texture/Font: 0 = not attempted, 1 = loaded (Type A => ошибка загрузки = PANIC).
-        //  - Sound:        0 = not attempted, 1 = loaded, 2 = failed (soft-fail, stop retries).
-        std::vector<std::uint8_t> mTextureState;
-        std::vector<std::uint8_t> mFontState;
-        std::vector<std::uint8_t> mSoundState;
+        // Состояния загрузки (single-threaded for now):
+        //  - Texture/Font: NotLoaded -> Resident (Type A => ошибка загрузки = PANIC).
+        //  - Sound:        NotLoaded -> Resident | Failed (soft-fail, stop retries).
+        std::vector<ResourceState> mTextureState;
+        std::vector<ResourceState> mFontState;
+        std::vector<ResourceState> mSoundState;
 
         TextureKey mMissingTextureKey{};
         FontKey mMissingFontKey{};
