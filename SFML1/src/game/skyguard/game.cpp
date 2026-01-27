@@ -463,6 +463,7 @@ namespace game::skyguard {
         assert(dtSeconds > 0.0f); // фиксированный шаг должен быть положительным
         mWorld.update(dtSeconds); // обновляем все ECS-системы
         updateCamera();
+        mWorld.flushDestroyed();
     }
 
     void Game::updateCamera() {

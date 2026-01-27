@@ -11,10 +11,10 @@
 // ================================================================================================
 #pragma once
 
-#include <algorithm>
 #include <cassert>
 #include <concepts>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <ranges>
 #include <type_traits>
@@ -31,20 +31,6 @@ namespace sf {
 } // namespace sf
 
 namespace core::ecs {
-
-#if !defined(NDEBUG)
-    namespace detail {
-        /**
-         * @brief Общий scratch buffer для валидации destroyEntities().
-         *
-         * Дизайн:
-         *  - inline thread_local: один буфер на поток, нет проблем с ODR.
-         *  - Только в Debug: zero overhead в Release.
-         *  - Переиспользуем при вызове для избежания повторных аллокаций.
-         */
-        inline thread_local std::vector<Entity> gDestroyEntitiesScratch{};
-    } // namespace detail
-#endif
 
     /**
      * @brief Политика допустимого ECS-компонента (фильтр на этапе компиляции).
@@ -92,10 +78,11 @@ namespace core::ecs {
      *
      * КРИТИЧНЫЕ ИНВАРИАНТЫ (жизненный цикл сущностей):
      *  1. createEntity() — единственный способ создания сущностей
-     *  2. destroyEntity() — единственный способ уничтожения сущностей
-     *  3. mAliveEntityCount синхронизирован с registry (Debug: validateEntityCount)
-     *  4. registry() доступен ТОЛЬКО через friend (контролируемый escape hatch)
-     *  5. Friend-классы НЕ должны вызывать registry.create/destroy напрямую
+     *  2. destroyEntity() — единственный способ планирования уничтожения сущностей
+     *  3. flushDestroyed() — единственная точка фактического уничтожения
+     *  4. mAliveEntityCount синхронизирован с registry (Debug: validateEntityCount)
+     *  5. registry() доступен ТОЛЬКО через friend (контролируемый escape hatch)
+     *  6. Friend-классы НЕ должны вызывать registry.create/destroy напрямую
      */
     class World {
       public:
@@ -130,8 +117,21 @@ namespace core::ecs {
          */
         World(World&& other) noexcept
             : mRegistry(std::move(other.mRegistry)), mSystems(std::move(other.mSystems)),
-              mAliveEntityCount(other.mAliveEntityCount) {
+              mAliveEntityCount(other.mAliveEntityCount),
+              mDeferredDestroyQueue(std::move(other.mDeferredDestroyQueue))
+#if !defined(NDEBUG)
+            , mQueuedDestroyStampByIndex(std::move(other.mQueuedDestroyStampByIndex))
+            , mQueuedDestroyStamp(other.mQueuedDestroyStamp)
+            , mDebugUpdateInProgress(other.mDebugUpdateInProgress)
+            , mDebugFlushInProgress(other.mDebugFlushInProgress)
+#endif
+        {
             other.mAliveEntityCount = 0; // КРИТИЧНО: обнуляем источник
+#if !defined(NDEBUG)
+            // moved-from мир не должен "залипать" в фазах.
+            other.mDebugUpdateInProgress = false;
+            other.mDebugFlushInProgress = false;
+#endif
         }
 
         /**
@@ -156,6 +156,16 @@ namespace core::ecs {
                 mRegistry = std::move(other.mRegistry);
                 mSystems = std::move(other.mSystems);
                 mAliveEntityCount = other.mAliveEntityCount;
+                mDeferredDestroyQueue = std::move(other.mDeferredDestroyQueue);
+#if !defined(NDEBUG)
+                mQueuedDestroyStampByIndex = std::move(other.mQueuedDestroyStampByIndex);
+                mQueuedDestroyStamp = other.mQueuedDestroyStamp;
+                mDebugUpdateInProgress = other.mDebugUpdateInProgress;
+                mDebugFlushInProgress = other.mDebugFlushInProgress;
+
+                other.mDebugUpdateInProgress = false;
+                other.mDebugFlushInProgress = false;
+#endif
                 other.mAliveEntityCount = 0; // КРИТИЧНО: обнуляем источник
             }
             return *this;
@@ -179,35 +189,77 @@ namespace core::ecs {
         }
 
         /**
-         * @brief Уничтожить сущность и все её компоненты.
+         * @brief Prewarm/maintenance: зарезервировать ёмкость очереди deferred destroy.
          *
-         * ИНВАРИАНТ: Decrement mAliveEntityCount (поддерживаем синхронизацию).
+         * Зачем это нужно:
+         *  - "no heap churn per destroy" достигается не микро-логикой роста на каждом destroy,
+         *    а контролируемой аллокацией в cold-пути (init/maintenance/перед стрессом).
          *
-         * Сложность: O(N), где N — количество типов компонентов у сущности.
-         * Потокобезопасность: Небезопасно.
+         * Контракт:
+         *  - Вызывать в cold-пути (например, после initWorld или перед крупной сценой/стрессом).
+         *  - В hot-пути destroyDeferred()/destroyEntities() не должно быть скрытых reserve().
          */
-        void destroyEntity(Entity e) {
-            assert(isAlive(e) && "destroyEntity: entity must be alive");
-            assert(mAliveEntityCount > 0 &&
-                   "destroyEntity: counter underflow (bug in entity lifecycle)");
-
-            mRegistry.destroy(e);
-            --mAliveEntityCount;
+        void reserveDeferredDestroyQueue(std::size_t capacity) {
+            mDeferredDestroyQueue.reserve(capacity);
         }
 
         /**
-         * @brief Уничтожить несколько сущностей за одну операцию (batch destroy).
+         * @brief Планировать уничтожение сущности (deferred destroy).
+         *
+         * Контракт:
+         *  - Фактическое уничтожение происходит ТОЛЬКО в flushDestroyed()
+         *  - on_destroy hooks вызываются во время flushDestroyed()
+         *  - В течение текущей фазы сущность считается живой
+         *
+         * ВАЖНО (юридический контракт):
+         *  - destroyDeferred()/destroyEntity() НЕ удаляют сущность "мгновенно".
+         *  - Если нужно немедленно исключить сущность из логики/рендера в этом же тике,
+         *    используй отдельный state/tag (например, Disabled/Hidden/Inactive), а не destroy.
+         *  - Любые системы НЕ должны полагаться на "мгновенное исчезновение" после destroyEntity().
+         *
+         * Сложность: O(1) amortized.
+         * Потокобезопасность: Небезопасно.
+         */
+        void destroyDeferred(Entity e) {
+#if !defined(NDEBUG)
+            assert(!mDebugFlushInProgress &&
+                   "destroyDeferred: cannot enqueue entities while flushDestroyed() is running");
+#endif
+            assert(isAlive(e) && "destroyDeferred: entity must be alive");
+
+#if !defined(NDEBUG)
+            debugMarkQueuedForDestroy(e);
+#endif
+            mDeferredDestroyQueue.push_back(e);
+        }
+
+        /**
+         * @brief Уничтожить сущность (deferred).
+         *
+         * ВАЖНО: уничтожение происходит только в flushDestroyed().
+         * Это alias для destroyDeferred() ради обратной совместимости.
+         *
+         * ВАЖНО (юридический контракт):
+         *  - destroyEntity() НЕ удаляет сущность "мгновенно" (она остаётся alive до flushDestroyed()).
+         *  - Для "сразу выключить" используй tag/state, а не destroy.
+         */
+        void destroyEntity(Entity e) {
+            destroyDeferred(e);
+        }
+
+        /**
+         * @brief Планировать уничтожение нескольких сущностей (batch enqueue).
          *
          * КРИТИЧНО ДЛЯ ПРОИЗВОДИТЕЛЬНОСТИ:
          *  - Для 500k+ entities удаление 50k сущностей в цикле destroyEntity() медленно
-         *  - Batch destroy использует EnTT оптимизацию (одна операция вместо N)
+         *  - Batch enqueue избегает лишних проверок и аллокаций
          *  - Типичный сценарий использования: удаление всех юнитов фракции после поражения
          *
-         * ИНВАРИАНТ: Decrement mAliveEntityCount на count сущностей.
+         * ИНВАРИАНТ: Decrement mAliveEntityCount происходит в flushDestroyed().
          *
          * ТРЕБОВАНИЯ:
          *  - Все сущности в диапазоне должны быть валидны (isAlive)
-         *  - Observers on_destroy получат события для всех сущностей
+         *  - Observers on_destroy получат события для всех сущностей во время flushDestroyed()
          *
          * @warning НЕ передавайте итераторы напрямую из registry.view() или registry.each()!
          *          EnTT может инвалидировать их во время удаления.
@@ -226,13 +278,16 @@ namespace core::ecs {
          * @param first Начало диапазона
          * @param last Конец диапазона (exclusive)
          *
-         * Сложность: O(N × M), где N — количество сущностей, M — средние компоненты.
-         *            Но быстрее чем N вызовов destroyEntity() из-за EnTT batch optimization.
+         * Сложность: O(N)
          * Потокобезопасность: Небезопасно.
          */
         template <std::random_access_iterator Iterator>
             requires std::same_as<std::iter_value_t<Iterator>, Entity>
         void destroyEntities(Iterator first, Iterator last) {
+#if !defined(NDEBUG)
+            assert(!mDebugFlushInProgress &&
+                   "destroyEntities: cannot enqueue entities while flushDestroyed() is running");
+#endif
             // O(1) distance для random_access_iterator (гарантировано концептом)
             const auto signedDist = last - first;
             assert(signedDist >= 0 && "destroyEntities: invalid iterator range (last < first)");
@@ -243,23 +298,15 @@ namespace core::ecs {
                                                  "(invalid iterators or double-destroy)");
 
 #if !defined(NDEBUG)
-            // Debug: проверяем что все сущности валидны
+            // Debug: validate-on-write без O(N×M). Дубликаты и повторное enqueue детектим по stamp-маске.
             for (auto it = first; it != last; ++it) {
-                assert(isAlive(*it) && "destroyEntities: iterator contains invalid entity");
+                const Entity e = *it;
+                assert(isAlive(e) && "destroyEntities: iterator contains invalid entity");
+                debugMarkQueuedForDestroy(e);
             }
-            // Debug: проверяем уникальность (дубликаты ломают контракт и счётчик)
-            auto& scratch = detail::gDestroyEntitiesScratch;
-            scratch.clear();
-            scratch.reserve(count);
-            scratch.insert(scratch.end(), first, last);
-            std::sort(scratch.begin(), scratch.end());
-            assert(std::adjacent_find(scratch.begin(), scratch.end()) == scratch.end() &&
-                   "destroyEntities: range contains duplicate entities");
 #endif
 
-            // EnTT batch destroy (гораздо быстрее чем цикл)
-            mRegistry.destroy(first, last);
-            mAliveEntityCount -= count;
+            mDeferredDestroyQueue.insert(mDeferredDestroyQueue.end(), first, last);
         }
 
         /**
@@ -320,7 +367,7 @@ namespace core::ecs {
          *
          * РЕШЕНИЕ:
          *  - Собственный счётчик (стандарт Paradox/Unity/Unreal)
-         *  - Increment в createEntity(), decrement в destroyEntity()
+         *  - Increment в createEntity(), decrement в flushDestroyed()
          *  - O(1) гарантированно, стабильный API, детерминизм
          *  - Легко расширить (entity count by archetype, component stats)
          *
@@ -359,6 +406,53 @@ namespace core::ecs {
         void clear() {
             mRegistry.clear();
             mAliveEntityCount = 0;
+            mDeferredDestroyQueue.clear();
+
+#if !defined(NDEBUG)
+            // После clear() очередь пуста, но stamp-эпоху обновляем, чтобы "забыть" всё старое
+            // без O(N) проходов по маске.
+            debugAdvanceQueuedDestroyStamp();
+#endif
+        }
+
+        /**
+         * @brief Выполнить фактическое уничтожение всех отложенных сущностей.
+         *
+         * Контракт:
+         *  - ЕДИНСТВЕННАЯ точка фактического destroy (registry.destroy вызывается только здесь)
+         *  - Вызывается ровно один раз на фазовом барьере (после update, до render)
+         *  - Запрещено вызывать во время выполнения систем (внутри updateAll)
+         *  - Запрещена реентерабельность (вложенный flush)
+         *  - on_destroy hooks вызываются здесь
+         */
+        void flushDestroyed() {
+#if !defined(NDEBUG)
+            assert(!mDebugUpdateInProgress &&
+                   "flushDestroyed: forbidden during World::update() (must be end-of-phase barrier)");
+            assert(!mDebugFlushInProgress && "flushDestroyed: recursive call detected");
+            ScopedDebugFlag flushGuard(mDebugFlushInProgress);
+#endif
+
+            if (mDeferredDestroyQueue.empty()) {
+                return;
+            }
+
+            const std::size_t count = mDeferredDestroyQueue.size();
+            assert(count <= mAliveEntityCount && "flushDestroyed: count exceeds alive entities "
+                                                 "(double-destroy or invalid queue)");
+#if !defined(NDEBUG)
+            for (const Entity e : mDeferredDestroyQueue) {
+                assert(isAlive(e) && "flushDestroyed: queued entity is not alive");
+            }
+#endif
+            mRegistry.destroy(mDeferredDestroyQueue.begin(), mDeferredDestroyQueue.end());
+            mDeferredDestroyQueue.clear();
+            mAliveEntityCount -= count;
+
+#if !defined(NDEBUG)
+            // Новая эпоха: после flush всё считается "не в очереди", без O(N) очисток.
+            debugAdvanceQueuedDestroyStamp();
+#endif
         }
 
 #if !defined(NDEBUG)
@@ -644,6 +738,9 @@ namespace core::ecs {
          * @brief Обновить все системы (логическая часть игры).
          */
         void update(float dt) {
+#if !defined(NDEBUG)
+            ScopedDebugFlag updateGuard(mDebugUpdateInProgress);
+#endif
             mSystems.updateAll(*this, dt);
         }
 
@@ -658,6 +755,70 @@ namespace core::ecs {
         entt::registry mRegistry{};
         SystemManager mSystems{};
 
+#if !defined(NDEBUG)
+        /**
+         * @brief Debug-only RAII для установки/сброса флагов фаз.
+         *
+         * Это не "защитное программирование": флаги проверяются только в cold write-API
+         * (flush/enqueue) и только в Debug. В Release/Profile — ноль.
+         */
+        struct ScopedDebugFlag {
+            explicit ScopedDebugFlag(bool& flagRef) noexcept : flag(flagRef) {
+                flag = true;
+            }
+
+            ~ScopedDebugFlag() {
+                flag = false;
+            }
+
+            ScopedDebugFlag(const ScopedDebugFlag&) = delete;
+            ScopedDebugFlag& operator=(const ScopedDebugFlag&) = delete;
+
+          private:
+            bool& flag;
+        };
+
+        [[nodiscard]] static std::size_t debugEntityRawIndex(const Entity e) noexcept {
+            return static_cast<std::size_t>(entt::to_entity(e));
+        }
+
+        void debugEnsureQueuedStampStorage(const std::size_t rawIndex) {
+            if (rawIndex >= mQueuedDestroyStampByIndex.size()) {
+                // Debug-only: расширяем таблицу под новые индексы.
+                mQueuedDestroyStampByIndex.resize(rawIndex + 1u, 0u);
+            }
+        }
+
+        void debugMarkQueuedForDestroy(const Entity e) {
+            const std::size_t idx = debugEntityRawIndex(e);
+            debugEnsureQueuedStampStorage(idx);
+
+            // O(1) детект:
+            //  - повторного enqueue (entity уже в очереди в этой эпохе),
+            //  - дубликата внутри batch destroyEntities().
+            assert(mQueuedDestroyStampByIndex[idx] != mQueuedDestroyStamp &&
+                   "destroyDeferred/destroyEntities: entity already queued for destruction");
+            mQueuedDestroyStampByIndex[idx] = mQueuedDestroyStamp;
+        }
+
+        void debugAdvanceQueuedDestroyStamp() {
+            // Переключаем эпоху. 0 зарезервирован как "никогда не маркировали".
+            ++mQueuedDestroyStamp;
+            if (mQueuedDestroyStamp == 0u) {
+                // Переполнение u32 в Debug — крайне редкий случай.
+                // Даже при 60 FPS это ~66M секунд (~2 года) непрерывной работы.
+                //
+                // Сбрасываем всю таблицу в 0 и начинаем с 1.
+                // Это O(N) проход по Debug-only таблице; даже для 1M индексов это обычно
+                // единичные миллисекунды и происходит "почти никогда".
+                for (std::uint32_t& v : mQueuedDestroyStampByIndex) {
+                    v = 0u;
+                }
+                mQueuedDestroyStamp = 1u;
+            }
+        }
+#endif
+
         // ----------------------------------------------------------------------------------------
         // Диагностика (ECS-метрики)
         // ----------------------------------------------------------------------------------------
@@ -668,18 +829,18 @@ namespace core::ecs {
          * ОБОСНОВАНИЕ ДИЗАЙНА:
          *  - EnTT не предоставляет публичный O(1) метод для entity count
          *  - Собственный счётчик - стандарт индустрии (Paradox/Unity/Unreal)
-         *  - Синхронизируется в createEntity()/destroyEntity()
+         *  - Синхронизируется в createEntity()/flushDestroyed()
          *  - Debug: validateEntityCount() проверяет счётчик против реальности
          *
          * INVARIANT PROTECTION:
          *  - Increment ТОЛЬКО в createEntity()
-         *  - Decrement ТОЛЬКО в destroyEntity()
+         *  - Decrement ТОЛЬКО в flushDestroyed()
          *  - Reset ТОЛЬКО в clear()
          *  - Debug: assert на underflow (детект lifecycle bugs)
          *
          * СТОИМОСТЬ:
          *  - Memory: 8 bytes (sizeof(std::size_t))
-         *  - CPU: negligible (increment/decrement на create/destroy)
+         *  - CPU: negligible (increment/decrement на create/flush)
          *
          * FUTURE EXPANSION:
          *  - Entity count by archetype
@@ -687,6 +848,38 @@ namespace core::ecs {
          *  - Memory usage stats
          */
         std::size_t mAliveEntityCount{0};
+
+        /**
+         * @brief Очередь отложенного уничтожения сущностей.
+         *
+         * Контракт:
+         *  - push_back/insert только в write-фазе
+         *  - уничтожение выполняется в flushDestroyed()
+         *  - без аллокаций на query/read путях
+         *
+         * Примечание по производительности:
+         *  - Для "no heap churn per destroy" вызывать reserveDeferredDestroyQueue() в cold-пути.
+         *  - Здесь нет микро-логики роста: она нарушает DRY и добавляет ветвления в write-API.
+         */
+        std::vector<Entity> mDeferredDestroyQueue{};
+
+#if !defined(NDEBUG)
+        // Debug-only: stamp-таблица для O(1) детекта дубликатов/повторного enqueue.
+        // Индексация по raw index entt::entity (entt::to_entity()).
+        // Важно:
+        //  - raw index может содержать "дырки" (после массовых create/destroy), поэтому размер
+        //    таблицы определяется max raw index, а не aliveEntityCount().
+        //
+        // Memory:
+        //  - ~4 bytes × max_entity_raw_index.
+        //  - Например, для 1M entities это ≈ 4MB в Debug, что приемлемо для диагностики.
+        std::vector<std::uint32_t> mQueuedDestroyStampByIndex{};
+        std::uint32_t mQueuedDestroyStamp{1u};
+
+        // Debug-only: минимальная защита от misuse фаз/flush (cold-path asserts).
+        bool mDebugUpdateInProgress{false};
+        bool mDebugFlushInProgress{false};
+#endif
 
         // ----------------------------------------------------------------------------------------
         // Прямой доступ к EnTT (только для observers/signals)
