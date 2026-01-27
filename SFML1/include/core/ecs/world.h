@@ -24,6 +24,7 @@
 #include "adapters/entt/entt_registry.hpp"
 
 #include "core/ecs/entity.h"
+#include "core/ecs/stable_id_service.h"
 #include "core/ecs/system_manager.h"
 
 namespace sf {
@@ -117,6 +118,7 @@ namespace core::ecs {
          */
         World(World&& other) noexcept
             : mRegistry(std::move(other.mRegistry)), mSystems(std::move(other.mSystems)),
+              mStableIds(std::move(other.mStableIds)),
               mAliveEntityCount(other.mAliveEntityCount),
               mDeferredDestroyQueue(std::move(other.mDeferredDestroyQueue))
 #if !defined(NDEBUG)
@@ -155,6 +157,7 @@ namespace core::ecs {
             if (this != &other) {
                 mRegistry = std::move(other.mRegistry);
                 mSystems = std::move(other.mSystems);
+                mStableIds = std::move(other.mStableIds);
                 mAliveEntityCount = other.mAliveEntityCount;
                 mDeferredDestroyQueue = std::move(other.mDeferredDestroyQueue);
 #if !defined(NDEBUG)
@@ -211,7 +214,7 @@ namespace core::ecs {
          *  - on_destroy hooks вызываются во время flushDestroyed()
          *  - В течение текущей фазы сущность считается живой
          *
-         * ВАЖНО (юридический контракт):
+         * ВАЖНО (контракт):
          *  - destroyDeferred()/destroyEntity() НЕ удаляют сущность "мгновенно".
          *  - Если нужно немедленно исключить сущность из логики/рендера в этом же тике,
          *    используй отдельный state/tag (например, Disabled/Hidden/Inactive), а не destroy.
@@ -239,7 +242,7 @@ namespace core::ecs {
          * ВАЖНО: уничтожение происходит только в flushDestroyed().
          * Это alias для destroyDeferred() ради обратной совместимости.
          *
-         * ВАЖНО (юридический контракт):
+         * ВАЖНО (контракт):
          *  - destroyEntity() НЕ удаляет сущность "мгновенно" (она остаётся alive до flushDestroyed()).
          *  - Для "сразу выключить" используй tag/state, а не destroy.
          */
@@ -407,6 +410,7 @@ namespace core::ecs {
             mRegistry.clear();
             mAliveEntityCount = 0;
             mDeferredDestroyQueue.clear();
+            mStableIds.clear();
 
 #if !defined(NDEBUG)
             // После clear() очередь пуста, но stamp-эпоху обновляем, чтобы "забыть" всё старое
@@ -445,7 +449,16 @@ namespace core::ecs {
                 assert(isAlive(e) && "flushDestroyed: queued entity is not alive");
             }
 #endif
+            // ВАЖНО: инвалидация StableID выполняется ПОСЛЕ registry.destroy(), чтобы 
+            // on_destroy hooks (вызываемые внутри destroy()) могли ещё прочитать StableID 
+            // через tryGet().
+            //
+            // Безопасно итерировать по "мёртвым" entity handles: entt::to_entity/to_version работают
+            // с битовым представлением handle и не обращаются к registry.
             mRegistry.destroy(mDeferredDestroyQueue.begin(), mDeferredDestroyQueue.end());
+            for (const Entity e : mDeferredDestroyQueue) {
+                mStableIds.onEntityDestroyed(e);
+            }
             mDeferredDestroyQueue.clear();
             mAliveEntityCount -= count;
 
@@ -751,9 +764,18 @@ namespace core::ecs {
             mSystems.renderAll(*this, window);
         }
 
+        [[nodiscard]] StableIdService& stableIds() noexcept {
+            return mStableIds;
+        }
+
+        [[nodiscard]] const StableIdService& stableIds() const noexcept {
+            return mStableIds;
+        }
+
       private:
         entt::registry mRegistry{};
         SystemManager mSystems{};
+        StableIdService mStableIds{};
 
 #if !defined(NDEBUG)
         /**

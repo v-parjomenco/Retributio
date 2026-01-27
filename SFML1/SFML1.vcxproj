@@ -449,6 +449,7 @@
     <ClCompile Include="src\core\config\loader\debug_overlay_loader.cpp" />
     <ClCompile Include="src\core\config\loader\detail\non_critical_config_report.cpp" />
     <ClCompile Include="src\core\config\loader\engine_settings_loader.cpp" />
+    <ClCompile Include="src\core\ecs\stable_id_service.cpp" />
     <ClCompile Include="src\core\ecs\systems\debug_overlay_system.cpp" />
     <ClCompile Include="src\core\ecs\systems\movement_system.cpp" />
     <ClCompile Include="src\core\ecs\systems\render_system.cpp" />
@@ -537,6 +538,7 @@
     <ClInclude Include="include\core\ecs\components\velocity_component.h" />
     <ClInclude Include="include\core\ecs\entity.h" />
     <ClInclude Include="include\core\ecs\render\sprite_bounds.h" />
+    <ClInclude Include="include\core\ecs\stable_id_service.h" />
     <ClInclude Include="include\core\ecs\system.h" />
     <ClInclude Include="include\core\ecs\systems\debug_overlay_system.h" />
     <ClInclude Include="include\core\ecs\systems\input_system.h" />

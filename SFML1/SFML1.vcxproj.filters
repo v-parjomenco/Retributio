@@ -438,6 +438,9 @@
     <ClCompile Include="src\game\skyguard\bootstrap\scene_bootstrap.cpp">
       <Filter>src\game\skyguard\bootstrap</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\ecs\stable_id_service.cpp">
+      <Filter>src\core\ecs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\resources\resource_manager.h">
@@ -757,6 +760,9 @@
     </ClInclude>
     <ClInclude Include="include\game\skyguard\bootstrap\scene_bootstrap.h">
       <Filter>include\game\skyguard\bootstrap</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\stable_id_service.h">
+      <Filter>include\core\ecs</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
