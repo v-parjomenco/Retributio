@@ -464,6 +464,7 @@
     <ClCompile Include="src\core\resources\resource_manager.cpp" />
     <ClCompile Include="src\core\resources\resource_manager_self_test.cpp" />
     <ClCompile Include="src\core\spatial\spatial_index.cpp" />
+    <ClCompile Include="src\core\spatial\spatial_index_v2.cpp" />
     <ClCompile Include="src\core\time\time_service.cpp" />
     <ClCompile Include="src\core\ui\anchor_policy.cpp" />
     <ClCompile Include="src\core\ui\ids\ui_id_utils.cpp" />
@@ -567,7 +568,10 @@
     <ClInclude Include="include\core\resources\types\soundbuffer_resource.h" />
     <ClInclude Include="include\core\resources\types\texture_resource.h" />
     <ClInclude Include="include\core\spatial\aabb2.h" />
+    <ClInclude Include="include\core\spatial\aabb2i.h" />
+    <ClInclude Include="include\core\spatial\chunk_coord.h" />
     <ClInclude Include="include\core\spatial\spatial_index.h" />
+    <ClInclude Include="include\core\spatial\spatial_index_v2.h" />
     <ClInclude Include="include\core\time\time_config.h" />
     <ClInclude Include="include\core\time\time_service.h" />
     <ClInclude Include="include\core\ui\anchor_policy.h" />

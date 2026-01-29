@@ -441,6 +441,9 @@
     <ClCompile Include="src\core\ecs\stable_id_service.cpp">
       <Filter>src\core\ecs</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\spatial\spatial_index_v2.cpp">
+      <Filter>src\core\spatial</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\resources\resource_manager.h">
@@ -763,6 +766,15 @@
     </ClInclude>
     <ClInclude Include="include\core\ecs\stable_id_service.h">
       <Filter>include\core\ecs</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\spatial\aabb2i.h">
+      <Filter>include\core\spatial</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\spatial\chunk_coord.h">
+      <Filter>include\core\spatial</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\spatial\spatial_index_v2.h">
+      <Filter>include\core\spatial</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
