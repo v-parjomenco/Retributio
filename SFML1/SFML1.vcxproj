@@ -477,6 +477,7 @@
     <ClCompile Include="src\game\skyguard\config\loader\user_settings_loader.cpp" />
     <ClCompile Include="src\game\skyguard\config\loader\view_config_loader.cpp" />
     <ClCompile Include="src\game\skyguard\config\loader\window_config_loader.cpp" />
+    <ClCompile Include="src\game\skyguard\dev\spatial_index_harness.cpp" />
     <ClCompile Include="src\game\skyguard\dev\stress_scene.cpp" />
     <ClCompile Include="src\game\skyguard\ecs\systems\player_init_system.cpp" />
     <ClCompile Include="src\game\skyguard\game.cpp" />
@@ -533,6 +534,7 @@
     <ClInclude Include="include\core\ecs\components\scaling_behavior_component.h" />
     <ClInclude Include="include\core\ecs\components\spatial_dirty_tag.h" />
     <ClInclude Include="include\core\ecs\components\spatial_handle_component.h" />
+    <ClInclude Include="include\core\ecs\components\spatial_id_component.h" />
     <ClInclude Include="include\core\ecs\components\sprite_component.h" />
     <ClInclude Include="include\core\ecs\components\sprite_scaling_data_component.h" />
     <ClInclude Include="include\core\ecs\components\transform_component.h" />
@@ -570,6 +572,7 @@
     <ClInclude Include="include\core\spatial\aabb2.h" />
     <ClInclude Include="include\core\spatial\aabb2i.h" />
     <ClInclude Include="include\core\spatial\chunk_coord.h" />
+    <ClInclude Include="include\core\spatial\entity_id32.h" />
     <ClInclude Include="include\core\spatial\spatial_index.h" />
     <ClInclude Include="include\core\spatial\spatial_index_v2.h" />
     <ClInclude Include="include\core\time\time_config.h" />
@@ -601,6 +604,7 @@
     <ClInclude Include="include\game\skyguard\config\properties\aircraft_control_properties.h" />
     <ClInclude Include="include\game\skyguard\config\view_config.h" />
     <ClInclude Include="include\game\skyguard\config\window_config.h" />
+    <ClInclude Include="include\game\skyguard\dev\spatial_index_harness.h" />
     <ClInclude Include="include\game\skyguard\dev\stress_scene.h" />
     <ClInclude Include="include\game\skyguard\ecs\components\aircraft_control_bindings_component.h" />
     <ClInclude Include="include\game\skyguard\ecs\components\aircraft_control_component.h" />

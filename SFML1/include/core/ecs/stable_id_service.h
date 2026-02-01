@@ -35,6 +35,7 @@ namespace core::ecs {
 
         void onEntityDestroyed(Entity e) noexcept;
         void clear() noexcept;
+        void prewarm(std::size_t maxEntities);
 
       private:
         static constexpr StableId kUnsetStableId = 0u;

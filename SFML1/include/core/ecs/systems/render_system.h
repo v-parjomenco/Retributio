@@ -2,13 +2,14 @@
 // File: core/ecs/systems/render_system.h
 // Purpose: High-performance batched sprite rendering with spatial culling
 // Used by: Game layer (render loop)
-// Related headers: world.h, spatial_index.h, resource_manager.h
+// Related headers: world.h, spatial_index_v2.h, resource_manager.h
 // ================================================================================================
 #pragma once
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <vector>
 
 #include <SFML/Graphics/Rect.hpp>
@@ -18,6 +19,7 @@
 #include "core/ecs/entity.h"
 #include "core/ecs/system.h"
 #include "core/resources/keys/resource_key.h"
+#include "core/spatial/spatial_index_v2.h"
 
 namespace sf {
     class RenderWindow;
@@ -27,10 +29,6 @@ namespace sf {
 namespace core::resources {
     class ResourceManager;
 } // namespace core::resources
-
-namespace core::spatial {
-    class SpatialIndex;
-} // namespace core::spatial
 
 namespace core::ecs {
 
@@ -103,8 +101,11 @@ namespace core::ecs {
          * Дополнительно:
          *  - bind(nullptr, nullptr) допустим как явный "unbind" (сбрасывает кэш и состояние).
          *  - bind(spatialIndex, nullptr) / bind(nullptr, resources) — misuse -> (LOG_PANIC).
+         *  - entitiesBySpatialId must be non-empty when spatialIndex is provided.
+         *  - maxVisibleSprites > 0: upper bound for query output and vertex buffer sizing.
          */
-        void bind(const core::spatial::SpatialIndex* spatialIndex,
+        void bind(const core::spatial::SpatialIndexV2Flat* spatialIndex,
+                  std::span<const Entity> entitiesBySpatialId, std::size_t maxVisibleSprites,
                   const core::resources::ResourceManager* resources);
 
         /**
@@ -142,7 +143,11 @@ namespace core::ecs {
         // ----------------------------------------------------------------------------------------
 
         /// Spatial index для view-frustum culling (read-only, cell-level candidates)
-        const core::spatial::SpatialIndex* mSpatialIndex{nullptr};
+        const core::spatial::SpatialIndexV2Flat* mSpatialIndex{nullptr};
+
+        /// O(1) mapping from SpatialId32 -> Entity (index = id).
+        const Entity* mEntitiesBySpatialId{nullptr};
+        std::size_t mEntitiesBySpatialIdSize{0};
 
         /// Resource manager (resident-only access in render; NO lazy-load allowed).
         const core::resources::ResourceManager* mResources{nullptr};
@@ -182,7 +187,9 @@ namespace core::ecs {
         // Буферы (amortized growth, переиспользуются между кадрами)
         // ----------------------------------------------------------------------------------------
 
-        std::vector<Entity> mVisibleEntities;
+        std::vector<core::spatial::EntityId32> mVisibleIds;
+        std::size_t mVisibleCount{0};
+        std::size_t mMaxVisibleSprites{0};
         std::vector<RenderKey> mKeys;
         std::vector<RenderPacket> mPackets;
 

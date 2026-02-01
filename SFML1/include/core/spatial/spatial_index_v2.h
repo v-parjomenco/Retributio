@@ -24,12 +24,9 @@
 #include "core/spatial/aabb2.h"
 #include "core/spatial/aabb2i.h"
 #include "core/spatial/chunk_coord.h"
+#include "core/spatial/entity_id32.h"
 
 namespace core::spatial {
-
-    // EntityId32: НЕ entt::entity. Внешний 32-bit ID вызывающей стороны.
-    // Индексирует marks/overflow; требует prewarm(maxEntityId) перед write/query.
-    using EntityId32 = std::uint32_t;
 
     enum class ResidencyState : std::uint8_t { Unloaded = 0, Loading, Loaded, Unloading };
 
@@ -132,6 +129,18 @@ namespace core::spatial {
 
         template <typename Fn> bool forEach(std::uint32_t headHandle, Fn&& fn) const;
 
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        struct DebugStats final {
+            std::uint32_t nodeCapacity = 0;
+            std::uint32_t maxNodes = 0;
+            std::uint32_t peakUsedNodes = 0;
+            std::uint32_t freeDepth = 0;
+        };
+
+        [[nodiscard]] DebugStats debugStats() const noexcept;
+        [[nodiscard]] std::uint32_t totalCount(std::uint32_t headHandle) const noexcept;
+#endif
+
       private:
         [[nodiscard]] std::uint32_t allocateNode();
         void releaseNode(const std::uint32_t handle) noexcept;
@@ -152,6 +161,9 @@ namespace core::spatial {
         std::uint32_t mMaxNodes = 0;
         std::uint32_t mNextUnusedIndex = 0;
         std::uint32_t mFreeCount = 0;
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        std::uint32_t mPeakUsedNodes = 0;
+#endif
 
         std::vector<EntityId32> mEntries{};
         std::vector<std::uint32_t> mNext{};
@@ -369,7 +381,24 @@ namespace core::spatial {
             return mMarksClearRequired;
         }
 
-        void clearMarksTable() noexcept;
+        void clearMarksTable() const noexcept;
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        struct DebugQueryStats final {
+            std::uint32_t cellVisits = 0;
+            std::uint32_t overflowCellVisits = 0;
+            std::uint32_t overflowEntitiesVisited = 0;
+            std::uint32_t candidatesVisited = 0;
+        };
+
+        struct DebugStats final {
+            DebugQueryStats lastQuery{};
+            std::uint32_t worstCellDensity = 0;
+            OverflowPool::DebugStats overflow{};
+        };
+
+        [[nodiscard]] DebugStats debugStats() const noexcept;
+#endif
 
       private:
         struct CellRange final {
@@ -415,8 +444,10 @@ namespace core::spatial {
         void handleOutputOverflow() const;
 
         template <typename ChunkT, typename Fn>
-        bool forEachCellInRange(ChunkT& chunk, const ChunkCoord coord, const CellRange& cellRange,
-                                Fn&& fn) const;
+bool forEachCellInRange(ChunkT& chunk, const ChunkCoord coord, const CellRange& cellRange, Fn&& fn);
+
+template <typename ChunkT, typename Fn>
+bool forEachCellInRange(const ChunkT& chunk, const ChunkCoord coord, const CellRange& cellRange, Fn&& fn) const;
 
         template <typename Fn> bool forEachEntityInCell(const Cell& cell, Fn&& fn) const;
 
@@ -436,6 +467,11 @@ namespace core::spatial {
 
         std::int32_t mCellsPerChunkX = 0;
         std::int32_t mCellsPerChunkY = 0;
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        mutable DebugQueryStats mDebugLastQueryStats{};
+        std::uint32_t mDebugWorstCellDensity = 0;
+#endif
     };
 
     using SpatialIndexV2Flat = SpatialIndexV2<FlatStorage, Aabb2>;
@@ -456,6 +492,9 @@ namespace core::spatial {
             mFreeStack.clear();
             mFreeCount = 0;
             mNextUnusedIndex = 0;
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            mPeakUsedNodes = 0;
+#endif
             return;
         }
 
@@ -467,6 +506,9 @@ namespace core::spatial {
         mFreeStack.resize(mMaxNodes);
         mFreeCount = 0;
         mNextUnusedIndex = 0;
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        mPeakUsedNodes = 0;
+#endif
     }
 
     inline std::uint32_t OverflowPool::allocateNode() {
@@ -478,7 +520,7 @@ namespace core::spatial {
         }
 #endif
 
-        if (mFreeCount > 0) {
+        if (mFreeCount > 0u) {
             const std::uint32_t handle = mFreeStack[--mFreeCount];
 #if !defined(NDEBUG)
             assert(handle != 0u && "OverflowPool: invalid handle in free-stack");
@@ -490,6 +532,13 @@ namespace core::spatial {
             const std::uint32_t idx = nodeIndex(handle);
             mCounts[idx] = 0;
             mNext[idx] = 0;
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            const std::uint32_t used = mNextUnusedIndex - mFreeCount;
+            if (used > mPeakUsedNodes) {
+                mPeakUsedNodes = used;
+            }
+#endif
             return handle;
         }
 
@@ -500,6 +549,13 @@ namespace core::spatial {
         const std::uint32_t newIndex = mNextUnusedIndex++;
         mCounts[newIndex] = 0;
         mNext[newIndex] = 0;
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        const std::uint32_t used = mNextUnusedIndex - mFreeCount;
+        if (used > mPeakUsedNodes) {
+            mPeakUsedNodes = used;
+        }
+#endif
         return handleFromIndex(newIndex);
     }
 
@@ -696,6 +752,26 @@ namespace core::spatial {
         }
         return true;
     }
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+    inline OverflowPool::DebugStats OverflowPool::debugStats() const noexcept {
+        return DebugStats{.nodeCapacity = mNodeCapacity,
+                          .maxNodes = mMaxNodes,
+                          .peakUsedNodes = mPeakUsedNodes,
+                          .freeDepth = mFreeCount};
+    }
+
+    inline std::uint32_t OverflowPool::totalCount(const std::uint32_t headHandle) const noexcept {
+        std::uint32_t total = 0;
+        std::uint32_t handle = headHandle;
+        while (handle != 0u) {
+            const std::uint32_t idx = nodeIndex(handle);
+            total += mCounts[idx];
+            handle = mNext[idx];
+        }
+        return total;
+    }
+#endif
 
     inline std::uint32_t FlatStorage::allocateCellsBlock() {
 #if !defined(NDEBUG)
@@ -2115,7 +2191,12 @@ namespace core::spatial {
         }
 
         if (cell.overflowHandle != 0u) {
-            mOverflowPool.remove(cell.overflowHandle, id);
+            const bool removed = mOverflowPool.remove(cell.overflowHandle, id);
+            assert(removed && "SpatialIndexV2: overflow remove failed");
+            if (!removed) [[unlikely]] {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialIndexV2: overflow remove failed");
+            }
         }
     }
 
@@ -2125,6 +2206,11 @@ namespace core::spatial {
         if (cell.count < Cell::kInlineCapacity) {
             cell.entities[cell.count] = id;
             ++cell.count;
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            if (cell.count > mDebugWorstCellDensity) {
+                mDebugWorstCellDensity = cell.count;
+            }
+#endif
             return true;
         }
 
@@ -2136,7 +2222,13 @@ namespace core::spatial {
             }
             return false;
         }
-
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        const std::uint32_t overflowCount = mOverflowPool.totalCount(cell.overflowHandle);
+        const std::uint32_t total = static_cast<std::uint32_t>(cell.count) + overflowCount;
+        if (total > mDebugWorstCellDensity) {
+            mDebugWorstCellDensity = total;
+        }
+#endif
         return true;
     }
 
@@ -2217,78 +2309,141 @@ namespace core::spatial {
     }
 
     template <typename Storage, typename BoundsT>
-    inline void SpatialIndexV2<Storage, BoundsT>::clearMarksTable() noexcept {
+    inline void SpatialIndexV2<Storage, BoundsT>::clearMarksTable() const noexcept {
         std::fill(mMarks.begin(), mMarks.end(), 0u);
         mQueryStamp = 1;
         mMarksClearRequired = false;
     }
 
     template <typename Storage, typename BoundsT>
-    template <typename ChunkT, typename Fn>
-    inline bool SpatialIndexV2<Storage, BoundsT>::forEachCellInRange(ChunkT& chunk,
-                                                                     const ChunkCoord coord,
-                                                                     const CellRange& cellRange,
-                                                                     Fn&& fn) const {
-        const std::int64_t chunkCellOriginX = static_cast<std::int64_t>(coord.x) * mCellsPerChunkX;
-        const std::int64_t chunkCellOriginY = static_cast<std::int64_t>(coord.y) * mCellsPerChunkY;
+template <typename ChunkT, typename Fn>
+inline bool SpatialIndexV2<Storage, BoundsT>::forEachCellInRange(ChunkT& chunk,
+                                                                 const ChunkCoord coord,
+                                                                 const CellRange& cellRange,
+                                                                 Fn&& fn) {
+    const std::int64_t chunkCellOriginX = static_cast<std::int64_t>(coord.x) * mCellsPerChunkX;
+    const std::int64_t chunkCellOriginY = static_cast<std::int64_t>(coord.y) * mCellsPerChunkY;
 
-        const std::int64_t minX64 = static_cast<std::int64_t>(cellRange.minX) - chunkCellOriginX;
-        const std::int64_t minY64 = static_cast<std::int64_t>(cellRange.minY) - chunkCellOriginY;
-        const std::int64_t maxX64 = static_cast<std::int64_t>(cellRange.maxX) - chunkCellOriginX;
-        const std::int64_t maxY64 = static_cast<std::int64_t>(cellRange.maxY) - chunkCellOriginY;
+    const std::int64_t minX64 = static_cast<std::int64_t>(cellRange.minX) - chunkCellOriginX;
+    const std::int64_t minY64 = static_cast<std::int64_t>(cellRange.minY) - chunkCellOriginY;
+    const std::int64_t maxX64 = static_cast<std::int64_t>(cellRange.maxX) - chunkCellOriginX;
+    const std::int64_t maxY64 = static_cast<std::int64_t>(cellRange.maxY) - chunkCellOriginY;
 
-        const std::int64_t maxXClamp = static_cast<std::int64_t>(mCellsPerChunkX) - 1;
-        const std::int64_t maxYClamp = static_cast<std::int64_t>(mCellsPerChunkY) - 1;
-        constexpr std::int64_t kZero64 = std::int64_t{0};
+    const std::int64_t maxXClamp = static_cast<std::int64_t>(mCellsPerChunkX) - 1;
+    const std::int64_t maxYClamp = static_cast<std::int64_t>(mCellsPerChunkY) - 1;
+    constexpr std::int64_t kZero64 = std::int64_t{0};
 
-        const std::int32_t localMinX =
-            static_cast<std::int32_t>(std::clamp(minX64, kZero64, maxXClamp));
-        const std::int32_t localMinY =
-            static_cast<std::int32_t>(std::clamp(minY64, kZero64, maxYClamp));
-        const std::int32_t localMaxX =
-            static_cast<std::int32_t>(std::clamp(maxX64, kZero64, maxXClamp));
-        const std::int32_t localMaxY =
-            static_cast<std::int32_t>(std::clamp(maxY64, kZero64, maxYClamp));
+    const std::int32_t localMinX =
+        static_cast<std::int32_t>(std::clamp(minX64, kZero64, maxXClamp));
+    const std::int32_t localMinY =
+        static_cast<std::int32_t>(std::clamp(minY64, kZero64, maxYClamp));
+    const std::int32_t localMaxX =
+        static_cast<std::int32_t>(std::clamp(maxX64, kZero64, maxXClamp));
+    const std::int32_t localMaxY =
+        static_cast<std::int32_t>(std::clamp(maxY64, kZero64, maxYClamp));
 
-        if (localMinX > localMaxX || localMinY > localMaxY) {
-            return true;
-        }
-
-        auto* cells = cellsForChunk(chunk);
-#if !defined(NDEBUG)
-        assert(cells != nullptr && "SpatialIndexV2: cellsForChunk nullptr (internal error)");
-#else
-        if (cells == nullptr) [[unlikely]] {
-            LOG_PANIC(core::log::cat::ECS,
-                      "SpatialIndexV2: cellsForChunk nullptr (internal error)");
-        }
-#endif
-
-        for (std::int32_t y = localMinY; y <= localMaxY; ++y) {
-            const std::size_t rowOffset = static_cast<std::size_t>(y) * mCellsPerChunkX;
-            for (std::int32_t x = localMinX; x <= localMaxX; ++x) {
-                auto& cell = cells[rowOffset + x];
-                if (!fn(cell)) {
-                    return false;
-                }
-            }
-        }
-
+    if (localMinX > localMaxX || localMinY > localMaxY) {
         return true;
     }
 
-    template <typename Storage, typename BoundsT>
+    auto* cells = cellsForChunk(chunk);
+#if !defined(NDEBUG)
+    assert(cells != nullptr && "SpatialIndexV2: cellsForChunk nullptr (internal error)");
+#else
+    if (cells == nullptr) [[unlikely]] {
+        LOG_PANIC(core::log::cat::ECS,
+                  "SpatialIndexV2: cellsForChunk nullptr (internal error)");
+    }
+#endif
+
+    for (std::int32_t y = localMinY; y <= localMaxY; ++y) {
+        const std::size_t rowOffset = static_cast<std::size_t>(y) * mCellsPerChunkX;
+        for (std::int32_t x = localMinX; x <= localMaxX; ++x) {
+            auto& cell = cells[rowOffset + static_cast<std::size_t>(x)];
+            if (!fn(cell)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+template <typename Storage, typename BoundsT>
+template <typename ChunkT, typename Fn>
+inline bool SpatialIndexV2<Storage, BoundsT>::forEachCellInRange(const ChunkT& chunk,
+                                                                 const ChunkCoord coord,
+                                                                 const CellRange& cellRange,
+                                                                 Fn&& fn) const {
+    const std::int64_t chunkCellOriginX = static_cast<std::int64_t>(coord.x) * mCellsPerChunkX;
+    const std::int64_t chunkCellOriginY = static_cast<std::int64_t>(coord.y) * mCellsPerChunkY;
+
+    const std::int64_t minX64 = static_cast<std::int64_t>(cellRange.minX) - chunkCellOriginX;
+    const std::int64_t minY64 = static_cast<std::int64_t>(cellRange.minY) - chunkCellOriginY;
+    const std::int64_t maxX64 = static_cast<std::int64_t>(cellRange.maxX) - chunkCellOriginX;
+    const std::int64_t maxY64 = static_cast<std::int64_t>(cellRange.maxY) - chunkCellOriginY;
+
+    const std::int64_t maxXClamp = static_cast<std::int64_t>(mCellsPerChunkX) - 1;
+    const std::int64_t maxYClamp = static_cast<std::int64_t>(mCellsPerChunkY) - 1;
+    constexpr std::int64_t kZero64 = std::int64_t{0};
+
+    const std::int32_t localMinX =
+        static_cast<std::int32_t>(std::clamp(minX64, kZero64, maxXClamp));
+    const std::int32_t localMinY =
+        static_cast<std::int32_t>(std::clamp(minY64, kZero64, maxYClamp));
+    const std::int32_t localMaxX =
+        static_cast<std::int32_t>(std::clamp(maxX64, kZero64, maxXClamp));
+    const std::int32_t localMaxY =
+        static_cast<std::int32_t>(std::clamp(maxY64, kZero64, maxYClamp));
+
+    if (localMinX > localMaxX || localMinY > localMaxY) {
+        return true;
+    }
+
+    auto* cells = cellsForChunk(chunk);
+#if !defined(NDEBUG)
+    assert(cells != nullptr && "SpatialIndexV2: cellsForChunk nullptr (internal error)");
+#else
+    if (cells == nullptr) [[unlikely]] {
+        LOG_PANIC(core::log::cat::ECS,
+                  "SpatialIndexV2: cellsForChunk nullptr (internal error)");
+    }
+#endif
+
+    for (std::int32_t y = localMinY; y <= localMaxY; ++y) {
+        const std::size_t rowOffset = static_cast<std::size_t>(y) * mCellsPerChunkX;
+        for (std::int32_t x = localMinX; x <= localMaxX; ++x) {
+            auto& cell = cells[rowOffset + static_cast<std::size_t>(x)];
+            if (!fn(cell)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+template <typename Storage, typename BoundsT>
     template <typename Fn>
     inline bool SpatialIndexV2<Storage, BoundsT>::forEachEntityInCell(const Cell& cell,
                                                                       Fn&& fn) const {
         for (std::uint8_t i = 0; i < cell.count; ++i) {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            ++mDebugLastQueryStats.candidatesVisited;
+#endif
             if (!fn(cell.entities[i])) {
                 return false;
             }
         }
 
         if (cell.overflowHandle != 0u) {
-            return mOverflowPool.forEach(cell.overflowHandle, fn);
+            return mOverflowPool.forEach(cell.overflowHandle, [&](const EntityId32 id) {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                ++mDebugLastQueryStats.candidatesVisited;
+                ++mDebugLastQueryStats.overflowEntitiesVisited;
+#endif
+                return fn(id);
+            });
         }
 
         return true;
@@ -2345,7 +2500,9 @@ namespace core::spatial {
         if (!beginQueryStamp()) {
             return 0;
         }
-
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        mDebugLastQueryStats = DebugQueryStats{};
+#endif
         const CellRange chunkRange = computeChunkRange(area);
         if (chunkRange.empty()) {
             return 0;
@@ -2368,6 +2525,12 @@ namespace core::spatial {
                     if (stop) {
                         return false;
                     }
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                    ++mDebugLastQueryStats.cellVisits;
+                    if (cell.overflowHandle != 0u) {
+                        ++mDebugLastQueryStats.overflowCellVisits;
+                    }
+#endif
                     return forEachEntityInCell(cell, [&](const EntityId32 id) {
                         if (outCount >= out.size()) {
                             stop = true;
@@ -2397,7 +2560,9 @@ namespace core::spatial {
             handleMarksWrap();
             return 0;
         }
-
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        mDebugLastQueryStats = DebugQueryStats{};
+#endif
         const CellRange chunkRange = computeChunkRange(area);
         if (chunkRange.empty()) {
             return 0;
@@ -2422,6 +2587,12 @@ namespace core::spatial {
                     if (stop) {
                         return false;
                     }
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                    ++mDebugLastQueryStats.cellVisits;
+                    if (cell.overflowHandle != 0u) {
+                        ++mDebugLastQueryStats.overflowCellVisits;
+                    }
+#endif
                     return forEachEntityInCell(cell, [&](const EntityId32 id) {
                         if (outCount >= out.size()) {
                             handleOutputOverflow();
@@ -2443,5 +2614,15 @@ namespace core::spatial {
 
         return outCount;
     }
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+    template <typename Storage, typename BoundsT>
+    inline typename SpatialIndexV2<Storage, BoundsT>::DebugStats
+    SpatialIndexV2<Storage, BoundsT>::debugStats() const noexcept {
+        return DebugStats{.lastQuery = mDebugLastQueryStats,
+                          .worstCellDensity = mDebugWorstCellDensity,
+                          .overflow = mOverflowPool.debugStats()};
+    }
+#endif
 
 } // namespace core::spatial

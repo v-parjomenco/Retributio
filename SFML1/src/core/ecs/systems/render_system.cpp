@@ -11,14 +11,14 @@
 
 #include <SFML/System/Angle.hpp>
 
-#include "core/ecs/components/spatial_handle_component.h"
+#include "core/ecs/components/spatial_id_component.h"
 #include "core/ecs/components/sprite_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/world.h"
 #include "core/log/log_macros.h"
 #include "core/resources/resource_manager.h" // resident-only access (expectTextureResident)
 #include "core/spatial/aabb2.h"
-#include "core/spatial/spatial_index.h"      // mSpatialIndex->query()
+#include "core/spatial/spatial_index_v2.h"
 #include "core/utils/math_constants.h"
 
 namespace {
@@ -181,10 +181,14 @@ namespace core::ecs {
 #endif
     }
 
-    void RenderSystem::bind(const core::spatial::SpatialIndex* spatialIndex,
+    void RenderSystem::bind(const core::spatial::SpatialIndexV2Flat* spatialIndex,
+                            std::span<const Entity> entitiesBySpatialId,
+                            const std::size_t maxVisibleSprites,
                             const core::resources::ResourceManager* resources) {
         const bool hasIndex = (spatialIndex != nullptr);
         const bool hasRes = (resources != nullptr);
+        const bool hasMapping = (!entitiesBySpatialId.empty());
+        const bool hasVisibleCap = (maxVisibleSprites > 0);
 
         // Контракт: либо оба nullptr (unbind), либо оба валидны.
         if (hasIndex != hasRes) {
@@ -194,9 +198,23 @@ namespace core::ecs {
                       static_cast<const void*>(spatialIndex),
                       static_cast<const void*>(resources));
         }
+        if (hasIndex != hasMapping) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "RenderSystem::bind: spatial mapping mismatch (spatialIndex={}, "
+                      "mappingSize={})",
+                      static_cast<const void*>(spatialIndex), entitiesBySpatialId.size());
+        }
+        if (hasIndex != hasVisibleCap) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "RenderSystem::bind: invalid maxVisibleSprites (value={}, spatialIndex={})",
+                      maxVisibleSprites, static_cast<const void*>(spatialIndex));
+        }
 
         mSpatialIndex = spatialIndex;
         mResources = resources;
+        mEntitiesBySpatialId = entitiesBySpatialId.data();
+        mEntitiesBySpatialIdSize = entitiesBySpatialId.size();
+        mMaxVisibleSprites = maxVisibleSprites;
 
         // Unbind: bind(nullptr, nullptr).
         if (mResources == nullptr) {
@@ -204,6 +222,11 @@ namespace core::ecs {
             mFrameTextureStamp.clear();
             mFrameId = 0;
             mCachedResourceGen = 0;
+            mVisibleIds.clear();
+            mVisibleCount = 0;
+            mMaxVisibleSprites = 0;
+            mEntitiesBySpatialId = nullptr;
+            mEntitiesBySpatialIdSize = 0;
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
             mUniqueTexturesThisFrame = 0;
@@ -235,6 +258,26 @@ namespace core::ecs {
 
         resizeEpochArrays(count);
         mCachedResourceGen = mResources->cacheGeneration();
+
+        // Prewarm buffers to fixed caps (no hot-path growth).
+        mVisibleIds.assign(mMaxVisibleSprites, core::spatial::EntityId32{0});
+        mVisibleCount = 0;
+
+        if (mKeys.capacity() < mMaxVisibleSprites) {
+            mKeys.reserve(mMaxVisibleSprites);
+        }
+        if (mPackets.capacity() < mMaxVisibleSprites) {
+            mPackets.reserve(mMaxVisibleSprites);
+        }
+
+        const std::size_t maxVertices = mMaxVisibleSprites * 6u;
+        if (maxVertices > 0) {
+            mVertexBuffer = std::make_unique_for_overwrite<sf::Vertex[]>(maxVertices);
+            mVertexBufferCapacity = maxVertices;
+        } else {
+            mVertexBuffer.reset();
+            mVertexBufferCapacity = 0;
+        }
     }
 
     void RenderSystem::resizeEpochArrays(const std::size_t textureCount) {
@@ -326,6 +369,8 @@ namespace core::ecs {
                "RenderSystem: view rotation is not supported (view.getRotation() must be 0).");
         assert(mSpatialIndex != nullptr && "RenderSystem: bind() не вызван — mSpatialIndex null");
         assert(mResources != nullptr && "RenderSystem: bind() не вызван — mResources null");
+        assert(mEntitiesBySpatialId != nullptr && mEntitiesBySpatialIdSize > 0 &&
+               "RenderSystem: spatial mapping not bound");
         assert(mFrameTexturePtr.size() == mResources->registry().textureCount() &&
                "RenderSystem: epoch cache size mismatch (call bind() after registry reload).");
         assert(mFrameTextureStamp.size() == mResources->registry().textureCount() &&
@@ -358,59 +403,65 @@ namespace core::ecs {
         // Шаг 1: Gather + Culling — собираем ключи только для видимых спрайтов.
         // ----------------------------------------------------------------------------------------
 
-        // Amortized growth: reserve(count + max(count/2, 256)).
-        // Избегаем повторных реаллокаций при постепенном увеличении visible count.
-        const auto ensureCapacity = [](auto& vec, std::size_t count) {
-            const std::size_t current = vec.capacity();
-            if (count > current) {
-                const std::size_t grow = std::max(count / 2, std::size_t{256});
-                vec.reserve(count + grow);
-            }
-        };
+        if (mVisibleIds.empty()) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "RenderSystem: query buffer not prewarmed (bind() not called)");
+        }
 
-        ensureCapacity(mVisibleEntities, mLastVisibleCount);
-
-        mVisibleEntities.clear();
         mKeys.clear();
         mPackets.clear();
         beginFrame();
 
-        mSpatialIndex->query(viewAabb, mVisibleEntities);
+        if (mSpatialIndex->marksClearRequired()) {
+            mSpatialIndex->clearMarksTable();
+        }
 
-        const std::size_t visibleCount = mVisibleEntities.size();
-        mLastVisibleCount = visibleCount;
-
-        ensureCapacity(mKeys, visibleCount);
-        ensureCapacity(mPackets, visibleCount);
+        const std::span<core::spatial::EntityId32> outIds(mVisibleIds);
+        const std::size_t idCount = mSpatialIndex->queryFast(viewAabb, outIds);
+        if (idCount == outIds.size()) {
+            LOG_ERROR(core::log::cat::ECS,
+                      "RenderSystem: SpatialIndexV2 query truncated (capacity={})", outIds.size());
+        }
+        mVisibleCount = idCount;
+        mLastVisibleCount = idCount;
 
         // ----------------------------------------------------------------------------------------
         // КРИТИЧНАЯ ОПТИМИЗАЦИЯ: Vertex buffer без инициализации.
         // std::vector<sf::Vertex>::resize(N) зануляет ~7MB при 50k sprites.
         // std::make_unique_for_overwrite<sf::Vertex[]> (C++20) = zero init cost.
         // ----------------------------------------------------------------------------------------
-        const std::size_t maxVertices = visibleCount * 6;
+        const std::size_t maxVertices = mVisibleCount * 6;
         if (maxVertices > mVertexBufferCapacity) {
-            const std::size_t grow = std::max(maxVertices / 2, std::size_t{1536});
-            const std::size_t newCapacity = maxVertices + grow;
-            mVertexBuffer = std::make_unique_for_overwrite<sf::Vertex[]>(newCapacity);
-            mVertexBufferCapacity = newCapacity;
+            LOG_PANIC(core::log::cat::ECS,
+                      "RenderSystem: vertex buffer overflow (visible={}, capacity={})",
+                      mVisibleCount, mVertexBufferCapacity / 6u);
         }
 
-        auto ecsView = world.view<TransformComponent, SpriteComponent, SpatialHandleComponent>();
+        auto ecsView = world.view<TransformComponent, SpriteComponent, SpatialIdComponent>();
 
-        // Итерация по mVisibleEntities (уже отфильтровано SpatialIndex).
+        // Итерация по mVisibleIds (уже отфильтровано SpatialIndexV2).
         // Если число видимых сущностей будет постоянно превышать 50k, поменять на:
         //  packed iteration через view.each() + inline culling.
 
-        for (const Entity entity : mVisibleEntities) {
+        for (std::size_t i = 0; i < mVisibleCount; ++i) {
+            const core::spatial::EntityId32 id = mVisibleIds[i];
+            assert(id < mEntitiesBySpatialIdSize &&
+                   "RenderSystem: SpatialId32 out of range (mapping)");
+            const Entity entity = mEntitiesBySpatialId[id];
+            if (entity == core::ecs::NullEntity) {
+                continue;
+            }
+            if (!ecsView.contains(entity)) {
+                continue;
+            }
             assert(ecsView.contains(entity) && "RenderSystem: SpatialIndex вернул entity без "
-                                               "(Transform, Sprite, SpatialHandle)");
+                                               "(Transform, Sprite, SpatialId)");
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
             ++totalCandidates;
 #endif
             const auto& spr = ecsView.get<SpriteComponent>(entity);
             const auto& tr = ecsView.get<TransformComponent>(entity);
-            const auto& sh = ecsView.get<SpatialHandleComponent>(entity);
+            const auto& sh = ecsView.get<SpatialIdComponent>(entity);
 
 #if !defined(NDEBUG)
             const bool dataFinite = isFiniteVec2(tr.position) &&

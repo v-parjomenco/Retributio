@@ -111,6 +111,30 @@ namespace core::ecs {
         mObservedVersionPlusOneByIndex.clear();
     }
 
+    void StableIdService::prewarm(const std::size_t maxEntities) {
+#if !defined(NDEBUG)
+        debugAssertInvariants();
+        assert(mEnabled && "StableIdService::prewarm: service is disabled. Call enable().");
+#else
+        if (!mEnabled) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "StableIdService::prewarm: service is disabled. Call enable().");
+        }
+#endif
+
+        if (maxEntities == 0) {
+            return;
+        }
+
+        const std::size_t newSize = maxEntities;
+        if (mStableIdByIndex.size() >= newSize) {
+            return;
+        }
+
+        mStableIdByIndex.resize(newSize, kUnsetStableId);
+        mObservedVersionPlusOneByIndex.resize(newSize, kUnsetObservedVersionPlusOne);
+    }
+
     std::size_t StableIdService::rawIndex(const Entity e) noexcept {
         return static_cast<std::size_t>(entt::to_entity(e));
     }

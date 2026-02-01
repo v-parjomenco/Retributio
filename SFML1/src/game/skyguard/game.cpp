@@ -2,9 +2,11 @@
 
 #include "game/skyguard/game.h"
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <cmath>
 #include <filesystem>
 #include <optional>
 #include <span>
@@ -27,14 +29,13 @@
 #include "core/log/log_macros.h"
 #include "core/resources/registry/resource_registry.h"
 #include "core/time/time_config.h"
-
 #include "game/skyguard/bootstrap/scene_bootstrap.h"
 #include "game/skyguard/config/config_paths.h"
 #include "game/skyguard/config/loader/app_config_loader.h"
 #include "game/skyguard/config/loader/config_loader.h"
+#include "game/skyguard/config/loader/user_settings_loader.h"
 #include "game/skyguard/config/loader/view_config_loader.h"
 #include "game/skyguard/config/loader/window_config_loader.h"
-#include "game/skyguard/config/loader/user_settings_loader.h"
 #include "game/skyguard/config/window_config.h"
 #include "game/skyguard/ecs/components/player_tag_component.h"
 #include "game/skyguard/ecs/systems/aircraft_control_system.h"
@@ -46,6 +47,9 @@
 
 #if defined(SFML1_PROFILE)
     #include "game/skyguard/dev/stress_scene.h"
+#endif
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+    #include "game/skyguard/dev/spatial_index_harness.h"
 #endif
 
 // Движковые конфиги (Vsync, frame limit и т.п.).
@@ -61,6 +65,77 @@ namespace skycfg_paths = ::game::skyguard::config::paths;
 
 namespace platform = ::game::skyguard::platform;
 
+namespace {
+    [[nodiscard]] core::ecs::SpatialIndexSystemConfig
+    makeSpatialIndexV2ConfigSkyGuard(const core::config::EngineSettings& settings,
+                                     const sf::Vector2f worldLogicalSize) {
+        constexpr std::int32_t kChunkSizeWorld = 4096;
+        constexpr std::uint32_t kExpectedMaxEntities = 2'000'000;
+        constexpr std::size_t kMaxVisibleSprites = 50'000;
+        constexpr std::size_t kMaxDirtyEntities = 50'000;
+
+        const float cellSizeFloat = settings.spatialCellSize;
+        const auto cellSizeWorld = static_cast<std::int32_t>(cellSizeFloat);
+        if (cellSizeWorld <= 0 || static_cast<float>(cellSizeWorld) != cellSizeFloat) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexV2: spatialCellSize must be a positive integer "
+                      "(value={})",
+                      cellSizeFloat);
+        }
+        if (kChunkSizeWorld % cellSizeWorld != 0) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexV2: chunkSizeWorld must be divisible by cellSizeWorld "
+                      "(chunkSizeWorld={}, cellSizeWorld={})",
+                      kChunkSizeWorld, cellSizeWorld);
+        }
+
+        if (!(worldLogicalSize.x > 0.f) || !(worldLogicalSize.y > 0.f)) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexV2: worldLogicalSize must be positive ({}x{})",
+                      worldLogicalSize.x, worldLogicalSize.y);
+        }
+
+        const auto chunksX = static_cast<std::int32_t>(
+            std::ceil(static_cast<double>(worldLogicalSize.x) / kChunkSizeWorld));
+        const auto chunksY = static_cast<std::int32_t>(
+            std::ceil(static_cast<double>(worldLogicalSize.y) / kChunkSizeWorld));
+
+        if (chunksX <= 0 || chunksY <= 0) {
+            LOG_PANIC(core::log::cat::ECS, "SpatialIndexV2: computed chunk grid is invalid ({}x{})",
+                      chunksX, chunksY);
+        }
+
+        const std::uint32_t totalChunks =
+            static_cast<std::uint32_t>(chunksX) * static_cast<std::uint32_t>(chunksY);
+        const std::uint32_t maxResident = totalChunks;
+
+        const auto overflowMaxNodes = static_cast<std::uint32_t>(
+            std::max<std::size_t>(1u, kMaxVisibleSprites / core::spatial::Cell::kInlineCapacity));
+
+        core::ecs::SpatialIndexSystemConfig cfg{};
+        cfg.index.chunkSizeWorld = kChunkSizeWorld;
+        cfg.index.cellSizeWorld = cellSizeWorld;
+        cfg.index.maxEntityId = kExpectedMaxEntities;
+        cfg.index.marksCapacity = kExpectedMaxEntities;
+        cfg.index.overflowPolicy = core::spatial::OverflowPolicy::FailFast;
+        cfg.index.overflow = core::spatial::OverflowConfig{
+            // Stage 4: explicit overflow budget (bounded, no hidden growth).
+            .nodeCapacity = 32u,
+            .maxNodes = overflowMaxNodes};
+
+        cfg.storage.origin = core::spatial::ChunkCoord{0, 0};
+        cfg.storage.width = chunksX;
+        cfg.storage.height = chunksY;
+        cfg.storage.maxResidentChunks = maxResident;
+
+        cfg.maxEntityId = kExpectedMaxEntities;
+        cfg.maxDirtyEntities = kMaxDirtyEntities;
+        cfg.maxVisibleSprites = kMaxVisibleSprites;
+        cfg.determinismEnabled = false;
+        return cfg;
+    }
+} // namespace
+
 namespace game::skyguard {
 
     Game::Game() {
@@ -75,8 +150,7 @@ namespace game::skyguard {
         // ----------------------------------------------------------------------------------------
         const skycfg::WindowConfig windowCfg =
             skycfg::loadWindowConfig(skycfg_paths::SKYGUARD_GAME);
-        const skycfg::ViewConfig viewCfg =
-            skycfg::loadViewConfig(skycfg_paths::SKYGUARD_GAME);
+        const skycfg::ViewConfig viewCfg = skycfg::loadViewConfig(skycfg_paths::SKYGUARD_GAME);
 
         // ----------------------------------------------------------------------------------------
         // Загружаем пользовательские настройки (переопределяя дефолты)
@@ -161,13 +235,8 @@ namespace game::skyguard {
         // Инициализация key-world реестра ресурсов (v1).
         // Критичный конфиг: если он сломан — нет смысла продолжать игру.
         const std::array<core::resources::ResourceSource, 1> sources{
-            core::resources::ResourceSource{
-                std::string(skycfg_paths::RESOURCES),
-                0,
-                0,
-                "skyguard"
-            }
-        };
+            core::resources::ResourceSource{std::string(skycfg_paths::RESOURCES), 0, 0,
+                                            "skyguard"}};
         mResources.initialize(sources);
 
         // Fallback-ключи (core.texture.missing, core.font.default) валидируются
@@ -187,9 +256,7 @@ namespace game::skyguard {
         // Scene bootstrap: resolve keys + preload + derived sprite data (validate-on-write).
         // Game остаётся дирижёром: реализация подготовки сцены вынесена в bootstrap-модуль.
         // ----------------------------------------------------------------------------------------
-        game::skyguard::bootstrap::SceneBootstrapConfig bootCfg{
-            .players = std::span(players)
-        };
+        game::skyguard::bootstrap::SceneBootstrapConfig bootCfg{.players = std::span(players)};
 
         const game::skyguard::bootstrap::SceneBootstrapResult boot =
             game::skyguard::bootstrap::preloadAndResolveInitialScene(mResources, bootCfg);
@@ -207,18 +274,26 @@ namespace game::skyguard {
         mAircraftControlSystem = &mWorld.addSystem<game::skyguard::ecs::AircraftControlSystem>();
         mWorld.addSystem<core::ecs::MovementSystem>();
         mWorld.addSystem<game::skyguard::ecs::PlayerBoundsSystem>(
-            mViewManager.getWorldLogicalSize(),
-            playerFloorY);
+            mViewManager.getWorldLogicalSize(), playerFloorY);
 
-        auto& spatialSystem =
-            mWorld.addSystem<core::ecs::SpatialIndexSystem>(mEngineSettings.spatialCellSize);
+        const core::ecs::SpatialIndexSystemConfig spatialCfg =
+            makeSpatialIndexV2ConfigSkyGuard(mEngineSettings, mViewManager.getWorldLogicalSize());
+
+        auto& spatialSystem = mWorld.addSystem<core::ecs::SpatialIndexSystem>(spatialCfg);
 
         // 1. Создаем систему рендеринга конструктором по умолчанию (без аргументов)
         auto& renderSys = mWorld.addSystem<core::ecs::RenderSystem>();
         // 2. Привязываем зависимости через bind(). Передаем адреса (&).
-        renderSys.bind(&spatialSystem.index(), &mResources);
+        renderSys.bind(&spatialSystem.index(),
+                       spatialSystem.entitiesBySpatialId(),
+                       spatialCfg.maxVisibleSprites,
+                       &mResources);
         // 3. Сохраняем указатель
         mRenderSystem = &renderSys;
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        game::skyguard::dev::tryRunSpatialIndexHarnessFromEnv(spatialCfg);
+#endif
 
         // Эти системы требуют прямого доступа (onResize, onKeyEvent),
         // поэтому сохраняем указатели.
@@ -260,8 +335,7 @@ namespace game::skyguard {
         }
 
         const core::resources::TextureKey playerKey = *boot.stressPlayerKey;
-        game::skyguard::dev::trySpawnStressSpritesFromEnv(
-            mWorld, mResources, playerKey);
+        game::skyguard::dev::trySpawnStressSpritesFromEnv(mWorld, mResources, playerKey);
 #endif
     }
 
@@ -289,9 +363,8 @@ namespace game::skyguard {
         // Формула выводится из константы TimeService::kMaxAccumulatedSeconds и fixed timestep.
         // При значениях (0.5s / (1/60)) ≈ 30 апдейтов максимум.
         // ----------------------------------------------------------------------------------------
-        const int maxUpdatesPerFrame =
-            static_cast<int>(core::time::TimeService::kMaxAccumulatedSeconds /
-                             fixedTimeStep.asSeconds());
+        const int maxUpdatesPerFrame = static_cast<int>(
+            core::time::TimeService::kMaxAccumulatedSeconds / fixedTimeStep.asSeconds());
 
         LOG_INFO(core::log::cat::Gameplay, "Game loop started");
 
@@ -328,10 +401,8 @@ namespace game::skyguard {
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
             // Ограничение частоты вывода отладочной информации, чтобы избежать спама логом.
             if (++frameCount % 600ULL == 0ULL) {
-                LOG_DEBUG(core::log::cat::Performance,
-                          "FPS: {:.1f} (frame {})",
-                          mTime.getSmoothedFps(),
-                          frameCount);
+                LOG_DEBUG(core::log::cat::Performance, "FPS: {:.1f} (frame {})",
+                          mTime.getSmoothedFps(), frameCount);
             }
 #endif
         }
@@ -368,10 +439,8 @@ namespace game::skyguard {
 
 #if !defined(NDEBUG)
                 if (keyPressed->code == dbg::HOTKEY_DUMP_CAMERA) {
-                    auto view = mWorld.view<
-                        game::skyguard::ecs::LocalPlayerTagComponent,
-                        core::ecs::TransformComponent
-                    >();
+                    auto view = mWorld.view<game::skyguard::ecs::LocalPlayerTagComponent,
+                                            core::ecs::TransformComponent>();
 
                     const auto it = view.begin();
                     if (it == view.end()) {
@@ -385,10 +454,7 @@ namespace game::skyguard {
                         LOG_DEBUG(core::log::cat::Gameplay,
                                   "CamDebug: playerY={:.2f} viewCenterY={:.2f} viewSizeY={:.2f} "
                                   "cameraOffsetY={:.2f} cameraCenterYMax={:.2f}",
-                                  tr.position.y,
-                                  vw.getCenter().y,
-                                  vw.getSize().y,
-                                  off.y,
+                                  tr.position.y, vw.getCenter().y, vw.getSize().y, off.y,
                                   mViewManager.getCameraCenterYMax());
                     }
                 }
@@ -421,7 +487,6 @@ namespace game::skyguard {
                     }
                 }
             }
-
         }
 
         // Применяем отложенный Alt+Enter toggle одним действием, вне цикла pollEvent.
@@ -467,10 +532,8 @@ namespace game::skyguard {
     }
 
     void Game::updateCamera() {
-        auto view = mWorld.view<
-            game::skyguard::ecs::LocalPlayerTagComponent,
-            core::ecs::TransformComponent
-        >();
+        auto view = mWorld.view<game::skyguard::ecs::LocalPlayerTagComponent,
+                                core::ecs::TransformComponent>();
 
         const auto it = view.begin();
         const bool foundPlayer = (it != view.end());
@@ -512,7 +575,7 @@ namespace game::skyguard {
             return;
         }
 
-    #if !defined(NDEBUG) || defined(SFML1_PROFILE)
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
         // Важно для Profile: если overlay выключен — не тратим CPU на форматирование extra-строк.
         if (mDebugOverlay->isEnabled()) {
             mDebugOverlay->clearExtraText();
@@ -533,13 +596,11 @@ namespace game::skyguard {
                 }
             }
 
-        #if !defined(NDEBUG)
+#if !defined(NDEBUG)
             // Camera line (Debug only)
             {
-                auto view = mWorld.view<
-                    game::skyguard::ecs::LocalPlayerTagComponent,
-                    core::ecs::TransformComponent
-                >();
+                auto view = mWorld.view<game::skyguard::ecs::LocalPlayerTagComponent,
+                                        core::ecs::TransformComponent>();
 
                 const auto it = view.begin();
                 if (it != view.end()) {
@@ -550,22 +611,18 @@ namespace game::skyguard {
                     const auto& vw = mViewManager.getWorldView();
                     const sf::Vector2f off = mViewManager.getCameraOffset();
 
-                    const std::size_t camSize =
-                        utils::formatCameraStatsLine(camBuf.data(), camBuf.size(),
-                                                     tr.position.y,
-                                                     vw.getCenter().y,
-                                                     vw.getSize().y,
-                                                     off.y,
-                                                     mViewManager.getCameraCenterYMax());
+                    const std::size_t camSize = utils::formatCameraStatsLine(
+                        camBuf.data(), camBuf.size(), tr.position.y, vw.getCenter().y,
+                        vw.getSize().y, off.y, mViewManager.getCameraCenterYMax());
 
                     if (camSize > 0) {
                         mDebugOverlay->appendExtraLine(std::string_view(camBuf.data(), camSize));
                     }
                 }
             }
-        #endif
+#endif
         }
-    #endif
+#endif
 
         mDebugOverlay->prepareFrame(mWorld);
         mDebugOverlay->draw(mWindow);
