@@ -23,10 +23,13 @@ namespace core::ecs {
 
     struct SpatialIndexSystemConfig final {
         core::spatial::SpatialIndexConfig index{};
-        core::spatial::FlatStorageConfig storage{};
+        core::spatial::SlidingWindowConfig storage{};
         std::uint32_t maxEntityId = 0;
         std::size_t maxDirtyEntities = 0;
         std::size_t maxVisibleSprites = 0;
+        std::uint32_t maxLoadsPerFrame = 0;
+        std::uint32_t maxUnloadsPerFrame = 0;
+        std::int32_t hysteresisMarginChunks = 0;
         bool determinismEnabled = false;
     };
 
@@ -34,17 +37,19 @@ namespace core::ecs {
       public:
         explicit SpatialIndexSystem(const SpatialIndexSystemConfig& config) noexcept;
 
-        [[nodiscard]] core::spatial::SpatialIndexV2Flat& index() noexcept {
+        [[nodiscard]] core::spatial::SpatialIndexV2Sliding& index() noexcept {
             return mIndex;
         }
 
-        [[nodiscard]] const core::spatial::SpatialIndexV2Flat& index() const noexcept { 
+        [[nodiscard]] const core::spatial::SpatialIndexV2Sliding& index() const noexcept { 
             return mIndex;
         }
 
         [[nodiscard]] std::span<const Entity> entitiesBySpatialId() const noexcept {
             return mEntityBySpatialId;
         }
+
+        void ensureDestroyConnection(World& world);
 
         void update(World& world, float dt) override;
         void render(World&, sf::RenderWindow&) override {
@@ -56,15 +61,13 @@ namespace core::ecs {
             std::uint64_t stableId{0};
         };
 
-        void ensureDestroyConnection(World& world);
-
         void onHandleDestroyed(entt::registry& registry, Entity entity) noexcept;
 
         [[nodiscard]] core::spatial::EntityId32 allocateSpatialId();
         void releaseSpatialId(core::spatial::EntityId32 id) noexcept;
         void setMapping(core::spatial::EntityId32 id, Entity entity) noexcept;
 
-        core::spatial::SpatialIndexV2Flat mIndex;
+        core::spatial::SpatialIndexV2Sliding mIndex;
         std::vector<Entity> mEntityBySpatialId{};
         std::vector<core::spatial::EntityId32> mFreeSpatialIds{};
         std::vector<Entity> mDirtyScratch{};

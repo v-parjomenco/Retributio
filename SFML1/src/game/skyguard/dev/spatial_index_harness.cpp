@@ -173,7 +173,7 @@ namespace game::skyguard::dev {
         }
 
         core::spatial::SpatialIndex v1Index{static_cast<float>(spatialCfg.index.cellSizeWorld)};
-        core::spatial::SpatialIndexV2Flat v2Index{};
+        core::spatial::SpatialIndexV2Sliding v2Index{};
         v2Index.init(spatialCfg.index, spatialCfg.storage);
 
         for (std::int32_t y = spatialCfg.storage.origin.y;
@@ -424,7 +424,7 @@ namespace game::skyguard::dev {
             overflowCfg.overflowPolicy = core::spatial::OverflowPolicy::Truncate;
             overflowCfg.overflow = core::spatial::OverflowConfig{1u, 1u};
 
-            core::spatial::SpatialIndexV2Flat overflowIndex{};
+            core::spatial::SpatialIndexV2Sliding overflowIndex{};
             overflowIndex.init(overflowCfg, spatialCfg.storage);
 
             for (std::int32_t y = spatialCfg.storage.origin.y;

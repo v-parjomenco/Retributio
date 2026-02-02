@@ -7,6 +7,7 @@
 
 #include "core/ecs/components/spatial_dirty_tag.h"
 #include "core/ecs/components/spatial_id_component.h"
+#include "core/ecs/components/spatial_streamed_out_tag.h"
 #include "core/ecs/components/sprite_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/render/sprite_bounds.h"
@@ -15,19 +16,22 @@
 #include "core/utils/math_constants.h"
 
 namespace {
+
     [[nodiscard]] core::spatial::Aabb2 computeEntityAabb(
         const core::ecs::TransformComponent& tr, const core::ecs::SpriteComponent& sp) noexcept {
         const float rotationDegrees = tr.rotationDegrees;
         if (rotationDegrees == 0.f) {
-            return core::ecs::render::computeSpriteAabbNoRotation(tr.position, sp.origin,
-                                                                   sp.scale, sp.textureRect);
+            return core::ecs::render::computeSpriteAabbNoRotation(
+                tr.position, sp.origin, sp.scale, sp.textureRect);
         }
+
         const float radians = rotationDegrees * core::utils::kDegToRad;
         const float cachedSin = std::sin(radians);
         const float cachedCos = std::cos(radians);
-        return core::ecs::render::computeSpriteAabbRotated(tr.position, sp.origin, sp.scale,
-                                                            sp.textureRect, cachedSin, cachedCos);
+        return core::ecs::render::computeSpriteAabbRotated(
+            tr.position, sp.origin, sp.scale, sp.textureRect, cachedSin, cachedCos);
     }
+
 } // namespace
 
 namespace core::ecs {
@@ -42,23 +46,19 @@ namespace core::ecs {
                "SpatialIndexSystem: index.maxEntityId must match maxEntityId");
 
         mIndex.init(config.index, config.storage);
-        const auto origin = config.storage.origin;
-        for (std::int32_t y = origin.y; y < origin.y + config.storage.height; ++y) {
-            for (std::int32_t x = origin.x; x < origin.x + config.storage.width; ++x) {
-                const bool loaded =
-                    mIndex.setChunkState({x, y}, core::spatial::ResidencyState::Loaded);
-                if (!loaded) {
-                    LOG_PANIC(core::log::cat::ECS,
-                              "SpatialIndexSystem: failed to set chunk loaded ({}, {})", x, y);
-                }
-            }
-        }
 
+        // Инварианты ID-пула (SpatialId32):
+        //  - id==0: "нет привязки".
+        //  - mEntityBySpatialId[id] == NullEntity <=> id свободен (может быть в free-list).
+        //  - Если у сущности есть SpatialIdComponent{id!=0}, то mEntityBySpatialId[id] == entity.
+        //  - releaseSpatialId(id) разрешён ТОЛЬКО если mapping[id] != NullEntity (fail-fast).
         mEntityBySpatialId.clear();
         mEntityBySpatialId.resize(static_cast<std::size_t>(config.maxEntityId) + 1u,
                                   core::ecs::NullEntity);
+
         mFreeSpatialIds.clear();
         mFreeSpatialIds.reserve(static_cast<std::size_t>(config.maxEntityId) / 16u);
+
         mNextSpatialId = 1u;
         mDeterminismEnabled = config.determinismEnabled;
     }
@@ -75,8 +75,7 @@ namespace core::ecs {
         }
 
         auto newView = registry.view<TransformComponent, SpriteComponent>(
-            entt::exclude<SpatialIdComponent>);
-
+            entt::exclude<SpatialIdComponent, SpatialStreamedOutTag>);
 
         for (auto [entity, transform, sprite] : newView.each()) {
             assert(core::ecs::render::hasExplicitRect(sprite.textureRect) &&
@@ -91,28 +90,76 @@ namespace core::ecs {
                           mEntityBySpatialId.size() - 1u);
             }
 
-            const core::spatial::WriteResult result = mIndex.registerEntity(id, aabb);
-            if (result == core::spatial::WriteResult::Rejected) {
+            // КРИТИЧЕСКИЙ КОНТРАКТ (state machine):
+            //  allocateSpatialId() возвращает "зарезервированный" id, но сам allocate НЕ знает
+            //  entity, поэтому mapping должен быть установлен СРАЗУ ЖЕ, до любых операций, которые
+            //  могут привести к releaseSpatialId(id) (ошибка регистрации, ранний выход и т.п.).
+            //
+            // Это гарантирует, что releaseSpatialId(id) остаётся строгим fail-fast:
+            // release без mapping == контрактная ошибка (или реальный double-free).
+            setMapping(id, entity);
+
+            const core::spatial::WriteResult writeResult = mIndex.registerEntity(id, aabb);
+            if (writeResult == core::spatial::WriteResult::Rejected) {
+                // Диагностика только на фейле: нулевой cost на успешном пути.
+                const bool isFinite = std::isfinite(aabb.minX) && std::isfinite(aabb.minY) &&
+                                      std::isfinite(aabb.maxX) && std::isfinite(aabb.maxY);
+
+                const std::int32_t chunkSize = mIndex.chunkSizeWorld();
+
+                const core::spatial::ChunkCoord minChunk = core::spatial::worldToChunk(
+                    core::spatial::WorldPosf{aabb.minX, aabb.minY}, chunkSize);
+                const core::spatial::ChunkCoord maxChunk = core::spatial::worldToChunk(
+                    core::spatial::WorldPosf{aabb.maxX, aabb.maxY}, chunkSize);
+
+                core::spatial::ChunkCoord firstBad{minChunk.x, minChunk.y};
+                core::spatial::ResidencyState firstBadState =
+                    core::spatial::ResidencyState::Unloaded;
+                bool foundBad = false;
+
+                for (std::int32_t cy = minChunk.y; cy <= maxChunk.y && !foundBad; ++cy) {
+                    for (std::int32_t cx = minChunk.x; cx <= maxChunk.x; ++cx) {
+                        const auto state = mIndex.chunkState({cx, cy});
+                        if (state != core::spatial::ResidencyState::Loaded) {
+                            firstBad = {cx, cy};
+                            firstBadState = state;
+                            foundBad = true;
+                            break;
+                        }
+                    }
+                }
+
+                releaseSpatialId(id);
+
+                const core::spatial::ChunkCoord winOrigin = mIndex.windowOrigin();
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialIndexSystem: registerEntity rejected (id={}, entity={}) "
+                          "AABB=({:.3f},{:.3f})..({:.3f},{:.3f}) finite={} "
+                          "chunkRange=({}, {})..({}, {}) "
+                          "firstNonLoaded=({}, {}) state={} "
+                          "windowOrigin=({}, {}) windowSize={}x{}",
+                          id, core::ecs::toUint(entity), aabb.minX, aabb.minY, aabb.maxX, aabb.maxY,
+                          isFinite ? 1 : 0, minChunk.x, minChunk.y, maxChunk.x, maxChunk.y,
+                          firstBad.x, firstBad.y, static_cast<int>(firstBadState), winOrigin.x,
+                          winOrigin.y, mIndex.windowWidth(), mIndex.windowHeight());
+            } else if (writeResult == core::spatial::WriteResult::PartialTruncated) {
                 releaseSpatialId(id);
                 LOG_PANIC(core::log::cat::ECS,
-                          "SpatialIndexSystem: registerEntity rejected (id={})", id);
-            }
-            if (result == core::spatial::WriteResult::PartialTruncated) {
-                releaseSpatialId(id);
-                LOG_PANIC(core::log::cat::ECS,
-                          "SpatialIndexSystem: registerEntity truncated (id={})", id);
+                          "SpatialIndexSystem: registerEntity truncated (id={}, entity={})", id,
+                          core::ecs::toUint(entity));
             }
 
-            // entity гарантированно не имел SpatialIdComponent (exclude<>),
-            // поэтому emplace достаточно.
+            // entity гарантированно не имел SpatialIdComponent (exclude<>), поэтому emplace
+            // достаточно.
+            // Инвариант после emplace: SpatialIdComponent.id != 0 и mapping[id] == entity.
             registry.emplace<SpatialIdComponent>(entity, SpatialIdComponent{id, aabb});
-            setMapping(id, entity);
         }
 
         auto dirtyView = registry.view<SpatialIdComponent,
-                                       SpatialDirtyTag,
-                                       TransformComponent,
-                                       SpriteComponent>();
+                               SpatialDirtyTag,
+                               TransformComponent,
+                               SpriteComponent>(
+                               entt::exclude<SpatialStreamedOutTag>);
 
         bool hadDirty = false;
         if (mDeterminismEnabled) {
@@ -121,13 +168,13 @@ namespace core::ecs {
             }
             mDirtyScratch.clear();
 
-            for (const Entity entity : dirtyView) {
-                mDirtyScratch.push_back(entity);
+            for (const Entity e : dirtyView) {
+                mDirtyScratch.push_back(e);
             }
 
             // Детерминированное присвоение StableID должно происходить в фиксированном порядке:
-            //  1) сортируем по runtime entity id (toUint) как стабильному tie-break 
-            //     в рамках процесса;
+            //  1) сортируем по runtime entity id (toUint) как стабильному tie-break в рамках
+            //     процесса;
             //  2) в этом порядке вызываем ensureAssigned() ровно один раз на сущность;
             //  3) после этого сортируем по StableID без write-path в comparator.
             std::sort(mDirtyScratch.begin(), mDirtyScratch.end(),
@@ -146,30 +193,31 @@ namespace core::ecs {
                           const auto bIdOpt = stableIds.tryGet(b);
                           if (!aIdOpt.has_value() || !bIdOpt.has_value()) {
                               LOG_PANIC(core::log::cat::ECS,
-                                        "SpatialIndexSystem: missing StableID during deterministic sort");
+                                        "SpatialIndexSystem: missing StableID "
+                                        "during deterministic sort");
                           }
                           return *aIdOpt < *bIdOpt;
                       });
 
-            for (const Entity entity : mDirtyScratch) {
-                auto& handleComp = registry.get<SpatialIdComponent>(entity);
-                const auto& transform = registry.get<TransformComponent>(entity);
-                const auto& sprite = registry.get<SpriteComponent>(entity);
+            for (const Entity e: mDirtyScratch) {
+                auto& handleComp = registry.get<SpatialIdComponent>(e);
+                const auto& tr = registry.get<TransformComponent>(e);
+                const auto& sp = registry.get<SpriteComponent>(e);
 
                 hadDirty = true;
 
-                assert(core::ecs::render::hasExplicitRect(sprite.textureRect) &&
+                assert(core::ecs::render::hasExplicitRect(sp.textureRect) &&
                        "SpatialIndexSystem: SpriteComponent.textureRect must be explicit");
 
-                const core::spatial::Aabb2 newAabb = computeEntityAabb(transform, sprite);
+                const core::spatial::Aabb2 newAabb = computeEntityAabb(tr, sp);
 
-                const core::spatial::WriteResult result =
+                const core::spatial::WriteResult updResult =
                     mIndex.updateEntity(handleComp.id, newAabb);
-                if (result == core::spatial::WriteResult::Rejected) {
+                if (updResult == core::spatial::WriteResult::Rejected) {
                     LOG_PANIC(core::log::cat::ECS,
                               "SpatialIndexSystem: updateEntity rejected (id={})", handleComp.id);
                 }
-                if (result == core::spatial::WriteResult::PartialTruncated) {
+                if (updResult == core::spatial::WriteResult::PartialTruncated) {
                     LOG_PANIC(core::log::cat::ECS,
                               "SpatialIndexSystem: updateEntity truncated (id={})", handleComp.id);
                 }
@@ -224,6 +272,24 @@ namespace core::ecs {
         if (handle.id == 0) {
             return;
         }
+
+#if !defined(NDEBUG)
+        assert(handle.id < mEntityBySpatialId.size() &&
+               "SpatialIndexSystem: SpatialId32 out of range on destroy");
+        assert(mEntityBySpatialId[handle.id] == entity &&
+               "SpatialIndexSystem: SpatialId32 mapping mismatch on destroy");
+#else
+        if (handle.id >= mEntityBySpatialId.size()) [[unlikely]] {
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexSystem: SpatialId32 out of range on destroy (id={})",
+                      handle.id);
+        }
+        if (mEntityBySpatialId[handle.id] != entity) [[unlikely]] {
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexSystem: SpatialId32 mapping mismatch on destroy (id={})",
+                      handle.id);
+        }
+#endif
 
         const bool removed = mIndex.unregisterEntity(handle.id);
         if (!removed) {
@@ -280,14 +346,17 @@ namespace core::ecs {
         assert(id < mEntityBySpatialId.size() &&
                "SpatialIndexSystem: SpatialId32 out of range on release");
         assert(mEntityBySpatialId[id] != core::ecs::NullEntity &&
-               "SpatialIndexSystem: double-free SpatialId32");
+               "SpatialIndexSystem: release of unmapped SpatialId32 "
+               "(double-free or contract violation)");
 #else
         if (id >= mEntityBySpatialId.size()) [[unlikely]] {
             LOG_PANIC(core::log::cat::ECS,
                       "SpatialIndexSystem: SpatialId32 out of range on release (id={})", id);
         }
         if (mEntityBySpatialId[id] == core::ecs::NullEntity) [[unlikely]] {
-            LOG_PANIC(core::log::cat::ECS, "SpatialIndexSystem: double-free SpatialId32 (id={})",
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexSystem: release of unmapped SpatialId32 "
+                      "(double-free or contract violation) (id={})",
                       id);
         }
 #endif
@@ -298,7 +367,12 @@ namespace core::ecs {
 
     void SpatialIndexSystem::setMapping(const core::spatial::EntityId32 id,
                                         const Entity entity) noexcept {
-        assert(id < mEntityBySpatialId.size() && "SpatialIndexSystem: SpatialId32 out of range");
+        assert(id != 0 && 
+            "SpatialIndexSystem: SpatialId32 must be non-zero");
+        assert(id < mEntityBySpatialId.size() && 
+            "SpatialIndexSystem: SpatialId32 out of range");
+        assert(entity != core::ecs::NullEntity && 
+            "SpatialIndexSystem: mapping NullEntity forbidden");
         mEntityBySpatialId[id] = entity;
     }
 

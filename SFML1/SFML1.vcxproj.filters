@@ -447,6 +447,9 @@
     <ClCompile Include="src\game\skyguard\dev\spatial_index_harness.cpp">
       <Filter>src\game\skyguard\dev</Filter>
     </ClCompile>
+    <ClCompile Include="src\game\skyguard\config\loader\spatial_v2_config_builder.cpp">
+      <Filter>src\game\skyguard\config\loader</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\resources\resource_manager.h">
@@ -787,6 +790,15 @@
     </ClInclude>
     <ClInclude Include="include\core\spatial\entity_id32.h">
       <Filter>include\core\spatial</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\config\loader\spatial_v2_config_builder.h">
+      <Filter>include\game\skyguard\config\loader</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\ecs\systems\spatial_streaming_system.h">
+      <Filter>include\game\skyguard\ecs\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\components\spatial_streamed_out_tag.h">
+      <Filter>include\core\ecs\components</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

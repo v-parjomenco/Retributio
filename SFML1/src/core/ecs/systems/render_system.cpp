@@ -181,7 +181,7 @@ namespace core::ecs {
 #endif
     }
 
-    void RenderSystem::bind(const core::spatial::SpatialIndexV2Flat* spatialIndex,
+    void RenderSystem::bind(const core::spatial::SpatialIndexV2Sliding* spatialIndex,
                             std::span<const Entity> entitiesBySpatialId,
                             const std::size_t maxVisibleSprites,
                             const core::resources::ResourceManager* resources) {
@@ -222,6 +222,7 @@ namespace core::ecs {
             mFrameTextureStamp.clear();
             mFrameId = 0;
             mCachedResourceGen = 0;
+            mQueryBuffer.clear();
             mVisibleIds.clear();
             mVisibleCount = 0;
             mMaxVisibleSprites = 0;
@@ -260,7 +261,9 @@ namespace core::ecs {
         mCachedResourceGen = mResources->cacheGeneration();
 
         // Prewarm buffers to fixed caps (no hot-path growth).
-        mVisibleIds.assign(mMaxVisibleSprites, core::spatial::EntityId32{0});
+        mQueryBuffer.assign(mMaxVisibleSprites, core::spatial::EntityId32{0});
+        mVisibleIds.clear();
+        mVisibleIds.reserve(mMaxVisibleSprites);
         mVisibleCount = 0;
 
         if (mKeys.capacity() < mMaxVisibleSprites) {
@@ -317,6 +320,10 @@ namespace core::ecs {
         if (mFrameId == 0) {
             std::fill(mFrameTextureStamp.begin(), mFrameTextureStamp.end(), 0u);
             mFrameId = 1;
+        }
+
+        if (mSpatialIndex != nullptr && mSpatialIndex->marksClearRequired()) {
+            mSpatialIndex->clearMarksTable();
         }
     }
 
@@ -403,20 +410,17 @@ namespace core::ecs {
         // Шаг 1: Gather + Culling — собираем ключи только для видимых спрайтов.
         // ----------------------------------------------------------------------------------------
 
-        if (mVisibleIds.empty()) {
+        if (mQueryBuffer.empty()) {
             LOG_PANIC(core::log::cat::ECS,
                       "RenderSystem: query buffer not prewarmed (bind() not called)");
         }
 
         mKeys.clear();
         mPackets.clear();
+        mVisibleIds.clear();
         beginFrame();
 
-        if (mSpatialIndex->marksClearRequired()) {
-            mSpatialIndex->clearMarksTable();
-        }
-
-        const std::span<core::spatial::EntityId32> outIds(mVisibleIds);
+        const std::span<core::spatial::EntityId32> outIds(mQueryBuffer);
         const std::size_t idCount = mSpatialIndex->queryFast(viewAabb, outIds);
         if (idCount == outIds.size()) {
             LOG_ERROR(core::log::cat::ECS,
@@ -439,12 +443,12 @@ namespace core::ecs {
 
         auto ecsView = world.view<TransformComponent, SpriteComponent, SpatialIdComponent>();
 
-        // Итерация по mVisibleIds (уже отфильтровано SpatialIndexV2).
+        // Итерация по mQueryBuffer (уже отфильтровано SpatialIndexV2).
         // Если число видимых сущностей будет постоянно превышать 50k, поменять на:
         //  packed iteration через view.each() + inline culling.
 
         for (std::size_t i = 0; i < mVisibleCount; ++i) {
-            const core::spatial::EntityId32 id = mVisibleIds[i];
+            const core::spatial::EntityId32 id = mQueryBuffer[i];
             assert(id < mEntitiesBySpatialIdSize &&
                    "RenderSystem: SpatialId32 out of range (mapping)");
             const Entity entity = mEntitiesBySpatialId[id];
@@ -488,6 +492,8 @@ namespace core::ecs {
 #endif
                 continue;
             }
+
+            mVisibleIds.push_back(id);
 
             // Sin/cos считаем только для реально отрисуемых (после culling).
             const float rotationDegrees = tr.rotationDegrees;

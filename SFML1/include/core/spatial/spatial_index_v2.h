@@ -3,7 +3,7 @@
 // Purpose: SpatialIndex v2 (chunked, cache-line cells, deterministic overflow)
 // Used by: Stage 3 core library (no ECS integration yet)
 // Notes:
-//  - Stage 4 readiness: storages use residency-bounded cell-block pool 
+//  - Stage 4 readiness: storages use residency-bounded cell-block pool
 //    (allocate on Loaded, free on leave Loaded).
 //  - Two query entry points only: queryFast(), queryDeterministic().
 // ================================================================================================
@@ -286,15 +286,80 @@ namespace core::spatial {
         [[nodiscard]] Cell* cellsForChunk(SpatialChunk& chunk) noexcept;
         [[nodiscard]] const Cell* cellsForChunk(const SpatialChunk& chunk) const noexcept;
 
-        // Stage 3: setWindowOrigin запрещён. Реализация ring-shift будет в Stage 4+.
         void setWindowOrigin(const ChunkCoord origin) noexcept {
-            (void) origin;
+            if (origin.x == mOrigin.x && origin.y == mOrigin.y) {
+                return;
+            }
+
+            assert(mShiftScratch.size() == mSlots.size() &&
+                   "SlidingWindowStorage: shift scratch size mismatch");
+
+            for (Slot& slot : mShiftScratch) {
+                slot.coord = ChunkCoord{0, 0};
+                slot.chunk.cellsBlockIndex = kInvalidCellsBlockIndex;
+                slot.chunk.activeEntityCount = 0;
+                slot.chunk.state = ResidencyState::Unloaded;
+                slot.occupied = false;
+            }
+
+            for (Slot& slot : mSlots) {
+                if (!slot.occupied) {
+                    continue;
+                }
+
+                if (!isInWindow(slot.coord)) {
 #if !defined(NDEBUG)
-            assert(false && "SlidingWindowStorage::setWindowOrigin: not implemented in Stage 3");
+                    assert(false && "SlidingWindowStorage::setWindowOrigin: slot coord mismatch");
 #else
-            LOG_PANIC(core::log::cat::ECS,
-                      "SlidingWindowStorage::setWindowOrigin: not implemented in Stage 3");
+                    LOG_PANIC(core::log::cat::ECS,
+                              "SlidingWindowStorage::setWindowOrigin: slot coord mismatch");
 #endif
+                }
+
+                if (!isInWindowForOrigin(slot.coord, origin)) {
+                    resetSlot(slot);
+                    continue;
+                }
+
+                const std::size_t dstIndex = slotIndexForOrigin(slot.coord, origin);
+                Slot& dst = mShiftScratch[dstIndex];
+
+#if !defined(NDEBUG)
+                assert(!dst.occupied &&
+                       "SlidingWindowStorage::setWindowOrigin: slot collision in shift");
+#else
+                if (dst.occupied) {
+                    LOG_PANIC(core::log::cat::ECS,
+                              "SlidingWindowStorage::setWindowOrigin: slot collision in shift");
+                }
+#endif
+                transferSlot(dst, slot);
+            }
+
+            mSlots.swap(mShiftScratch);
+            mOrigin = origin;
+
+            const std::int64_t maxX64 = static_cast<std::int64_t>(mOrigin.x) + mWidth - 1;
+            const std::int64_t maxY64 = static_cast<std::int64_t>(mOrigin.y) + mHeight - 1;
+
+#if !defined(NDEBUG)
+            assert(maxX64 >= std::numeric_limits<std::int32_t>::min() &&
+                   maxX64 <= std::numeric_limits<std::int32_t>::max() &&
+                   "SlidingWindowStorage: maxXInclusive overflow");
+            assert(maxY64 >= std::numeric_limits<std::int32_t>::min() &&
+                   maxY64 <= std::numeric_limits<std::int32_t>::max() &&
+                   "SlidingWindowStorage: maxYInclusive overflow");
+#else
+            if (maxX64 < std::numeric_limits<std::int32_t>::min() ||
+                maxX64 > std::numeric_limits<std::int32_t>::max() ||
+                maxY64 < std::numeric_limits<std::int32_t>::min() ||
+                maxY64 > std::numeric_limits<std::int32_t>::max()) {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SlidingWindowStorage: max inclusive bounds overflow");
+            }
+#endif
+            mMaxXInclusive = static_cast<std::int32_t>(maxX64);
+            mMaxYInclusive = static_cast<std::int32_t>(maxY64);
         }
 
         [[nodiscard]] ChunkCoord origin() const noexcept {
@@ -317,7 +382,11 @@ namespace core::spatial {
         };
 
         [[nodiscard]] bool isInWindow(const ChunkCoord coord) const noexcept;
+        [[nodiscard]] bool isInWindowForOrigin(const ChunkCoord coord,
+                                               const ChunkCoord origin) const noexcept;
         [[nodiscard]] std::size_t slotIndex(const ChunkCoord coord) const noexcept;
+        [[nodiscard]] std::size_t slotIndexForOrigin(const ChunkCoord coord,
+                                                     const ChunkCoord origin) const noexcept;
         [[nodiscard]] Slot* ensureSlot(const ChunkCoord coord) noexcept;
         [[nodiscard]] const Slot* tryGetSlot(const ChunkCoord coord) const noexcept;
 
@@ -326,6 +395,8 @@ namespace core::spatial {
 
         void clearSlot(Slot& slot) noexcept;
         void clearChunkDataInSlot(Slot& slot) noexcept;
+        void resetSlot(Slot& slot) noexcept;
+        void transferSlot(Slot& dst, Slot& src) noexcept;
 
         ChunkCoord mOrigin{0, 0};
         std::int32_t mWidth = 0;
@@ -345,6 +416,7 @@ namespace core::spatial {
         std::vector<std::uint32_t> mFreeBlockStack{}; // stores cell-offsets
 
         std::vector<Slot> mSlots{};
+        std::vector<Slot> mShiftScratch{};
         std::vector<Cell> mCellsPool{};
         OverflowPool* mOverflowPool = nullptr;
     };
@@ -367,13 +439,43 @@ namespace core::spatial {
         [[nodiscard]] std::size_t queryFast(const BoundsT& area, std::span<EntityId32> out) const;
         [[nodiscard]] std::size_t queryDeterministic(const BoundsT& area,
                                                      std::span<EntityId32> out) const;
+        void collectEntityIdsInChunk(const ChunkCoord coord,
+                                     std::vector<EntityId32>& outIdsScratch) const;
 
         [[nodiscard]] bool setChunkState(const ChunkCoord coord, const ResidencyState state) {
             return mStorage.setChunkState(coord, state);
         }
 
+        void setWindowOrigin(const ChunkCoord origin) noexcept
+            requires requires(Storage& storage, const ChunkCoord coord) {
+                storage.setWindowOrigin(coord);
+            }
+        {
+            mStorage.setWindowOrigin(origin);
+        }
+
+        [[nodiscard]] ChunkCoord windowOrigin() const noexcept {
+            return mStorage.origin();
+        }
+
+        [[nodiscard]] std::int32_t windowWidth() const noexcept {
+            return mStorage.width();
+        }
+
+        [[nodiscard]] std::int32_t windowHeight() const noexcept {
+            return mStorage.height();
+        }
+
         [[nodiscard]] ResidencyState chunkState(const ChunkCoord coord) const noexcept {
             return mStorage.chunkState(coord);
+        }
+
+        [[nodiscard]] std::int32_t chunkSizeWorld() const noexcept {
+            return mConfig.chunkSizeWorld;
+        }
+
+        [[nodiscard]] std::int32_t cellSizeWorld() const noexcept {
+            return mConfig.cellSizeWorld;
         }
 
         // Marks wrap => maintenance required (call clearMarksTable before queries).
@@ -444,10 +546,12 @@ namespace core::spatial {
         void handleOutputOverflow() const;
 
         template <typename ChunkT, typename Fn>
-bool forEachCellInRange(ChunkT& chunk, const ChunkCoord coord, const CellRange& cellRange, Fn&& fn);
+        bool forEachCellInRange(ChunkT& chunk, const ChunkCoord coord, const CellRange& cellRange,
+                                Fn&& fn);
 
-template <typename ChunkT, typename Fn>
-bool forEachCellInRange(const ChunkT& chunk, const ChunkCoord coord, const CellRange& cellRange, Fn&& fn) const;
+        template <typename ChunkT, typename Fn>
+        bool forEachCellInRange(const ChunkT& chunk, const ChunkCoord coord,
+                                const CellRange& cellRange, Fn&& fn) const;
 
         template <typename Fn> bool forEachEntityInCell(const Cell& cell, Fn&& fn) const;
 
@@ -467,6 +571,7 @@ bool forEachCellInRange(const ChunkT& chunk, const ChunkCoord coord, const CellR
 
         std::int32_t mCellsPerChunkX = 0;
         std::int32_t mCellsPerChunkY = 0;
+        std::size_t mCellsPerChunk = 0;
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         mutable DebugQueryStats mDebugLastQueryStats{};
@@ -1202,6 +1307,8 @@ bool forEachCellInRange(const ChunkT& chunk, const ChunkCoord coord, const CellR
 
         mSlots.clear();
         mSlots.resize(count);
+        mShiftScratch.clear();
+        mShiftScratch.resize(count);
 
         const std::size_t cellsCount = static_cast<std::size_t>(cellsPerChunkX) * cellsPerChunkY;
         mCellsPerChunk = cellsCount;
@@ -1261,6 +1368,14 @@ bool forEachCellInRange(const ChunkT& chunk, const ChunkCoord coord, const CellR
             slot.coord = ChunkCoord{0, 0};
             slot.occupied = false;
         }
+
+        for (Slot& slot : mShiftScratch) {
+            slot.chunk.cellsBlockIndex = kInvalidCellsBlockIndex;
+            slot.chunk.activeEntityCount = 0;
+            slot.chunk.state = ResidencyState::Unloaded;
+            slot.coord = ChunkCoord{0, 0};
+            slot.occupied = false;
+        }
     }
 
     inline bool SlidingWindowStorage::isInWindow(const ChunkCoord coord) const noexcept {
@@ -1269,9 +1384,27 @@ bool forEachCellInRange(const ChunkT& chunk, const ChunkCoord coord, const CellR
         return dx >= 0 && dx < mWidth && dy >= 0 && dy < mHeight;
     }
 
+    inline bool SlidingWindowStorage::isInWindowForOrigin(const ChunkCoord coord,
+                                                          const ChunkCoord origin) const noexcept {
+        const std::int32_t dx = coord.x - origin.x;
+        const std::int32_t dy = coord.y - origin.y;
+        return dx >= 0 && dx < mWidth && dy >= 0 && dy < mHeight;
+    }
+
     inline std::size_t SlidingWindowStorage::slotIndex(const ChunkCoord coord) const noexcept {
         const std::int32_t localX = coord.x - mOrigin.x;
         const std::int32_t localY = coord.y - mOrigin.y;
+        const std::int32_t wrapX = detail::euclideanMod(localX, mWidth);
+        const std::int32_t wrapY = detail::euclideanMod(localY, mHeight);
+        const std::int64_t idx = static_cast<std::int64_t>(wrapY) * mWidth + wrapX;
+        return static_cast<std::size_t>(idx);
+    }
+
+    inline std::size_t
+    SlidingWindowStorage::slotIndexForOrigin(const ChunkCoord coord,
+                                             const ChunkCoord origin) const noexcept {
+        const std::int32_t localX = coord.x - origin.x;
+        const std::int32_t localY = coord.y - origin.y;
         const std::int32_t wrapX = detail::euclideanMod(localX, mWidth);
         const std::int32_t wrapY = detail::euclideanMod(localY, mHeight);
         const std::int64_t idx = static_cast<std::int64_t>(wrapY) * mWidth + wrapX;
@@ -1285,6 +1418,19 @@ bool forEachCellInRange(const ChunkT& chunk, const ChunkCoord coord, const CellR
     }
 
     inline void SlidingWindowStorage::clearSlot(Slot& slot) noexcept {
+        if (slot.chunk.state == ResidencyState::Loaded) {
+#if !defined(NDEBUG)
+            assert(slot.chunk.activeEntityCount == 0 &&
+                   "SlidingWindowStorage: unload with active entities");
+#else
+            if (slot.chunk.activeEntityCount != 0) [[unlikely]] {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SlidingWindowStorage: unload with active entities (count={})",
+                          slot.chunk.activeEntityCount);
+            }
+#endif
+        }
+
         if (slot.chunk.cellsBlockIndex != kInvalidCellsBlockIndex) {
             clearChunkDataInSlot(slot);
             releaseCellsBlock(slot.chunk.cellsBlockIndex);
@@ -1295,6 +1441,22 @@ bool forEachCellInRange(const ChunkT& chunk, const ChunkCoord coord, const CellR
         slot.chunk.state = ResidencyState::Unloaded;
         slot.occupied = false;
         slot.coord = ChunkCoord{0, 0};
+    }
+
+    inline void SlidingWindowStorage::resetSlot(Slot& slot) noexcept {
+        clearSlot(slot);
+    }
+
+    inline void SlidingWindowStorage::transferSlot(Slot& dst, Slot& src) noexcept {
+        dst.coord = src.coord;
+        dst.chunk = src.chunk;
+        dst.occupied = src.occupied;
+
+        src.coord = ChunkCoord{0, 0};
+        src.chunk.cellsBlockIndex = kInvalidCellsBlockIndex;
+        src.chunk.activeEntityCount = 0;
+        src.chunk.state = ResidencyState::Unloaded;
+        src.occupied = false;
     }
 
     inline SlidingWindowStorage::Slot*
@@ -1438,6 +1600,16 @@ bool forEachCellInRange(const ChunkT& chunk, const ChunkCoord coord, const CellR
         // Strict model:
         //  - Only Loaded chunks may hold cell data (and therefore must own an allocated block).
         if (prev == ResidencyState::Loaded && state != ResidencyState::Loaded) {
+#if !defined(NDEBUG)
+            assert(slot.chunk.activeEntityCount == 0 &&
+                   "SlidingWindowStorage: unload with active entities");
+#else
+            if (slot.chunk.activeEntityCount != 0) [[unlikely]] {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SlidingWindowStorage: unload with active entities (count={})",
+                          slot.chunk.activeEntityCount);
+            }
+#endif
             clearChunkDataInSlot(slot);
 
 #if !defined(NDEBUG)
@@ -1584,6 +1756,7 @@ bool forEachCellInRange(const ChunkT& chunk, const ChunkCoord coord, const CellR
 
         mCellsPerChunkX = config.chunkSizeWorld / config.cellSizeWorld;
         mCellsPerChunkY = config.chunkSizeWorld / config.cellSizeWorld;
+        mCellsPerChunk = static_cast<std::size_t>(mCellsPerChunkX) * mCellsPerChunkY;
 
         prepareStorage(storageConfig);
         mOverflowPool.init(config.overflow);
@@ -2194,8 +2367,7 @@ bool forEachCellInRange(const ChunkT& chunk, const ChunkCoord coord, const CellR
             const bool removed = mOverflowPool.remove(cell.overflowHandle, id);
             assert(removed && "SpatialIndexV2: overflow remove failed");
             if (!removed) [[unlikely]] {
-                LOG_PANIC(core::log::cat::ECS,
-                          "SpatialIndexV2: overflow remove failed");
+                LOG_PANIC(core::log::cat::ECS, "SpatialIndexV2: overflow remove failed");
             }
         }
     }
@@ -2316,114 +2488,113 @@ bool forEachCellInRange(const ChunkT& chunk, const ChunkCoord coord, const CellR
     }
 
     template <typename Storage, typename BoundsT>
-template <typename ChunkT, typename Fn>
-inline bool SpatialIndexV2<Storage, BoundsT>::forEachCellInRange(ChunkT& chunk,
-                                                                 const ChunkCoord coord,
-                                                                 const CellRange& cellRange,
-                                                                 Fn&& fn) {
-    const std::int64_t chunkCellOriginX = static_cast<std::int64_t>(coord.x) * mCellsPerChunkX;
-    const std::int64_t chunkCellOriginY = static_cast<std::int64_t>(coord.y) * mCellsPerChunkY;
+    template <typename ChunkT, typename Fn>
+    inline bool
+    SpatialIndexV2<Storage, BoundsT>::forEachCellInRange(ChunkT& chunk, const ChunkCoord coord,
+                                                         const CellRange& cellRange, Fn&& fn) {
+        const std::int64_t chunkCellOriginX = static_cast<std::int64_t>(coord.x) * mCellsPerChunkX;
+        const std::int64_t chunkCellOriginY = static_cast<std::int64_t>(coord.y) * mCellsPerChunkY;
 
-    const std::int64_t minX64 = static_cast<std::int64_t>(cellRange.minX) - chunkCellOriginX;
-    const std::int64_t minY64 = static_cast<std::int64_t>(cellRange.minY) - chunkCellOriginY;
-    const std::int64_t maxX64 = static_cast<std::int64_t>(cellRange.maxX) - chunkCellOriginX;
-    const std::int64_t maxY64 = static_cast<std::int64_t>(cellRange.maxY) - chunkCellOriginY;
+        const std::int64_t minX64 = static_cast<std::int64_t>(cellRange.minX) - chunkCellOriginX;
+        const std::int64_t minY64 = static_cast<std::int64_t>(cellRange.minY) - chunkCellOriginY;
+        const std::int64_t maxX64 = static_cast<std::int64_t>(cellRange.maxX) - chunkCellOriginX;
+        const std::int64_t maxY64 = static_cast<std::int64_t>(cellRange.maxY) - chunkCellOriginY;
 
-    const std::int64_t maxXClamp = static_cast<std::int64_t>(mCellsPerChunkX) - 1;
-    const std::int64_t maxYClamp = static_cast<std::int64_t>(mCellsPerChunkY) - 1;
-    constexpr std::int64_t kZero64 = std::int64_t{0};
+        const std::int64_t maxXClamp = static_cast<std::int64_t>(mCellsPerChunkX) - 1;
+        const std::int64_t maxYClamp = static_cast<std::int64_t>(mCellsPerChunkY) - 1;
+        constexpr std::int64_t kZero64 = std::int64_t{0};
 
-    const std::int32_t localMinX =
-        static_cast<std::int32_t>(std::clamp(minX64, kZero64, maxXClamp));
-    const std::int32_t localMinY =
-        static_cast<std::int32_t>(std::clamp(minY64, kZero64, maxYClamp));
-    const std::int32_t localMaxX =
-        static_cast<std::int32_t>(std::clamp(maxX64, kZero64, maxXClamp));
-    const std::int32_t localMaxY =
-        static_cast<std::int32_t>(std::clamp(maxY64, kZero64, maxYClamp));
+        const std::int32_t localMinX =
+            static_cast<std::int32_t>(std::clamp(minX64, kZero64, maxXClamp));
+        const std::int32_t localMinY =
+            static_cast<std::int32_t>(std::clamp(minY64, kZero64, maxYClamp));
+        const std::int32_t localMaxX =
+            static_cast<std::int32_t>(std::clamp(maxX64, kZero64, maxXClamp));
+        const std::int32_t localMaxY =
+            static_cast<std::int32_t>(std::clamp(maxY64, kZero64, maxYClamp));
 
-    if (localMinX > localMaxX || localMinY > localMaxY) {
+        if (localMinX > localMaxX || localMinY > localMaxY) {
+            return true;
+        }
+
+        auto* cells = cellsForChunk(chunk);
+#if !defined(NDEBUG)
+        assert(cells != nullptr && "SpatialIndexV2: cellsForChunk nullptr (internal error)");
+#else
+        if (cells == nullptr) [[unlikely]] {
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexV2: cellsForChunk nullptr (internal error)");
+        }
+#endif
+
+        for (std::int32_t y = localMinY; y <= localMaxY; ++y) {
+            const std::size_t rowOffset = static_cast<std::size_t>(y) * mCellsPerChunkX;
+            for (std::int32_t x = localMinX; x <= localMaxX; ++x) {
+                auto& cell = cells[rowOffset + static_cast<std::size_t>(x)];
+                if (!fn(cell)) {
+                    return false;
+                }
+            }
+        }
+
         return true;
     }
 
-    auto* cells = cellsForChunk(chunk);
+    template <typename Storage, typename BoundsT>
+    template <typename ChunkT, typename Fn>
+    inline bool SpatialIndexV2<Storage, BoundsT>::forEachCellInRange(const ChunkT& chunk,
+                                                                     const ChunkCoord coord,
+                                                                     const CellRange& cellRange,
+                                                                     Fn&& fn) const {
+        const std::int64_t chunkCellOriginX = static_cast<std::int64_t>(coord.x) * mCellsPerChunkX;
+        const std::int64_t chunkCellOriginY = static_cast<std::int64_t>(coord.y) * mCellsPerChunkY;
+
+        const std::int64_t minX64 = static_cast<std::int64_t>(cellRange.minX) - chunkCellOriginX;
+        const std::int64_t minY64 = static_cast<std::int64_t>(cellRange.minY) - chunkCellOriginY;
+        const std::int64_t maxX64 = static_cast<std::int64_t>(cellRange.maxX) - chunkCellOriginX;
+        const std::int64_t maxY64 = static_cast<std::int64_t>(cellRange.maxY) - chunkCellOriginY;
+
+        const std::int64_t maxXClamp = static_cast<std::int64_t>(mCellsPerChunkX) - 1;
+        const std::int64_t maxYClamp = static_cast<std::int64_t>(mCellsPerChunkY) - 1;
+        constexpr std::int64_t kZero64 = std::int64_t{0};
+
+        const std::int32_t localMinX =
+            static_cast<std::int32_t>(std::clamp(minX64, kZero64, maxXClamp));
+        const std::int32_t localMinY =
+            static_cast<std::int32_t>(std::clamp(minY64, kZero64, maxYClamp));
+        const std::int32_t localMaxX =
+            static_cast<std::int32_t>(std::clamp(maxX64, kZero64, maxXClamp));
+        const std::int32_t localMaxY =
+            static_cast<std::int32_t>(std::clamp(maxY64, kZero64, maxYClamp));
+
+        if (localMinX > localMaxX || localMinY > localMaxY) {
+            return true;
+        }
+
+        auto* cells = cellsForChunk(chunk);
 #if !defined(NDEBUG)
-    assert(cells != nullptr && "SpatialIndexV2: cellsForChunk nullptr (internal error)");
+        assert(cells != nullptr && "SpatialIndexV2: cellsForChunk nullptr (internal error)");
 #else
-    if (cells == nullptr) [[unlikely]] {
-        LOG_PANIC(core::log::cat::ECS,
-                  "SpatialIndexV2: cellsForChunk nullptr (internal error)");
-    }
+        if (cells == nullptr) [[unlikely]] {
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexV2: cellsForChunk nullptr (internal error)");
+        }
 #endif
 
-    for (std::int32_t y = localMinY; y <= localMaxY; ++y) {
-        const std::size_t rowOffset = static_cast<std::size_t>(y) * mCellsPerChunkX;
-        for (std::int32_t x = localMinX; x <= localMaxX; ++x) {
-            auto& cell = cells[rowOffset + static_cast<std::size_t>(x)];
-            if (!fn(cell)) {
-                return false;
+        for (std::int32_t y = localMinY; y <= localMaxY; ++y) {
+            const std::size_t rowOffset = static_cast<std::size_t>(y) * mCellsPerChunkX;
+            for (std::int32_t x = localMinX; x <= localMaxX; ++x) {
+                auto& cell = cells[rowOffset + static_cast<std::size_t>(x)];
+                if (!fn(cell)) {
+                    return false;
+                }
             }
         }
-    }
 
-    return true;
-}
-
-template <typename Storage, typename BoundsT>
-template <typename ChunkT, typename Fn>
-inline bool SpatialIndexV2<Storage, BoundsT>::forEachCellInRange(const ChunkT& chunk,
-                                                                 const ChunkCoord coord,
-                                                                 const CellRange& cellRange,
-                                                                 Fn&& fn) const {
-    const std::int64_t chunkCellOriginX = static_cast<std::int64_t>(coord.x) * mCellsPerChunkX;
-    const std::int64_t chunkCellOriginY = static_cast<std::int64_t>(coord.y) * mCellsPerChunkY;
-
-    const std::int64_t minX64 = static_cast<std::int64_t>(cellRange.minX) - chunkCellOriginX;
-    const std::int64_t minY64 = static_cast<std::int64_t>(cellRange.minY) - chunkCellOriginY;
-    const std::int64_t maxX64 = static_cast<std::int64_t>(cellRange.maxX) - chunkCellOriginX;
-    const std::int64_t maxY64 = static_cast<std::int64_t>(cellRange.maxY) - chunkCellOriginY;
-
-    const std::int64_t maxXClamp = static_cast<std::int64_t>(mCellsPerChunkX) - 1;
-    const std::int64_t maxYClamp = static_cast<std::int64_t>(mCellsPerChunkY) - 1;
-    constexpr std::int64_t kZero64 = std::int64_t{0};
-
-    const std::int32_t localMinX =
-        static_cast<std::int32_t>(std::clamp(minX64, kZero64, maxXClamp));
-    const std::int32_t localMinY =
-        static_cast<std::int32_t>(std::clamp(minY64, kZero64, maxYClamp));
-    const std::int32_t localMaxX =
-        static_cast<std::int32_t>(std::clamp(maxX64, kZero64, maxXClamp));
-    const std::int32_t localMaxY =
-        static_cast<std::int32_t>(std::clamp(maxY64, kZero64, maxYClamp));
-
-    if (localMinX > localMaxX || localMinY > localMaxY) {
         return true;
     }
 
-    auto* cells = cellsForChunk(chunk);
-#if !defined(NDEBUG)
-    assert(cells != nullptr && "SpatialIndexV2: cellsForChunk nullptr (internal error)");
-#else
-    if (cells == nullptr) [[unlikely]] {
-        LOG_PANIC(core::log::cat::ECS,
-                  "SpatialIndexV2: cellsForChunk nullptr (internal error)");
-    }
-#endif
-
-    for (std::int32_t y = localMinY; y <= localMaxY; ++y) {
-        const std::size_t rowOffset = static_cast<std::size_t>(y) * mCellsPerChunkX;
-        for (std::int32_t x = localMinX; x <= localMaxX; ++x) {
-            auto& cell = cells[rowOffset + static_cast<std::size_t>(x)];
-            if (!fn(cell)) {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
-template <typename Storage, typename BoundsT>
+    template <typename Storage, typename BoundsT>
     template <typename Fn>
     inline bool SpatialIndexV2<Storage, BoundsT>::forEachEntityInCell(const Cell& cell,
                                                                       Fn&& fn) const {
@@ -2553,12 +2724,56 @@ template <typename Storage, typename BoundsT>
     }
 
     template <typename Storage, typename BoundsT>
+    inline void SpatialIndexV2<Storage, BoundsT>::collectEntityIdsInChunk(
+        const ChunkCoord coord, std::vector<EntityId32>& outIdsScratch) const {
+        outIdsScratch.clear();
+
+        if (!beginQueryStamp()) {
+#if defined(NDEBUG)
+            handleMarksWrap();
+#else
+            handleMarksWrap();
+            return;
+#endif
+        }
+
+        const SpatialChunk* chunk = mStorage.tryGetChunk(coord);
+        if (chunk == nullptr || chunk->state != ResidencyState::Loaded) {
+            return;
+        }
+
+        const Cell* cells = cellsForChunk(*chunk);
+        if (cells == nullptr) {
+            return;
+        }
+
+        for (std::size_t i = 0; i < mCellsPerChunk; ++i) {
+            const Cell& cell = cells[i];
+            (void) forEachEntityInCell(cell, [&](const EntityId32 id) {
+#if !defined(NDEBUG)
+                assert(id < mMarks.size() && "SpatialIndexV2: marks table too small");
+#endif
+                if (mMarks[id] == mQueryStamp) {
+                    return true;
+                }
+                mMarks[id] = mQueryStamp;
+                outIdsScratch.push_back(id);
+                return true;
+            });
+        }
+    }
+
+    template <typename Storage, typename BoundsT>
     inline std::size_t
     SpatialIndexV2<Storage, BoundsT>::queryDeterministic(const BoundsT& area,
                                                          std::span<EntityId32> out) const {
         if (!beginQueryStamp()) {
+#if defined(NDEBUG)
+            handleMarksWrap();
+#else
             handleMarksWrap();
             return 0;
+#endif
         }
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         mDebugLastQueryStats = DebugQueryStats{};
@@ -2579,9 +2794,13 @@ template <typename Storage, typename BoundsT>
                     return false;
                 }
                 if (chunk.state != ResidencyState::Loaded) {
+#if defined(NDEBUG)
+                    handleNonLoadedChunk(coord);
+#else
                     handleNonLoadedChunk(coord);
                     stop = true;
                     return false;
+#endif
                 }
                 return forEachCellInRange(chunk, coord, cellRange, [&](const Cell& cell) {
                     if (stop) {
@@ -2595,9 +2814,13 @@ template <typename Storage, typename BoundsT>
 #endif
                     return forEachEntityInCell(cell, [&](const EntityId32 id) {
                         if (outCount >= out.size()) {
+#if defined(NDEBUG)
+                            handleOutputOverflow();
+#else
                             handleOutputOverflow();
                             stop = true;
                             return false;
+#endif
                         }
 #if !defined(NDEBUG)
                         assert(id < mMarks.size() && "SpatialIndexV2: marks table too small");

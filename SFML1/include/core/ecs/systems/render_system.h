@@ -104,7 +104,7 @@ namespace core::ecs {
          *  - entitiesBySpatialId must be non-empty when spatialIndex is provided.
          *  - maxVisibleSprites > 0: upper bound for query output and vertex buffer sizing.
          */
-        void bind(const core::spatial::SpatialIndexV2Flat* spatialIndex,
+        void bind(const core::spatial::SpatialIndexV2Sliding* spatialIndex,
                   std::span<const Entity> entitiesBySpatialId, std::size_t maxVisibleSprites,
                   const core::resources::ResourceManager* resources);
 
@@ -143,7 +143,7 @@ namespace core::ecs {
         // ----------------------------------------------------------------------------------------
 
         /// Spatial index для view-frustum culling (read-only, cell-level candidates)
-        const core::spatial::SpatialIndexV2Flat* mSpatialIndex{nullptr};
+        const core::spatial::SpatialIndexV2Sliding* mSpatialIndex{nullptr};
 
         /// O(1) mapping from SpatialId32 -> Entity (index = id).
         const Entity* mEntitiesBySpatialId{nullptr};
@@ -187,6 +187,7 @@ namespace core::ecs {
         // Буферы (amortized growth, переиспользуются между кадрами)
         // ----------------------------------------------------------------------------------------
 
+        std::vector<core::spatial::EntityId32> mQueryBuffer;
         std::vector<core::spatial::EntityId32> mVisibleIds;
         std::size_t mVisibleCount{0};
         std::size_t mMaxVisibleSprites{0};

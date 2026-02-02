@@ -24,4 +24,7 @@ namespace core::ecs {
         core::spatial::Aabb2 lastAabb{};
     };
 
+    static_assert(sizeof(SpatialIdComponent) <= 32,
+                  "SpatialIdComponent must stay compact (<= 32 bytes)");
+
 } // namespace core::ecs

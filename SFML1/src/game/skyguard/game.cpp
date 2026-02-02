@@ -33,6 +33,7 @@
 #include "game/skyguard/config/config_paths.h"
 #include "game/skyguard/config/loader/app_config_loader.h"
 #include "game/skyguard/config/loader/config_loader.h"
+#include "game/skyguard/config/loader/spatial_v2_config_builder.h"
 #include "game/skyguard/config/loader/user_settings_loader.h"
 #include "game/skyguard/config/loader/view_config_loader.h"
 #include "game/skyguard/config/loader/window_config_loader.h"
@@ -41,6 +42,7 @@
 #include "game/skyguard/ecs/systems/aircraft_control_system.h"
 #include "game/skyguard/ecs/systems/player_bounds_system.h"
 #include "game/skyguard/ecs/systems/player_init_system.h"
+#include "game/skyguard/ecs/systems/spatial_streaming_system.h"
 #include "game/skyguard/platform/user_paths.h"
 #include "game/skyguard/presentation/view_manager.h"
 #include "game/skyguard/utils/debug_format.h"
@@ -64,77 +66,6 @@ namespace skycfg = ::game::skyguard::config;
 namespace skycfg_paths = ::game::skyguard::config::paths;
 
 namespace platform = ::game::skyguard::platform;
-
-namespace {
-    [[nodiscard]] core::ecs::SpatialIndexSystemConfig
-    makeSpatialIndexV2ConfigSkyGuard(const core::config::EngineSettings& settings,
-                                     const sf::Vector2f worldLogicalSize) {
-        constexpr std::int32_t kChunkSizeWorld = 4096;
-        constexpr std::uint32_t kExpectedMaxEntities = 2'000'000;
-        constexpr std::size_t kMaxVisibleSprites = 50'000;
-        constexpr std::size_t kMaxDirtyEntities = 50'000;
-
-        const float cellSizeFloat = settings.spatialCellSize;
-        const auto cellSizeWorld = static_cast<std::int32_t>(cellSizeFloat);
-        if (cellSizeWorld <= 0 || static_cast<float>(cellSizeWorld) != cellSizeFloat) {
-            LOG_PANIC(core::log::cat::ECS,
-                      "SpatialIndexV2: spatialCellSize must be a positive integer "
-                      "(value={})",
-                      cellSizeFloat);
-        }
-        if (kChunkSizeWorld % cellSizeWorld != 0) {
-            LOG_PANIC(core::log::cat::ECS,
-                      "SpatialIndexV2: chunkSizeWorld must be divisible by cellSizeWorld "
-                      "(chunkSizeWorld={}, cellSizeWorld={})",
-                      kChunkSizeWorld, cellSizeWorld);
-        }
-
-        if (!(worldLogicalSize.x > 0.f) || !(worldLogicalSize.y > 0.f)) {
-            LOG_PANIC(core::log::cat::ECS,
-                      "SpatialIndexV2: worldLogicalSize must be positive ({}x{})",
-                      worldLogicalSize.x, worldLogicalSize.y);
-        }
-
-        const auto chunksX = static_cast<std::int32_t>(
-            std::ceil(static_cast<double>(worldLogicalSize.x) / kChunkSizeWorld));
-        const auto chunksY = static_cast<std::int32_t>(
-            std::ceil(static_cast<double>(worldLogicalSize.y) / kChunkSizeWorld));
-
-        if (chunksX <= 0 || chunksY <= 0) {
-            LOG_PANIC(core::log::cat::ECS, "SpatialIndexV2: computed chunk grid is invalid ({}x{})",
-                      chunksX, chunksY);
-        }
-
-        const std::uint32_t totalChunks =
-            static_cast<std::uint32_t>(chunksX) * static_cast<std::uint32_t>(chunksY);
-        const std::uint32_t maxResident = totalChunks;
-
-        const auto overflowMaxNodes = static_cast<std::uint32_t>(
-            std::max<std::size_t>(1u, kMaxVisibleSprites / core::spatial::Cell::kInlineCapacity));
-
-        core::ecs::SpatialIndexSystemConfig cfg{};
-        cfg.index.chunkSizeWorld = kChunkSizeWorld;
-        cfg.index.cellSizeWorld = cellSizeWorld;
-        cfg.index.maxEntityId = kExpectedMaxEntities;
-        cfg.index.marksCapacity = kExpectedMaxEntities;
-        cfg.index.overflowPolicy = core::spatial::OverflowPolicy::FailFast;
-        cfg.index.overflow = core::spatial::OverflowConfig{
-            // Stage 4: explicit overflow budget (bounded, no hidden growth).
-            .nodeCapacity = 32u,
-            .maxNodes = overflowMaxNodes};
-
-        cfg.storage.origin = core::spatial::ChunkCoord{0, 0};
-        cfg.storage.width = chunksX;
-        cfg.storage.height = chunksY;
-        cfg.storage.maxResidentChunks = maxResident;
-
-        cfg.maxEntityId = kExpectedMaxEntities;
-        cfg.maxDirtyEntities = kMaxDirtyEntities;
-        cfg.maxVisibleSprites = kMaxVisibleSprites;
-        cfg.determinismEnabled = false;
-        return cfg;
-    }
-} // namespace
 
 namespace game::skyguard {
 
@@ -277,9 +208,15 @@ namespace game::skyguard {
             mViewManager.getWorldLogicalSize(), playerFloorY);
 
         const core::ecs::SpatialIndexSystemConfig spatialCfg =
-            makeSpatialIndexV2ConfigSkyGuard(mEngineSettings, mViewManager.getWorldLogicalSize());
+            config::buildSpatialIndexV2ConfigSkyGuard(
+                mEngineSettings, mViewManager.getWorldLogicalSize(), mWindow.getSize());
+
+        auto& streamingSystem =
+            mWorld.addSystem<game::skyguard::ecs::SpatialStreamingSystem>(spatialCfg);
 
         auto& spatialSystem = mWorld.addSystem<core::ecs::SpatialIndexSystem>(spatialCfg);
+
+        streamingSystem.bind(&spatialSystem);
 
         // 1. Создаем систему рендеринга конструктором по умолчанию (без аргументов)
         auto& renderSys = mWorld.addSystem<core::ecs::RenderSystem>();

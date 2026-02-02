@@ -474,6 +474,7 @@
     <ClCompile Include="src\game\skyguard\bootstrap\scene_bootstrap.cpp" />
     <ClCompile Include="src\game\skyguard\config\loader\app_config_loader.cpp" />
     <ClCompile Include="src\game\skyguard\config\loader\config_loader.cpp" />
+    <ClCompile Include="src\game\skyguard\config\loader\spatial_v2_config_builder.cpp" />
     <ClCompile Include="src\game\skyguard\config\loader\user_settings_loader.cpp" />
     <ClCompile Include="src\game\skyguard\config\loader\view_config_loader.cpp" />
     <ClCompile Include="src\game\skyguard\config\loader\window_config_loader.cpp" />
@@ -535,6 +536,7 @@
     <ClInclude Include="include\core\ecs\components\spatial_dirty_tag.h" />
     <ClInclude Include="include\core\ecs\components\spatial_handle_component.h" />
     <ClInclude Include="include\core\ecs\components\spatial_id_component.h" />
+    <ClInclude Include="include\core\ecs\components\spatial_streamed_out_tag.h" />
     <ClInclude Include="include\core\ecs\components\sprite_component.h" />
     <ClInclude Include="include\core\ecs\components\sprite_scaling_data_component.h" />
     <ClInclude Include="include\core\ecs\components\transform_component.h" />
@@ -597,6 +599,7 @@
     <ClInclude Include="include\game\skyguard\config\config_paths.h" />
     <ClInclude Include="include\game\skyguard\config\loader\app_config_loader.h" />
     <ClInclude Include="include\game\skyguard\config\loader\config_loader.h" />
+    <ClInclude Include="include\game\skyguard\config\loader\spatial_v2_config_builder.h" />
     <ClInclude Include="include\game\skyguard\config\loader\user_settings_loader.h" />
     <ClInclude Include="include\game\skyguard\config\loader\view_config_loader.h" />
     <ClInclude Include="include\game\skyguard\config\loader\window_config_loader.h" />
@@ -612,6 +615,7 @@
     <ClInclude Include="include\game\skyguard\ecs\systems\player_bounds_system.h" />
     <ClInclude Include="include\game\skyguard\ecs\systems\player_init_system.h" />
     <ClInclude Include="include\game\skyguard\ecs\systems\aircraft_control_system.h" />
+    <ClInclude Include="include\game\skyguard\ecs\systems\spatial_streaming_system.h" />
     <ClInclude Include="include\game\skyguard\game.h" />
     <ClInclude Include="include\game\skyguard\platform\user_paths.h" />
     <ClInclude Include="include\game\skyguard\presentation\background_math.h" />
