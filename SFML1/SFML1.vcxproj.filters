@@ -313,6 +313,12 @@
     <Filter Include="src\game\skyguard\bootstrap">
       <UniqueIdentifier>{b42c41e9-8b44-4037-ba98-28ff83090388}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\game\skyguard\streaming">
+      <UniqueIdentifier>{25950167-d91c-415c-ba9e-223a120e2a49}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\streaming">
+      <UniqueIdentifier>{28c4768b-80d9-44e3-8683-3fc2a2e900a6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -371,9 +377,6 @@
     </ClCompile>
     <ClCompile Include="src\core\utils\json\json_document.cpp">
       <Filter>src\core\utils\json</Filter>
-    </ClCompile>
-    <ClCompile Include="src\game\skyguard\dev\stress_scene.cpp">
-      <Filter>src\game\skyguard\dev</Filter>
     </ClCompile>
     <ClCompile Include="src\core\config\loader\detail\non_critical_config_report.cpp">
       <Filter>src\core\config\loader\detail</Filter>
@@ -449,6 +452,9 @@
     </ClCompile>
     <ClCompile Include="src\game\skyguard\config\loader\spatial_v2_config_builder.cpp">
       <Filter>src\game\skyguard\config\loader</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\skyguard\dev\stress_chunk_content_provider.cpp">
+      <Filter>src\game\skyguard\dev</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -638,9 +644,6 @@
     <ClInclude Include="include\core\utils\json\json_common.h">
       <Filter>include\core\utils\json</Filter>
     </ClInclude>
-    <ClInclude Include="include\game\skyguard\dev\stress_scene.h">
-      <Filter>include\game\skyguard\dev</Filter>
-    </ClInclude>
     <ClInclude Include="include\core\config\properties\debug_overlay_runtime_properties.h">
       <Filter>include\core\config\properties</Filter>
     </ClInclude>
@@ -799,6 +802,12 @@
     </ClInclude>
     <ClInclude Include="include\core\ecs\components\spatial_streamed_out_tag.h">
       <Filter>include\core\ecs\components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\dev\stress_chunk_content_provider.h">
+      <Filter>include\game\skyguard\dev</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\streaming\chunk_content_provider.h">
+      <Filter>include\game\skyguard\streaming</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

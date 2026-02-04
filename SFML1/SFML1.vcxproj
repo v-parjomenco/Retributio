@@ -479,7 +479,7 @@
     <ClCompile Include="src\game\skyguard\config\loader\view_config_loader.cpp" />
     <ClCompile Include="src\game\skyguard\config\loader\window_config_loader.cpp" />
     <ClCompile Include="src\game\skyguard\dev\spatial_index_harness.cpp" />
-    <ClCompile Include="src\game\skyguard\dev\stress_scene.cpp" />
+    <ClCompile Include="src\game\skyguard\dev\stress_chunk_content_provider.cpp" />
     <ClCompile Include="src\game\skyguard\ecs\systems\player_init_system.cpp" />
     <ClCompile Include="src\game\skyguard\game.cpp" />
     <ClCompile Include="src\game\skyguard\platform\user_paths.cpp" />
@@ -608,7 +608,7 @@
     <ClInclude Include="include\game\skyguard\config\view_config.h" />
     <ClInclude Include="include\game\skyguard\config\window_config.h" />
     <ClInclude Include="include\game\skyguard\dev\spatial_index_harness.h" />
-    <ClInclude Include="include\game\skyguard\dev\stress_scene.h" />
+    <ClInclude Include="include\game\skyguard\dev\stress_chunk_content_provider.h" />
     <ClInclude Include="include\game\skyguard\ecs\components\aircraft_control_bindings_component.h" />
     <ClInclude Include="include\game\skyguard\ecs\components\aircraft_control_component.h" />
     <ClInclude Include="include\game\skyguard\ecs\components\player_tag_component.h" />
@@ -622,6 +622,7 @@
     <ClInclude Include="include\game\skyguard\presentation\background_renderer.h" />
     <ClInclude Include="include\game\skyguard\presentation\view_manager.h" />
     <ClInclude Include="include\game\skyguard\presentation\window_mode_manager.h" />
+    <ClInclude Include="include\game\skyguard\streaming\chunk_content_provider.h" />
     <ClInclude Include="include\game\skyguard\utils\debug_format.h" />
     <ClInclude Include="include\pch.h" />
   </ItemGroup>

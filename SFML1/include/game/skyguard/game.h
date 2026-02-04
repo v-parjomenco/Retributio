@@ -9,6 +9,8 @@
 // ================================================================================================
 #pragma once
 
+#include <memory>
+
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/System/Time.hpp>
 
@@ -20,6 +22,7 @@
 #include "game/skyguard/presentation/background_renderer.h"
 #include "game/skyguard/presentation/view_manager.h"
 #include "game/skyguard/presentation/window_mode_manager.h"
+#include "game/skyguard/streaming/chunk_content_provider.h"
 
 namespace core::ecs {
     class DebugOverlaySystem;
@@ -91,6 +94,7 @@ namespace game::skyguard {
         game::skyguard::ecs::AircraftControlSystem* mAircraftControlSystem{nullptr};
         core::ecs::DebugOverlaySystem* mDebugOverlay{nullptr};
         core::ecs::RenderSystem* mRenderSystem{nullptr};
+        std::unique_ptr<streaming::IChunkContentProvider> mChunkContentProvider{};
 
         game::skyguard::config::UserSettings mUserSettings{};
         std::filesystem::path mUserSettingsPath{};

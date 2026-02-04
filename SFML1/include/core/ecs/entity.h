@@ -39,21 +39,12 @@ namespace core::ecs {
      * Заменяет старый `Entity{0}` или проверки `entity.id == 0`.
      * Используется для инициализации и проверки на "нет сущности".
      */
-    inline constexpr Entity NullEntity = entt::null;
+    inline constexpr Entity NullEntity{entt::null};
 
     /**
      * @brief Проверка, является ли сущность "пустой" (невалидной).
-     *
-     * @param entity Дескриптор сущности для проверки
-     * @return true если entity == entt::null
-     *
-     * Пример использования:
-     *   Entity e = world.createEntity();
-     *   if (!isNull(e)) {
-     *       // сущность валидна
-     *   }
      */
-    [[nodiscard]] constexpr bool isNull(Entity entity) noexcept {
+    [[nodiscard]] constexpr bool isNull(const Entity entity) noexcept {
         return entity == NullEntity;
     }
 
@@ -61,25 +52,14 @@ namespace core::ecs {
      * @brief Преобразование Entity в uint32_t для логирования/отладки.
      *
      * ВАЖНО:
-     *  - Это НЕ "индекс" в массиве компонентов (EnTT управляет этим внутри);
-     *  - Это удобное числовое представление для человека (логи, UI, отладка);
-     *  - НЕ используйте это значение как persistent ID для сохранений/загрузок между запусками:
-     *    для сейвов нужен отдельный стабильный идентификатор и маппинг.
-     *  - Для доступа к компонентам используйте World::getComponent<T>(entity).
-     *
-     * Замена старого кода:
-     *   ДО:  entity.id
-     *   ПОСЛЕ: toUint(entity)
-     *
-     * @param entity Дескриптор сущности
-     * @return uint32_t числовое представление (включает generation)
+     *  - Это НЕ persistent ID (для сейвов нужен StableID сервис + маппинг).
+     *  - Это просто числовое представление handle'а (включая generation биты).
      */
-    [[nodiscard]] constexpr std::uint32_t toUint(Entity entity) noexcept {
-        // entt::to_integral возвращает числовое представление дескриптора (underlying value).
-        // Для null entity возвращаем явно 0xFFFFFFFF, чтобы в логах это не сливалось с обычными ID.
-        if (entity == entt::null) {
-            return 0xFFFFFFFF; // Явный маркер "null entity"
-        }
+    [[nodiscard]] constexpr std::uint32_t toUint(const Entity entity) noexcept {
+        using underlying_type = std::underlying_type_t<Entity>;
+        static_assert(sizeof(underlying_type) <= sizeof(std::uint32_t),
+                      "core::ecs::Entity underlying type must fit into uint32_t");
+
         return static_cast<std::uint32_t>(entt::to_integral(entity));
     }
 
@@ -87,13 +67,12 @@ namespace core::ecs {
 
 // Хеш-функция для использования Entity в std::unordered_map / std::unordered_set.
 //
-// Технически entt::entity уже hashable через entt::to_integral, но явная
-// специализация std::hash гарантирует совместимость со стандартными контейнерами.
+// Примечание:
+//  - entt::entity по сути компактный enum-handle; хешируем по integral представлению.
 namespace std {
     template <>
     struct hash<core::ecs::Entity> {
-        std::size_t operator()(core::ecs::Entity entity) const noexcept {
-            // Используем underlying type для хеша (uint32_t с generation битами)
+        std::size_t operator()(const core::ecs::Entity entity) const noexcept {
             using underlying_type = std::underlying_type_t<core::ecs::Entity>;
             const auto value = static_cast<underlying_type>(entt::to_integral(entity));
             return std::hash<underlying_type>{}(value);

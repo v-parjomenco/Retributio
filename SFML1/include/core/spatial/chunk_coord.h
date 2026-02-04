@@ -16,6 +16,8 @@ namespace core::spatial {
     struct ChunkCoord final {
         std::int32_t x = 0;
         std::int32_t y = 0;
+
+        [[nodiscard]] constexpr bool operator==(const ChunkCoord&) const noexcept = default;
     };
 
     template <typename T>

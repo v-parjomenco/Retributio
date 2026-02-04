@@ -107,7 +107,7 @@ namespace game::skyguard::ecs {
                 });
 
             if (i == 0) {
-                world.addTagComponent<game::skyguard::ecs::LocalPlayerTagComponent>(entity);
+                world.addTag<game::skyguard::ecs::LocalPlayerTagComponent>(entity);
             }
 
             world.addComponent<core::ecs::MovementStatsComponent>(

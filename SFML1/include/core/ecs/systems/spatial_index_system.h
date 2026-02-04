@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include <entt/signal/sigh.hpp>
@@ -56,11 +57,8 @@ namespace core::ecs {
         }
 
       private:
-        struct DirtyEntry final {
-            Entity entity{core::ecs::NullEntity};
-            std::uint64_t stableId{0};
-        };
 
+        using StableId = std::uint64_t;
         void onHandleDestroyed(entt::registry& registry, Entity entity) noexcept;
 
         [[nodiscard]] core::spatial::EntityId32 allocateSpatialId();
@@ -70,14 +68,9 @@ namespace core::ecs {
         core::spatial::SpatialIndexV2Sliding mIndex;
         std::vector<Entity> mEntityBySpatialId{};
         std::vector<core::spatial::EntityId32> mFreeSpatialIds{};
-        std::vector<Entity> mDirtyScratch{};
-        std::vector<Entity> mDirtyToClear{};
-        std::vector<DirtyEntry> mDirtyEntries{};
-        std::size_t mDirtyScratchCount{0};
-        std::size_t mDirtyToClearCount{0};
+        std::vector<std::pair<StableId, Entity>> mDirtyStableScratch{};
         core::spatial::EntityId32 mNextSpatialId{1};
-        bool mDeterminismEnabled{false};
-        bool mStableIdsPrepared{false};
+        bool mDeterminismEnabled{false};        
         entt::scoped_connection mOnDestroyConnection;
         bool mConnected = false;
     };

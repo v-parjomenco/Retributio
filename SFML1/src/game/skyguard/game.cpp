@@ -5,8 +5,8 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
-#include <cstdint>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <span>
@@ -48,7 +48,7 @@
 #include "game/skyguard/utils/debug_format.h"
 
 #if defined(SFML1_PROFILE)
-    #include "game/skyguard/dev/stress_scene.h"
+    #include "game/skyguard/dev/stress_chunk_content_provider.h"
 #endif
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
     #include "game/skyguard/dev/spatial_index_harness.h"
@@ -62,10 +62,37 @@ namespace timecfg = ::core::time;
 namespace dbg = ::core::debug;
 // Специфические игровые конфиги/blueprints для SkyGuard (player.json, window и т.п.).
 namespace skycfg = ::game::skyguard::config;
-// Централизованное хранилище путей к JSON-конфигам
+// Централизованное хранилище путей к JSON-конфигам.
 namespace skycfg_paths = ::game::skyguard::config::paths;
-
+// Платформенные утилиты SkyGuard (OS-стандартные пути записи/чтения и т.п.).
 namespace platform = ::game::skyguard::platform;
+
+namespace {
+
+    // O(1) поиск локального игрока: берём первую сущность из view и сразу возвращаем Transform.
+    // Без сравнений с NullEntity → не зависит от нюансов EnTT null-типа и не плодит operator!=.
+    [[nodiscard]] bool tryGetLocalPlayerTransform(
+        core::ecs::World& world,
+        core::ecs::Entity& outEntity,
+        const core::ecs::TransformComponent*& outTransform) noexcept {
+
+        auto view = world.view<game::skyguard::ecs::LocalPlayerTagComponent,
+                               core::ecs::TransformComponent>();
+
+        const auto it = view.begin();
+        if (it == view.end()) {
+            outEntity = core::ecs::NullEntity;
+            outTransform = nullptr;
+            return false;
+        }
+
+        const core::ecs::Entity e = *it;
+        outEntity = e;
+        outTransform = &view.get<core::ecs::TransformComponent>(e);
+        return true;
+    }
+
+} // namespace
 
 namespace game::skyguard {
 
@@ -79,9 +106,10 @@ namespace game::skyguard {
         // ----------------------------------------------------------------------------------------
         // Загружаем конфиг окна и view SkyGuard из JSON (skyguard_game.json)
         // ----------------------------------------------------------------------------------------
-        const skycfg::WindowConfig windowCfg =
+        const skycfg::WindowConfig windowCfg = 
             skycfg::loadWindowConfig(skycfg_paths::SKYGUARD_GAME);
-        const skycfg::ViewConfig viewCfg = skycfg::loadViewConfig(skycfg_paths::SKYGUARD_GAME);
+        const skycfg::ViewConfig viewCfg = 
+            skycfg::loadViewConfig(skycfg_paths::SKYGUARD_GAME);
 
         // ----------------------------------------------------------------------------------------
         // Загружаем пользовательские настройки (переопределяя дефолты)
@@ -146,6 +174,7 @@ namespace game::skyguard {
         // Создаём ECS-мир и игровые сущности SkyGuard
         // ----------------------------------------------------------------------------------------
         initWorld();
+
         // После init/preload запрещаем любые lazy-load попытки (runtime contract).
         mResources.setIoForbidden(true);
     }
@@ -166,8 +195,9 @@ namespace game::skyguard {
         // Инициализация key-world реестра ресурсов (v1).
         // Критичный конфиг: если он сломан — нет смысла продолжать игру.
         const std::array<core::resources::ResourceSource, 1> sources{
-            core::resources::ResourceSource{std::string(skycfg_paths::RESOURCES), 0, 0,
-                                            "skyguard"}};
+            core::resources::ResourceSource{std::string(skycfg_paths::RESOURCES), 0, 0, "skyguard"}
+        };
+
         mResources.initialize(sources);
 
         // Fallback-ключи (core.texture.missing, core.font.default) валидируются
@@ -193,6 +223,33 @@ namespace game::skyguard {
             game::skyguard::bootstrap::preloadAndResolveInitialScene(mResources, bootCfg);
 
         // ----------------------------------------------------------------------------------------
+        // Determinism/stable IDs wiring ДОЛЖНО происходить до создания любой сущности.
+        // Guard + enable + prewarm до любых addSystem(), чтобы будущий рефактор
+        // (например, создание сущностей в ctor системы) не мог случайно обойти контракт.
+        // ----------------------------------------------------------------------------------------
+        const core::ecs::SpatialIndexSystemConfig spatialCfg =
+            config::buildSpatialIndexV2ConfigSkyGuard(
+                mEngineSettings, mViewManager.getWorldLogicalSize(), mWindow.getSize());
+
+#if !defined(NDEBUG)
+        if (spatialCfg.determinismEnabled) {
+            mWorld.requireStableIdsForDeterminism();
+        }
+#endif
+
+        // Deterministic wiring — включаем StableID сервис один раз до первого createEntity().
+        if (spatialCfg.determinismEnabled) {
+            auto& ids = mWorld.stableIds();
+            ids.enable();
+
+            const std::size_t capacity = config::computeStableIdCapacitySkyGuard(spatialCfg);
+            ids.prewarm(capacity);
+
+            assert(ids.isEnabled() && ids.isPrewarmed() &&
+                   "Game::initWorld: StableIdService wiring failed in deterministic mode");
+        }
+
+        // ----------------------------------------------------------------------------------------
         // Подключаем ECS-системы (порядок важен для update/render)
         // ----------------------------------------------------------------------------------------
 
@@ -207,25 +264,36 @@ namespace game::skyguard {
         mWorld.addSystem<game::skyguard::ecs::PlayerBoundsSystem>(
             mViewManager.getWorldLogicalSize(), playerFloorY);
 
-        const core::ecs::SpatialIndexSystemConfig spatialCfg =
-            config::buildSpatialIndexV2ConfigSkyGuard(
-                mEngineSettings, mViewManager.getWorldLogicalSize(), mWindow.getSize());
+#if defined(SFML1_PROFILE)
+        // Profile: streaming stress provider (deterministic per-chunk).
+        if (!boot.stressPlayerKey.has_value()) {
+            LOG_PANIC(core::log::cat::Config,
+                      "Game::initWorld: stressPlayerKey must be resolved in PROFILE builds.");
+        }
+
+        mChunkContentProvider = std::make_unique<game::skyguard::dev::StressChunkContentProvider>(
+            mResources, *boot.stressPlayerKey, spatialCfg.index.chunkSizeWorld);
+#else
+        // Debug/Release: no stress content (empty provider).
+        mChunkContentProvider =
+            std::make_unique<game::skyguard::streaming::EmptyChunkContentProvider>();
+#endif
 
         auto& streamingSystem =
             mWorld.addSystem<game::skyguard::ecs::SpatialStreamingSystem>(spatialCfg);
 
         auto& spatialSystem = mWorld.addSystem<core::ecs::SpatialIndexSystem>(spatialCfg);
 
-        streamingSystem.bind(&spatialSystem);
+        streamingSystem.bind(&spatialSystem, mChunkContentProvider.get());
 
-        // 1. Создаем систему рендеринга конструктором по умолчанию (без аргументов)
+        // 1) Создаём систему рендеринга конструктором по умолчанию (без аргументов).
         auto& renderSys = mWorld.addSystem<core::ecs::RenderSystem>();
-        // 2. Привязываем зависимости через bind(). Передаем адреса (&).
+        // 2) Привязываем зависимости через bind().
         renderSys.bind(&spatialSystem.index(),
                        spatialSystem.entitiesBySpatialId(),
                        spatialCfg.maxVisibleSprites,
                        &mResources);
-        // 3. Сохраняем указатель
+        // 3) Сохраняем указатель.
         mRenderSystem = &renderSys;
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
@@ -263,17 +331,6 @@ namespace game::skyguard {
 
         // BackgroundRenderer: resident-only + generation-safe cache.
         mBackgroundRenderer.init(mResources, boot.backgroundKey);
-
-#if defined(SFML1_PROFILE)
-        // Только DEV/PROFILE: стресс-сцена через ENV.
-        if (!boot.stressPlayerKey.has_value()) {
-            LOG_PANIC(core::log::cat::Config,
-                      "Game::initWorld: stressPlayerKey must be resolved in DEV/PROFILE builds.");
-        }
-
-        const core::resources::TextureKey playerKey = *boot.stressPlayerKey;
-        game::skyguard::dev::trySpawnStressSpritesFromEnv(mWorld, mResources, playerKey);
-#endif
     }
 
     void Game::persistUserSettings() noexcept {
@@ -346,13 +403,25 @@ namespace game::skyguard {
     }
 
     void Game::processEvents() {
-        while (const std::optional<sf::Event> event = mWindow.pollEvent()) {
+        // Инварианты инициализации: Game::run() вызывается после ctor/initWorld().
+        assert(mAircraftControlSystem != nullptr);
+        assert(mDebugOverlay != nullptr);
+
+        for (;;) {
+            const std::optional<sf::Event> eventOpt = mWindow.pollEvent();
+            if (!eventOpt.has_value()) {
+                break;
+            }
+
+            const sf::Event& event = *eventOpt;
+
             // Закрытие окна.
-            if (event->is<sf::Event::Closed>()) {
+            if (event.is<sf::Event::Closed>()) {
                 mWindow.close();
             }
             // Нажатие клавиш.
-            else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
+            else if (const auto* keyPressed = event.getIf<sf::Event::KeyPressed>()) {
+
                 // Alt+Enter: циклическое переключение режимов:
                 //   Windowed -> BorderlessFullscreen -> Fullscreen -> Windowed.
                 //
@@ -361,58 +430,58 @@ namespace game::skyguard {
                 //    (или Windowed <-> LastFullscreenMode),
                 //  - Exclusive Fullscreen включать только через меню.
                 if (keyPressed->alt && keyPressed->code == sf::Keyboard::Key::Enter) {
+                    // ВАЖНО: не используем continue после вызова requestCycleMode().
+                    // Если в сигнатуре requestCycleMode() случайно окажется [[noreturn]],
+                    // MSVC будет ругаться на "недостижимый код" сразу на continue/следующей строке.
                     mWindowModeManager.requestCycleMode();
-                    continue;
-                }
+                } else {
+                    mAircraftControlSystem->onKeyEvent(keyPressed->code, true);
 
-                mAircraftControlSystem->onKeyEvent(keyPressed->code, true);
-
-                // Debug overlay toggle: хоткей работает во всех сборках.
-                // Политика: хоткей ВСЕГДА активен, независимо от дефолтного состояния overlay
-                // при старте.
-                if (keyPressed->code == dbg::HOTKEY_TOGGLE_OVERLAY) {
-                    mDebugOverlay->setEnabled(!mDebugOverlay->isEnabled());
-                }
+                    // Debug overlay toggle: хоткей работает во всех сборках.
+                    // Политика: хоткей ВСЕГДА активен, независимо от дефолтного состояния overlay
+                    // при старте.
+                    if (keyPressed->code == dbg::HOTKEY_TOGGLE_OVERLAY) {
+                        mDebugOverlay->setEnabled(!mDebugOverlay->isEnabled());
+                    }
 
 #if !defined(NDEBUG)
-                if (keyPressed->code == dbg::HOTKEY_DUMP_CAMERA) {
-                    auto view = mWorld.view<game::skyguard::ecs::LocalPlayerTagComponent,
-                                            core::ecs::TransformComponent>();
+                    if (keyPressed->code == dbg::HOTKEY_DUMP_CAMERA) {
+                        core::ecs::Entity e{};
+                        const core::ecs::TransformComponent* tr = nullptr;
 
-                    const auto it = view.begin();
-                    if (it == view.end()) {
-                        LOG_DEBUG(core::log::cat::Gameplay, "CamDebug: no local player");
-                    } else {
-                        const core::ecs::Entity e = *it;
-                        const auto& tr = view.get<core::ecs::TransformComponent>(e);
-                        const auto& vw = mViewManager.getWorldView();
-                        const sf::Vector2f off = mViewManager.getCameraOffset();
+                        if (!tryGetLocalPlayerTransform(mWorld, e, tr)) {
+                            LOG_DEBUG(core::log::cat::Gameplay, "CamDebug: no local player");
+                        } else {
+                            const auto& vw = mViewManager.getWorldView();
+                            const sf::Vector2f off = mViewManager.getCameraOffset();
 
-                        LOG_DEBUG(core::log::cat::Gameplay,
-                                  "CamDebug: playerY={:.2f} viewCenterY={:.2f} viewSizeY={:.2f} "
-                                  "cameraOffsetY={:.2f} cameraCenterYMax={:.2f}",
-                                  tr.position.y, vw.getCenter().y, vw.getSize().y, off.y,
-                                  mViewManager.getCameraCenterYMax());
+                            LOG_DEBUG(core::log::cat::Gameplay,
+                                      "CamDebug: playerY={:.2f} viewCenterY={:.2f} viewSizeY={:.2f}"
+                                      " cameraOffsetY={:.2f} cameraCenterYMax={:.2f}",
+                                      tr->position.y, vw.getCenter().y, vw.getSize().y, off.y,
+                                      mViewManager.getCameraCenterYMax());
+                        }
                     }
-                }
 #endif
+                }
             }
             // Отпускание клавиш.
-            else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) {
+            else if (const auto* keyReleased = event.getIf<sf::Event::KeyReleased>()) {
                 mAircraftControlSystem->onKeyEvent(keyReleased->code, false);
             }
             // Потеря фокуса: сбрасываем ввод, чтобы не залипали клавиши при Alt-Tab.
             // Также сбрасываем состояние управления самолетом.
-            else if (event->is<sf::Event::FocusLost>()) {
+            else if (event.is<sf::Event::FocusLost>()) {
                 mAircraftControlSystem->resetState();
             }
             // Изменение размера окна.
-            else if (const auto* resized = event->getIf<sf::Event::Resized>()) {
+            else if (const auto* resized = event.getIf<sf::Event::Resized>()) {
                 const sf::Vector2u newSize{resized->size.x, resized->size.y};
                 // При минимизации окно может сообщить 0x0. Не создаём/не применяем невалидный view.
                 if (newSize.x == 0u || newSize.y == 0u) {
                     continue;
                 }
+
                 mViewManager.onResize(newSize);
                 mWindowModeManager.onWindowResized(newSize);
 
@@ -469,15 +538,12 @@ namespace game::skyguard {
     }
 
     void Game::updateCamera() {
-        auto view = mWorld.view<game::skyguard::ecs::LocalPlayerTagComponent,
-                                core::ecs::TransformComponent>();
+        core::ecs::Entity e{};
+        const core::ecs::TransformComponent* tr = nullptr;
 
-        const auto it = view.begin();
-        const bool foundPlayer = (it != view.end());
+        const bool foundPlayer = tryGetLocalPlayerTransform(mWorld, e, tr);
         if (foundPlayer) {
-            const core::ecs::Entity entity = *it;
-            auto& transform = view.get<core::ecs::TransformComponent>(entity);
-            mViewManager.updateCamera(transform.position);
+            mViewManager.updateCamera(tr->position);
         }
 
 #if !defined(NDEBUG)
@@ -536,20 +602,16 @@ namespace game::skyguard {
 #if !defined(NDEBUG)
             // Camera line (Debug only)
             {
-                auto view = mWorld.view<game::skyguard::ecs::LocalPlayerTagComponent,
-                                        core::ecs::TransformComponent>();
+                core::ecs::Entity e{};
+                const core::ecs::TransformComponent* tr = nullptr;
 
-                const auto it = view.begin();
-                if (it != view.end()) {
-                    const core::ecs::Entity e = *it;
-                    const auto& tr = view.get<core::ecs::TransformComponent>(e);
-
+                if (tryGetLocalPlayerTransform(mWorld, e, tr)) {
                     std::array<char, 256> camBuf{};
                     const auto& vw = mViewManager.getWorldView();
                     const sf::Vector2f off = mViewManager.getCameraOffset();
 
                     const std::size_t camSize = utils::formatCameraStatsLine(
-                        camBuf.data(), camBuf.size(), tr.position.y, vw.getCenter().y,
+                        camBuf.data(), camBuf.size(), tr->position.y, vw.getCenter().y,
                         vw.getSize().y, off.y, mViewManager.getCameraCenterYMax());
 
                     if (camSize > 0) {

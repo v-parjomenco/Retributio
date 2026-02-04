@@ -5,6 +5,8 @@
 // ================================================================================================
 #pragma once
 
+#include <cstddef>
+
 #include <SFML/System/Vector2.hpp>
 
 #include "core/config/engine_settings.h"
@@ -23,5 +25,11 @@ namespace game::skyguard::config {
         const core::config::EngineSettings& settings,
         const sf::Vector2f worldLogicalSize,
         const sf::Vector2u windowPixelSize);
+
+    // StableIdService capacity planning for deterministic mode (SkyGuard wiring).
+    // Возвращает CAPACITY таблиц StableIdService (индексация по entt::to_entity(e)).
+    // Вызывается в cold-path перед первым тиком, дальше таблицы "заморожены".
+    [[nodiscard]] std::size_t computeStableIdCapacitySkyGuard(
+        const core::ecs::SpatialIndexSystemConfig& spatialCfg) noexcept;
 
 } // namespace game::skyguard::config

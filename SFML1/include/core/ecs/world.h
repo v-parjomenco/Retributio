@@ -51,6 +51,15 @@ namespace core::ecs {
                         !std::is_const_v<T> && !std::is_volatile_v<T> && !std::is_reference_v<T>;
 
     /**
+     * @brief Политика data-компонента (не пустой).
+     *
+     * Data-компоненты несут данные и должны добавляться через addComponent<T>().
+     * Tag-компоненты (empty) добавляются только через addTag<T>().
+     */
+    template <typename T>
+    concept DataComponent = Component<T> && !std::is_empty_v<T>;
+
+    /**
      * @brief Политика tag-компонента (пустой маркер для отслеживания dirty).
      *
      * Примечание по дизайну:
@@ -67,7 +76,8 @@ namespace core::ecs {
      *  ❌ struct Health { int value; };   // Не пустой
      *  ❌ struct NetworkDirty {};         // Пустой, но не задуман как tag (нужен явный opt-in)
      */
-    template <typename T> concept TagComponent = Component<T> && std::is_empty_v<T>;
+    template <typename T>
+    concept TagComponent = Component<T> && std::is_empty_v<T>;
 
     /**
      * @brief Главный координатор ECS (тонкий фасад над entt::registry).
@@ -126,6 +136,7 @@ namespace core::ecs {
             , mQueuedDestroyStamp(other.mQueuedDestroyStamp)
             , mDebugUpdateInProgress(other.mDebugUpdateInProgress)
             , mDebugFlushInProgress(other.mDebugFlushInProgress)
+            , mRequireStableIdsForDeterminism(other.mRequireStableIdsForDeterminism)
 #endif
         {
             other.mAliveEntityCount = 0; // КРИТИЧНО: обнуляем источник
@@ -133,6 +144,7 @@ namespace core::ecs {
             // moved-from мир не должен "залипать" в фазах.
             other.mDebugUpdateInProgress = false;
             other.mDebugFlushInProgress = false;
+            other.mRequireStableIdsForDeterminism = false;
 #endif
         }
 
@@ -165,9 +177,11 @@ namespace core::ecs {
                 mQueuedDestroyStamp = other.mQueuedDestroyStamp;
                 mDebugUpdateInProgress = other.mDebugUpdateInProgress;
                 mDebugFlushInProgress = other.mDebugFlushInProgress;
+                mRequireStableIdsForDeterminism = other.mRequireStableIdsForDeterminism;
 
                 other.mDebugUpdateInProgress = false;
                 other.mDebugFlushInProgress = false;
+                other.mRequireStableIdsForDeterminism = false;
 #endif
                 other.mAliveEntityCount = 0; // КРИТИЧНО: обнуляем источник
             }
@@ -187,8 +201,25 @@ namespace core::ecs {
          * Потокобезопасность: Небезопасно.
          */
         [[nodiscard]] Entity createEntity() {
+#if !defined(NDEBUG)
+            if (mRequireStableIdsForDeterminism) {
+                const auto& ids = stableIds();
+                assert(ids.isEnabled() && ids.isPrewarmed() &&
+                       "World::createEntity: deterministic mode requires StableIdService "
+                       "enabled+prewarmed BEFORE any entity creation. "
+                       "Fix Game wiring (enable+prewarm in init).");
+            }
+#endif
+
+            const Entity e = mRegistry.create();
             ++mAliveEntityCount;
-            return mRegistry.create();
+
+            // Контракт: если StableIdService включён, StableID назначается на write-boundary.
+            if (mStableIds.isEnabled()) {
+                (void) mStableIds.ensureAssigned(e);
+            }
+
+            return e;
         }
 
         /**
@@ -354,7 +385,7 @@ namespace core::ecs {
          * Сложность: O(1)
          * Потокобезопасность: Безопасно для чтения (если нет параллельных create/destroy).
          */
-        [[nodiscard]] bool isAlive(Entity e) const noexcept(noexcept(mRegistry.valid(e))) {
+        [[nodiscard]] bool isAlive(Entity e) const noexcept {
             return mRegistry.valid(e);
         }
 
@@ -512,18 +543,19 @@ namespace core::ecs {
          * @brief Добавить или заменить компонент (in-place construction).
          *
          * Политика детерминированности:
-         *  - Для НЕ-пустых компонентов запрещён вызов addComponent<T>(e) без аргументов.
-         *    Это блокирует случайные "пустые вставки" и скрытые неинициализации.
-         *  - Для tag-компонентов (empty type) addComponent<Tag>(e) разрешён.
+         *  - addComponent<T>() предназначен ТОЛЬКО для data-компонентов (не empty).
+         *  - Для tag-компонентов используйте addTag<T>().
+         *  - Для НЕ-пустых компонентов запрещён вызов addComponent<T>(e) без аргументов —
+         *    это блокирует случайные "пустые вставки" и скрытые неинициализации.
          *  - Если нужна дефолтная инициализация data-компонента — делай это ЯВНО:
          *      world.addComponent<Health>(e, Health{});
          *
          * Сложность: O(1) amortized.
          * Потокобезопасность: Небезопасно.
          */
-        template <Component T, typename... Args>
+        template <DataComponent T, typename... Args>
         requires std::constructible_from<T, Args...> T& addComponent(Entity e, Args&&... args) {
-            static_assert(sizeof...(Args) > 0 || std::is_empty_v<T>,
+            static_assert(sizeof...(Args) > 0,
                           "World::addComponent<T>: non-empty components must be explicitly "
                           "initialized. Use addComponent<T>(e, T{}) for default initialization.");
 
@@ -534,14 +566,33 @@ namespace core::ecs {
         /**
          * @brief Добавить или заменить tag-компонент (empty type).
          *
-         * Используется, когда addComponent<T>() возвращает void для empty типов в EnTT.
-         *
          * Сложность: O(1) amortized.
          * Потокобезопасность: Небезопасно.
          */
-        template <TagComponent T> void addTagComponent(Entity e) {
-            assert(isAlive(e) && "addTagComponent: entity must be alive");
+        template <TagComponent T> void addTag(Entity e) {
+            assert(isAlive(e) && "addTag: entity must be alive");
             mRegistry.emplace_or_replace<T>(e);
+        }
+
+        /**
+         * @brief Удалить tag-компонент у сущности (если он присутствует).
+         *
+         * Сложность: O(1)
+         * Потокобезопасность: Небезопасно.
+         */
+        template <TagComponent T>
+        void removeTag(Entity e) noexcept(noexcept(mRegistry.remove<T>(e))) {
+            assert(isAlive(e) && "removeTag: entity must be alive");
+            mRegistry.remove<T>(e);
+        }
+
+        /**
+         * @brief Проверить наличие tag-компонента у сущности.
+         *
+         * Контракт: безопасно вызывать с dead/invalid entity — вернёт false.
+         */
+        template <TagComponent T> [[nodiscard]] bool hasTag(Entity e) const noexcept {
+            return mRegistry.any_of<T>(e);
         }
 
         /**
@@ -763,6 +814,14 @@ namespace core::ecs {
         void render(sf::RenderWindow& window) {
             mSystems.renderAll(*this, window);
         }
+        
+#if !defined(NDEBUG)
+        // Debug-only wiring contract:
+        // determinismEnabled => StableIdService enabled+prewarmed BEFORE first createEntity().
+        void requireStableIdsForDeterminism() noexcept {
+            mRequireStableIdsForDeterminism = true;
+        }
+#endif
 
         [[nodiscard]] StableIdService& stableIds() noexcept {
             return mStableIds;
@@ -901,6 +960,7 @@ namespace core::ecs {
         // Debug-only: минимальная защита от misuse фаз/flush (cold-path asserts).
         bool mDebugUpdateInProgress{false};
         bool mDebugFlushInProgress{false};
+        bool mRequireStableIdsForDeterminism{false};
 #endif
 
         // ----------------------------------------------------------------------------------------

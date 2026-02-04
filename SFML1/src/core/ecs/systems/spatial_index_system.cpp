@@ -64,15 +64,10 @@ namespace core::ecs {
     }
 
     void SpatialIndexSystem::update(World& world, float) {
+
         ensureDestroyConnection(world);
 
         auto& registry = world.registry();
-
-        if (mDeterminismEnabled && !mStableIdsPrepared) {
-            world.stableIds().enable();
-            world.stableIds().prewarm(mEntityBySpatialId.size());
-            mStableIdsPrepared = true;
-        }
 
         auto newView = registry.view<TransformComponent, SpriteComponent>(
             entt::exclude<SpatialIdComponent, SpatialStreamedOutTag>);
@@ -162,44 +157,40 @@ namespace core::ecs {
                                entt::exclude<SpatialStreamedOutTag>);
 
         bool hadDirty = false;
+
         if (mDeterminismEnabled) {
-            if (mDirtyScratch.capacity() < dirtyView.size_hint()) {
-                mDirtyScratch.reserve(dirtyView.size_hint());
+            auto& stableIds = world.stableIds();
+
+            const std::size_t dirtyHint = dirtyView.size_hint();
+            if (mDirtyStableScratch.capacity() < dirtyHint) {
+                mDirtyStableScratch.reserve(dirtyHint);
             }
-            mDirtyScratch.clear();
+            mDirtyStableScratch.clear();
 
             for (const Entity e : dirtyView) {
-                mDirtyScratch.push_back(e);
+                const auto idOpt = stableIds.tryGet(e);
+                if (!idOpt.has_value()) {
+                    LOG_PANIC(core::log::cat::ECS,
+                              "SpatialIndexSystem: missing StableID in deterministic mode. "
+                              "Stable IDs must be assigned on entity creation.");
+                }
+                mDirtyStableScratch.emplace_back(*idOpt, e);
             }
 
-            // Детерминированное присвоение StableID должно происходить в фиксированном порядке:
-            //  1) сортируем по runtime entity id (toUint) как стабильному tie-break в рамках
-            //     процесса;
-            //  2) в этом порядке вызываем ensureAssigned() ровно один раз на сущность;
-            //  3) после этого сортируем по StableID без write-path в comparator.
-            std::sort(mDirtyScratch.begin(), mDirtyScratch.end(),
-                      [](const Entity a, const Entity b) noexcept {
-                          return core::ecs::toUint(a) < core::ecs::toUint(b);
-                      });
-
-            auto& stableIds = world.stableIds();
-            for (const Entity e : mDirtyScratch) {
-                (void) stableIds.ensureAssigned(e);
-            }
-
-            std::sort(mDirtyScratch.begin(), mDirtyScratch.end(),
-                      [&stableIds](const Entity a, const Entity b) {
-                          const auto aIdOpt = stableIds.tryGet(a);
-                          const auto bIdOpt = stableIds.tryGet(b);
-                          if (!aIdOpt.has_value() || !bIdOpt.has_value()) {
-                              LOG_PANIC(core::log::cat::ECS,
-                                        "SpatialIndexSystem: missing StableID "
-                                        "during deterministic sort");
+            std::sort(mDirtyStableScratch.begin(), mDirtyStableScratch.end(),
+                      [](const auto& lhs, const auto& rhs) noexcept {
+                          if (lhs.first < rhs.first) {
+                              return true;
                           }
-                          return *aIdOpt < *bIdOpt;
+                          if (rhs.first < lhs.first) {
+                              return false;
+                          }
+                          // Теоретический tie-break (StableIdService обещает уникальность).
+                          return core::ecs::toUint(lhs.second) < core::ecs::toUint(rhs.second);
                       });
 
-            for (const Entity e: mDirtyScratch) {
+            for (const auto& entry : mDirtyStableScratch) {
+                const Entity e = entry.second;
                 auto& handleComp = registry.get<SpatialIdComponent>(e);
                 const auto& tr = registry.get<TransformComponent>(e);
                 const auto& sp = registry.get<SpriteComponent>(e);
@@ -223,6 +214,7 @@ namespace core::ecs {
                 }
                 handleComp.lastAabb = newAabb;
             }
+
         } else {
             for (auto [entity, handleComp, transform, sprite] : dirtyView.each()) {
                 (void) entity;

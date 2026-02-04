@@ -5,8 +5,9 @@
 // Related headers: core/ecs/entity.h
 //
 // Notes:
-//  - StableIDs are monotonic uint64_t, never reused.
-//  - Lookup validates entity generation/version to avoid stale handles.
+//  - StableID is monotonic uint64_t, never reused within a World session while enabled.
+//  - Mapping is indexed by raw EnTT entity index (entt::to_entity(e)) and validated by generation
+//    (version) to reject stale handles.
 // ================================================================================================
 #pragma once
 
@@ -26,30 +27,54 @@ namespace core::ecs {
         [[nodiscard]] bool isEnabled() const noexcept;
         void enable() noexcept;
 
-        // Детерминизм:
-        //  - StableID детерминированен только при детерминированном порядке вызовов 
-        //    ensureAssigned().
-        //  - ensureAssigned() — write-path (может расширять таблицу); не вызывать в tight loops.
+        // КОНТРАКТ НАЗНАЧЕНИЯ StableID (Titan-oriented):
+        //
+        // 1) ensureAssigned() — write-path:
+        //    - вызывается ТОЛЬКО на write boundary (например, World::createEntity()).
+        //    - запрещено вызывать из update/render систем и tight loops.
+        //
+        // 2) tryGet() — read-path:
+        //    - используется в системах (включая deterministic сортировки).
+        //    - никаких "late assignment" в update: если tryGet() вернул nullopt в режиме
+        //      детерминизма — это ошибка wiring/контракта и должна фейлиться в месте вызова.
+        //
+        // 3) Zero allocations:
+        //    - prewarm() вызывается в cold-path и фиксирует capacity внутренних таблиц.
+        //    - после prewarm() ensureAssigned() НЕ имеет права расширять таблицы.
         [[nodiscard]] StableId ensureAssigned(Entity e);
+
+        // Read-only lookup:
+        //  - nullopt если сервис выключен,
+        //  - nullopt если для этой сущности StableID ещё не назначен,
+        //  - nullopt если handle устарел (generation mismatch).
         [[nodiscard]] std::optional<StableId> tryGet(Entity e) const;
 
+        // Хук жизненного цикла: вызывать после registry.destroy() в flushDestroyed().
+        // Инвалидация делается version-aware: stale handles не смогут "унаследовать" чужой ID.
         void onEntityDestroyed(Entity e) noexcept;
+
+        // Сброс состояния сервиса для текущего мира:
+        //  - очищает таблицы (без изменения capacity),
+        //  - сбрасывает счётчик выдачи StableID на стартовое значение.
         void clear() noexcept;
-        void prewarm(std::size_t maxEntities);
+
+        // Cold-path: фиксируем ёмкость таблиц (индексация по raw entity index).
+        // Аргумент — это именно CAPACITY (max raw index + 1), а не aliveEntityCount().
+        // После вызова таблицы считаются "замороженными": write-path не расширяет память.
+        void prewarm(std::size_t capacity);
+
+        [[nodiscard]] bool isPrewarmed() const noexcept;
 
       private:
         static constexpr StableId kUnsetStableId = 0u;
 
-        // Observed version storage strategy (ironclad):
-        //  - observedVersionPlusOne == 0  => unset
+        // Стратегия observed version (железно):
+        //  - observedVersionPlusOne == 0 => unset
         //  - observedVersionPlusOne == rawVersion(e) + 1 => match
-        // Это исключает "магические" sentinel значения и не зависит от диапазона версии EnTT.
         static constexpr std::uint32_t kUnsetObservedVersionPlusOne = 0u;
 
         [[nodiscard]] static std::size_t rawIndex(Entity e) noexcept;
         [[nodiscard]] static std::uint32_t rawVersionPlusOne(Entity e) noexcept;
-
-        void ensureStorage(std::size_t rawIndex);
 
 #if !defined(NDEBUG)
         void debugAssertInvariants() const;
@@ -57,10 +82,11 @@ namespace core::ecs {
 
         bool mEnabled{false};
 
-        // Начинаем с 1, потому что 0 = kUnsetStableId (sentinel, запрещённый StableID).
-        // mNextStableId — "следующий выдаваемый" идентификатор.
+        // 0 зарезервирован как sentinel (kUnsetStableId), поэтому начинаем с 1.
         StableId mNextStableId{1u};
 
+        // Таблицы фиксированной ёмкости после prewarm():
+        // индексируются по entt::to_entity(e).
         std::vector<StableId> mStableIdByIndex{};
         std::vector<std::uint32_t> mObservedVersionPlusOneByIndex{};
     };
