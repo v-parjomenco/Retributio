@@ -20,18 +20,6 @@
 
 namespace {
 
-    [[nodiscard]] std::string_view overflowPolicyName(
-        core::spatial::OverflowPolicy policy) noexcept {
-            switch (policy) {
-                case core::spatial::OverflowPolicy::FailFast:
-                    return "FailFast";
-                case core::spatial::OverflowPolicy::Truncate:
-                    return "Truncate";
-                default:
-                    return "Unknown";
-            }
-    }
-
 #if defined(SFML1_PROFILE)
 
     [[nodiscard]] std::optional<std::uint64_t> readEnvU64(const char* name) noexcept {
@@ -291,7 +279,6 @@ namespace game::skyguard::config {
         cfg.index.maxEntityId = expectedMaxEntities;
         cfg.index.marksCapacity = expectedMaxEntities;
 
-        cfg.index.overflowPolicy = core::spatial::OverflowPolicy::FailFast;
         cfg.index.overflow = core::spatial::OverflowConfig{
             .nodeCapacity = 32u,
             .maxNodes = overflowMaxNodes};
@@ -319,7 +306,7 @@ namespace game::skyguard::config {
                  "SpatialIndexV2(SkyGuard): window {}x{} px, window {}x{} chunks, "
                  "activeSetCeiling={} (maxPerChunk={}), expectedMaxEntities={}, "
                  "budgets(visible={}, dirty={}), maxResidentChunks={}, budgets(load={}, unload={}),"
-                 " overflow={} (nodes={}, capacity={})",
+                 " overflow(nodes={}, capacity={})",
                  windowPixelSize.x, windowPixelSize.y,
                  cfg.storage.width, cfg.storage.height,
                  activeSetCeiling, maxEntitiesPerChunkCeiling,
@@ -327,7 +314,6 @@ namespace game::skyguard::config {
                  cfg.maxVisibleSprites, cfg.maxDirtyEntities,
                  cfg.storage.maxResidentChunks,
                  cfg.maxLoadsPerFrame, cfg.maxUnloadsPerFrame,
-                 overflowPolicyName(cfg.index.overflowPolicy),
                  cfg.index.overflow.maxNodes, cfg.index.overflow.nodeCapacity);
 
         return cfg;

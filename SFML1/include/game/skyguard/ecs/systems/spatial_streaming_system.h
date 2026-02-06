@@ -6,9 +6,11 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <new>
 #include <span>
 #include <vector>
@@ -25,6 +27,10 @@
 
 #include "game/skyguard/ecs/components/player_tag_component.h"
 #include "game/skyguard/streaming/chunk_content_provider.h"
+
+namespace sf {
+    class RenderWindow;
+}
 
 namespace game::skyguard::ecs {
 
@@ -71,7 +77,6 @@ namespace game::skyguard::ecs {
             mDeferredDestroyReserve = windowSize;
 
             if (config.maxVisibleSprites > 0) {
-                mEntityIdsScratch.reserve(config.maxVisibleSprites);
                 mDestroyScratch.reserve(config.maxVisibleSprites);
                 mDeferredDestroyReserve =
                     std::max(mDeferredDestroyReserve, config.maxVisibleSprites);
@@ -90,26 +95,69 @@ namespace game::skyguard::ecs {
             const std::size_t maxPerChunk = mContentProvider->maxEntitiesPerChunk();
             mMaxEntitiesPerChunk = maxPerChunk;
 
-            // Буфер спавна — caller-owned: выделяем/расширяем один раз в cold path (bind/init),
-            // в update() никаких аллокаций. Буфер не сжимаем: держим capacity на случай будущего
-            // ребайнда/смены провайдера без лишних аллокаций.
+            // Буфер спавна — cold path (bind/init). В update() — ноль аллокаций.
             if (maxPerChunk == 0u) {
-                mSpawnBuffer.clear(); // размер 0, capacity не трогаем
+                mSpawnBuffer.clear(); // size=0, capacity не трогаем
+                mChunkEntityStride = 0;
+                mChunkEntityCounts.clear();
+                mChunkEntities.clear();
                 return;
             }
 
-            if (mSpawnBuffer.size() >= maxPerChunk) {
-                return; // текущего буфера достаточно
+            if (mSpawnBuffer.size() < maxPerChunk) {
+                try {
+                    mSpawnBuffer.resize(maxPerChunk);
+                } catch (const std::bad_alloc&) {
+                    LOG_PANIC(core::log::cat::ECS,
+                              "SpatialStreamingSystem: failed to allocate spawn buffer (maxPerChunk={})",
+                              maxPerChunk);
+                }
             }
 
-            try {
-                mSpawnBuffer.resize(maxPerChunk);
-            } catch (const std::bad_alloc&) {
-                LOG_PANIC(
-                    core::log::cat::ECS,
-                    "SpatialStreamingSystem: failed to allocate spawn buffer (maxPerChunk={})",
-                    maxPerChunk);
+            // ------------------------------------------------------------------------------------
+            // Streaming-owned chunk membership table.
+            // ВАЖНО: это - НЕ overlap по AABB. 
+            // Это "какие сущности были созданы провайдером для чанка".
+            // ------------------------------------------------------------------------------------
+            const std::size_t windowSize =
+                static_cast<std::size_t>(mWindowWidth) * static_cast<std::size_t>(mWindowHeight);
+
+            if (windowSize == 0u) {
+                LOG_PANIC(core::log::cat::ECS, "SpatialStreamingSystem: invalid window size");
             }
+
+            if (windowSize > (std::numeric_limits<std::size_t>::max() / maxPerChunk)) {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialStreamingSystem: membership pool size overflow "
+                          "(windowSize={}, maxPerChunk={})",
+                          windowSize, maxPerChunk);
+            }
+
+            const std::size_t poolSize = windowSize * maxPerChunk;
+
+            try {
+                mChunkEntityStride = maxPerChunk;
+
+                if (mChunkEntityCounts.size() != windowSize) {
+                    mChunkEntityCounts.assign(windowSize, 0u);
+                } else {
+                    std::fill(mChunkEntityCounts.begin(), mChunkEntityCounts.end(), 0u);
+                }
+
+                if (mChunkEntities.size() != poolSize) {
+                    mChunkEntities.assign(poolSize, core::ecs::NullEntity);
+                } else {
+                    // Не чистим весь poolSize каждый bind(), это может быть дорого.
+                    // Корректность обеспечивается mChunkEntityCounts + очисткой при unloadChunk().
+                }
+            } catch (const std::bad_alloc&) {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialStreamingSystem: failed to allocate membership pool "
+                          "(poolSize={})",
+                          poolSize);
+            }
+
+
         }
 
         void update(core::ecs::World& world, float dt) override {
@@ -208,6 +256,18 @@ namespace game::skyguard::ecs {
             const std::int32_t cx = static_cast<std::int32_t>(std::floor(x * invChunk));
             const std::int32_t cy = static_cast<std::int32_t>(std::floor(y * invChunk));
             return core::spatial::ChunkCoord{cx, cy};
+        }
+
+        /// Origin-independent ring-buffer slot for streaming membership table.
+        /// Stable across window origin shifts — no remapping needed.
+        /// Contract: for any width-consecutive x-coords and height-consecutive y-coords,
+        /// returns unique slots in [0, windowWidth * windowHeight).
+        [[nodiscard]] std::size_t membershipSlot(
+            const core::spatial::ChunkCoord coord) const noexcept {
+            const std::int32_t wx = core::spatial::detail::euclideanMod(coord.x, mWindowWidth);
+            const std::int32_t wy = core::spatial::detail::euclideanMod(coord.y, mWindowHeight);
+            return static_cast<std::size_t>(wy) * static_cast<std::size_t>(mWindowWidth) +
+                   static_cast<std::size_t>(wx);
         }
 
         [[nodiscard]] core::spatial::ChunkCoord
@@ -367,6 +427,33 @@ namespace game::skyguard::ecs {
             const core::spatial::WorldPosf origin =
                 core::spatial::chunkOrigin<float>(coord, mChunkSizeWorld);
 
+            const std::size_t slot = membershipSlot(coord);
+
+            if (slot >= mChunkEntityCounts.size()) {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialStreamingSystem: slot out of range for chunk "
+                          "({}, {}) slot={} windowSize={}",
+                          coord.x, coord.y, slot, mChunkEntityCounts.size());
+            }
+            if (mChunkEntityStride == 0u || mChunkEntities.empty()) {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialStreamingSystem: membership pool not initialized "
+                          "(stride=0)");
+            }
+            if (mChunkEntityCounts[slot] != 0u) {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialStreamingSystem: double-load detected for chunk "
+                          "({}, {}) slot={} count={}",
+                          coord.x, coord.y, slot, mChunkEntityCounts[slot]);
+            }
+            if (count > mChunkEntityStride) {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialStreamingSystem: provider overflow (count={}, stride={})",
+                          count, mChunkEntityStride);
+            }
+
+            const std::size_t base = slot * mChunkEntityStride;
+
             for (std::size_t i = 0; i < count; ++i) {
                 const auto& desc = mSpawnBuffer[i];
 
@@ -419,47 +506,59 @@ namespace game::skyguard::ecs {
 
                 world.addComponent<core::ecs::TransformComponent>(entity, tr);
                 world.addComponent<core::ecs::SpriteComponent>(entity, sp);
+
+                // Streaming membership: entity “belongs” to this chunk by construction.
+                mChunkEntities[base + i] = entity;
             }
+
+            mChunkEntityCounts[slot] = static_cast<std::uint32_t>(count);
         }
 
         void unloadChunk(core::ecs::World& world, const core::spatial::ChunkCoord coord) {
             auto& index = mSpatialSystem->index();
-            index.collectEntityIdsInChunk(coord, mEntityIdsScratch);
 
-            const std::span<const core::ecs::Entity> mapping =
-                mSpatialSystem->entitiesBySpatialId();
+            // Membership cleanup — only when provider actually spawns entities.
+            if (mMaxEntitiesPerChunk > 0u) {
+                const std::size_t slot = membershipSlot(coord);
+                assert(slot < mChunkEntityCounts.size() &&
+                       "SpatialStreamingSystem: slot out of range for unload");
+                assert(mChunkEntityStride > 0 && !mChunkEntities.empty() &&
+                       "SpatialStreamingSystem: membership pool not initialized");
 
-            for (const core::spatial::EntityId32 id : mEntityIdsScratch) {
-                if (id >= mapping.size()) {
-                    LOG_PANIC(core::log::cat::ECS,
-                              "SpatialStreamingSystem: SpatialId32 out of range (id={})", id);
+                const std::uint32_t count = mChunkEntityCounts[slot];
+                const std::size_t base = slot * mChunkEntityStride;
+
+                for (std::uint32_t i = 0; i < count; ++i) {
+                    const core::ecs::Entity entity = mChunkEntities[base + i];
+                    mChunkEntities[base + i] = core::ecs::NullEntity;
+
+                    if (entity == core::ecs::NullEntity || !world.isAlive(entity)) {
+                        continue;
+                    }
+
+                    if (!world.hasTag<core::ecs::SpatialStreamedOutTag>(entity)) {
+                        world.addTag<core::ecs::SpatialStreamedOutTag>(entity);
+                    }
+
+                    if (world.hasComponent<core::ecs::SpatialIdComponent>(entity)) {
+                        world.removeComponent<core::ecs::SpatialIdComponent>(entity);
+                    }
+                    if (world.hasTag<core::ecs::SpatialDirtyTag>(entity)) {
+                        world.removeTag<core::ecs::SpatialDirtyTag>(entity);
+                    }
+
+                    mDestroyScratch.push_back(entity);
                 }
 
-                const core::ecs::Entity entity = mapping[id];
-                if (entity == core::ecs::NullEntity || !world.isAlive(entity)) {
-                    continue;
-                }
-
-                if (!world.hasTag<core::ecs::SpatialStreamedOutTag>(entity)) {
-                    world.addTag<core::ecs::SpatialStreamedOutTag>(entity);
-                }
-
-                if (world.hasComponent<core::ecs::SpatialIdComponent>(entity)) {
-                    world.removeComponent<core::ecs::SpatialIdComponent>(entity);
-                }
-                if (world.hasTag<core::ecs::SpatialDirtyTag>(entity)) {
-                    world.removeTag<core::ecs::SpatialDirtyTag>(entity);
-                }
-
-                mDestroyScratch.push_back(entity);
+                mChunkEntityCounts[slot] = 0u;
             }
 
-            const bool unloaded =
-                index.setChunkState(coord, core::spatial::ResidencyState::Unloaded);
+            const bool unloaded = index.setChunkState(
+                coord, core::spatial::ResidencyState::Unloaded);
             if (!unloaded) {
                 LOG_PANIC(core::log::cat::ECS,
-                          "SpatialStreamingSystem: failed to unload chunk ({}, {})", coord.x,
-                          coord.y);
+                          "SpatialStreamingSystem: failed to unload chunk ({}, {})",
+                          coord.x, coord.y);
             }
 
             mContentProvider->onChunkUnloaded(coord);
@@ -483,9 +582,11 @@ namespace game::skyguard::ecs {
 
         std::vector<core::spatial::ChunkCoord> mUnloadScratch{};
         std::vector<core::spatial::ChunkCoord> mLoadScratch{};
-        std::vector<core::spatial::EntityId32> mEntityIdsScratch{};
         std::vector<core::ecs::Entity> mDestroyScratch{};
         std::vector<streaming::ChunkEntityDesc> mSpawnBuffer{};
+        std::size_t mChunkEntityStride = 0;
+        std::vector<std::uint32_t> mChunkEntityCounts{}; // windowSize
+        std::vector<core::ecs::Entity> mChunkEntities{}; // windowSize * stride
     };
 
 } // namespace game::skyguard::ecs

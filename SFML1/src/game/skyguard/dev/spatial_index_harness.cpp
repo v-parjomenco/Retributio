@@ -418,40 +418,6 @@ namespace game::skyguard::dev {
             }
         }
 
-        // Overflow exhaustion mode check (truncate policy must not crash).
-        {
-            core::spatial::SpatialIndexConfig overflowCfg = spatialCfg.index;
-            overflowCfg.overflowPolicy = core::spatial::OverflowPolicy::Truncate;
-            overflowCfg.overflow = core::spatial::OverflowConfig{1u, 1u};
-
-            core::spatial::SpatialIndexV2Sliding overflowIndex{};
-            overflowIndex.init(overflowCfg, spatialCfg.storage);
-
-            for (std::int32_t y = spatialCfg.storage.origin.y;
-                 y < spatialCfg.storage.origin.y + spatialCfg.storage.height; ++y) {
-                for (std::int32_t x = spatialCfg.storage.origin.x;
-                     x < spatialCfg.storage.origin.x + spatialCfg.storage.width; ++x) {
-                    const bool loaded = overflowIndex.setChunkState(
-                        {x, y}, core::spatial::ResidencyState::Loaded);
-                    if (!loaded) {
-                        LOG_PANIC(core::log::cat::ECS,
-                                  "Spatial harness: overflowIndex setChunkState failed ({}, {})",
-                                  x, y);
-                    }
-                }
-            }
-
-            const core::spatial::Aabb2 sameCell{0.f, 0.f, 1.f, 1.f};
-            core::spatial::WriteResult lastResult = core::spatial::WriteResult::Success;
-            for (std::uint32_t id = 1; id <= 64; ++id) {
-                lastResult = overflowIndex.registerEntity(id, sameCell);
-            }
-            if (lastResult != core::spatial::WriteResult::PartialTruncated) {
-                LOG_PANIC(core::log::cat::ECS,
-                          "Spatial harness: overflow truncation not triggered");
-            }
-        }
-
         LOG_INFO(core::log::cat::Performance,
                  "Spatial harness complete. Env vars: {}=1, {} (entities), {} (queries), {} "
                  "(updates).",

@@ -64,9 +64,15 @@ namespace core::spatial {
     static_assert(sizeof(Cell) == 64, "Cell must fit exactly one cache line.");
     static_assert(alignof(Cell) == 64, "Cell must align to cache-line boundary.");
 
-    struct SpatialChunk final {
+struct SpatialChunk final {
         std::uint32_t cellsBlockIndex = kInvalidCellsBlockIndex; // cell-offset in pool, or invalid
-        std::uint32_t activeEntityCount = 0;
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+         // Число зарегистрированных сущностей, чьи AABB пересекают этот chunk (coverage).
+         // НЕ membership/active-set; стриминг владеет residency/ceilings и "кто реально активен".
+         std::uint32_t aabbOverlapCount = 0;
+#endif
+
         ResidencyState state = ResidencyState::Unloaded;
     };
 
@@ -74,8 +80,6 @@ namespace core::spatial {
         std::uint32_t nodeCapacity = 32;
         std::uint32_t maxNodes = 0;
     };
-
-    enum class OverflowPolicy : std::uint8_t { FailFast = 0, Truncate };
 
     struct SpatialIndexConfig final {
         std::int32_t chunkSizeWorld = 0;
@@ -85,11 +89,12 @@ namespace core::spatial {
         std::uint32_t marksCapacity = 0;
 
         std::uint32_t maxEntityId = 0; // MUST be set (>0). Governs prewarm for marks/entities.
-        OverflowPolicy overflowPolicy = OverflowPolicy::FailFast;
         OverflowConfig overflow{};
     };
 
-    enum class WriteResult : std::uint8_t { Success = 0, PartialTruncated, Rejected };
+    // Контракт write-path: атомарный. Entity либо полностью записана во все cells, либо отвергнута.
+    // Частичная запись (truncation) запрещена by design.
+    enum class WriteResult : std::uint8_t { Success = 0, Rejected };
 
     struct FlatStorageConfig final {
         ChunkCoord origin{0, 0};
@@ -194,6 +199,65 @@ namespace core::spatial {
             }
         }
 
+        inline void resetChunkOverlapCount(SpatialChunk& chunk) noexcept {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            chunk.aabbOverlapCount = 0;
+#else
+            (void) chunk;
+#endif
+        }
+
+        inline void incrementChunkOverlapCount(SpatialChunk& chunk) noexcept {
+#if !defined(NDEBUG)
+            assert(chunk.aabbOverlapCount < std::numeric_limits<std::uint32_t>::max() &&
+                   "SpatialIndexV2: aabbOverlapCount overflow (debug-only)");
+             ++chunk.aabbOverlapCount;
+#elif defined(SFML1_PROFILE)
+            if (chunk.aabbOverlapCount == std::numeric_limits<std::uint32_t>::max()) [[unlikely]] {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialIndexV2: aabbOverlapCount overflow (profile)");
+            }
+            ++chunk.aabbOverlapCount;
+#else
+            (void) chunk;
+#endif
+        }
+
+        inline void decrementChunkOverlapCount(SpatialChunk& chunk) noexcept {
+#if !defined(NDEBUG)
+            assert(chunk.aabbOverlapCount > 0 &&
+                   "SpatialIndexV2: aabbOverlapCount underflow (debug-only)");
+            --chunk.aabbOverlapCount;
+#elif defined(SFML1_PROFILE)
+            if (chunk.aabbOverlapCount == 0u) [[unlikely]] {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialIndexV2: aabbOverlapCount underflow (profile)");
+            }
+            --chunk.aabbOverlapCount;
+#else
+            (void) chunk;
+#endif
+        }
+
+        [[nodiscard]] inline bool chunkOverlapCountIsZero(const SpatialChunk& chunk) noexcept {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            return chunk.aabbOverlapCount == 0;
+#else
+            (void) chunk;
+            return true;
+#endif
+        }
+
+        [[nodiscard]] inline std::uint32_t chunkOverlapCountForLog(
+            const SpatialChunk& chunk) noexcept {
+        #if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            return chunk.aabbOverlapCount;
+        #else
+            (void) chunk;
+            return 0u;
+        #endif
+        }
+
     } // namespace detail
 
     class FlatStorage final {
@@ -212,6 +276,10 @@ namespace core::spatial {
         template <typename Fn>
         bool forEachChunkInRange(const ChunkCoord minCoord, const ChunkCoord maxCoord,
                                  Fn&& fn) const;
+
+        template <typename Fn>
+        bool forEachChunkInRangeMut(const ChunkCoord minCoord, const ChunkCoord maxCoord,
+                                    Fn&& fn);
 
         [[nodiscard]] bool setChunkState(const ChunkCoord coord, const ResidencyState state);
         [[nodiscard]] ResidencyState chunkState(const ChunkCoord coord) const noexcept;
@@ -281,6 +349,10 @@ namespace core::spatial {
         bool forEachChunkInRange(const ChunkCoord minCoord, const ChunkCoord maxCoord,
                                  Fn&& fn) const;
 
+        template <typename Fn>
+        bool forEachChunkInRangeMut(const ChunkCoord minCoord, const ChunkCoord maxCoord,
+                                    Fn&& fn);
+
         [[nodiscard]] bool setChunkState(const ChunkCoord coord, const ResidencyState state);
         [[nodiscard]] ResidencyState chunkState(const ChunkCoord coord) const noexcept;
         [[nodiscard]] Cell* cellsForChunk(SpatialChunk& chunk) noexcept;
@@ -297,7 +369,7 @@ namespace core::spatial {
             for (Slot& slot : mShiftScratch) {
                 slot.coord = ChunkCoord{0, 0};
                 slot.chunk.cellsBlockIndex = kInvalidCellsBlockIndex;
-                slot.chunk.activeEntityCount = 0;
+                detail::resetChunkOverlapCount(slot.chunk);
                 slot.chunk.state = ResidencyState::Unloaded;
                 slot.occupied = false;
             }
@@ -483,6 +555,11 @@ namespace core::spatial {
             return mMarksClearRequired;
         }
 
+        // Global count of registered entities (accepted in write-path).
+        [[nodiscard]] std::uint32_t activeEntityCount() const noexcept {
+            return mActiveEntityCount;
+        }
+
         void clearMarksTable() const noexcept;
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
@@ -531,18 +608,17 @@ namespace core::spatial {
 
         [[nodiscard]] bool canWriteRange(const CellRange& chunkRange) const;
         [[nodiscard]] WriteResult writeToChunk(SpatialChunk& chunk, const ChunkCoord coord,
-                                               const CellRange& cellRange, const EntityId32 id,
-                                               bool& outTruncated);
+                                       const CellRange& cellRange, const EntityId32 id);
         void removeFromChunk(SpatialChunk& chunk, const ChunkCoord coord,
                              const CellRange& cellRange, const EntityId32 id) noexcept;
 
-        [[nodiscard]] bool appendToCell(Cell& cell, const EntityId32 id, bool& outTruncated);
+        void appendToCell(Cell& cell, const EntityId32 id);
         void removeFromCell(Cell& cell, const EntityId32 id) noexcept;
 
         [[nodiscard]] bool beginQueryStamp() const;
         void handleMarksWrap() const;
         void handleNonLoadedChunk(const ChunkCoord coord) const;
-        [[nodiscard]] bool handleOverflowExhausted() const;
+        [[noreturn]] void handleOverflowExhausted() const;
         void handleOutputOverflow() const;
 
         template <typename ChunkT, typename Fn>
@@ -572,6 +648,7 @@ namespace core::spatial {
         std::int32_t mCellsPerChunkX = 0;
         std::int32_t mCellsPerChunkY = 0;
         std::size_t mCellsPerChunk = 0;
+        std::uint32_t mActiveEntityCount = 0;
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         mutable DebugQueryStats mDebugLastQueryStats{};
@@ -1044,7 +1121,7 @@ namespace core::spatial {
 
         for (SpatialChunk& chunk : mChunks) {
             chunk.cellsBlockIndex = kInvalidCellsBlockIndex;
-            chunk.activeEntityCount = 0;
+            detail::resetChunkOverlapCount(chunk);
             chunk.state = ResidencyState::Unloaded;
         }
     }
@@ -1093,7 +1170,7 @@ namespace core::spatial {
     inline void FlatStorage::clearChunkData(SpatialChunk& chunk) noexcept {
         Cell* cells = cellsForChunk(chunk);
         detail::clearChunkCells(cells, mCellsPerChunk, mOverflowPool);
-        chunk.activeEntityCount = 0;
+        detail::resetChunkOverlapCount(chunk);
     }
 
     template <typename Fn>
@@ -1124,6 +1201,38 @@ namespace core::spatial {
         return true;
     }
 
+    template <typename Fn>
+    inline bool FlatStorage::forEachChunkInRangeMut(const ChunkCoord minCoord,
+                                                    const ChunkCoord maxCoord, Fn&& fn) {
+        if (mChunks.empty()) {
+            return true;
+        }
+
+        const std::int32_t clampedMinX = std::max(minCoord.x, mOrigin.x);
+        const std::int32_t clampedMinY = std::max(minCoord.y, mOrigin.y);
+        const std::int32_t clampedMaxX = std::min(maxCoord.x, mMaxXInclusive);
+        const std::int32_t clampedMaxY = std::min(maxCoord.y, mMaxYInclusive);
+
+        if (clampedMinX > clampedMaxX || clampedMinY > clampedMaxY) {
+            return true;
+        }
+
+        for (std::int32_t y = clampedMinY; y <= clampedMaxY; ++y) {
+            const std::int64_t baseIdx =
+                static_cast<std::int64_t>(y - mOrigin.y) * mWidth - mOrigin.x;
+            for (std::int32_t x = clampedMinX; x <= clampedMaxX; ++x) {
+                const std::size_t idx =
+                    static_cast<std::size_t>(baseIdx + static_cast<std::int64_t>(x));
+                SpatialChunk& chunk = mChunks[idx];
+                if (!fn(ChunkCoord{x, y}, chunk)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     inline bool FlatStorage::setChunkState(const ChunkCoord coord, const ResidencyState state) {
         SpatialChunk* chunk = tryGetChunk(coord);
         if (chunk == nullptr) {
@@ -1140,6 +1249,16 @@ namespace core::spatial {
         //  - Leaving Loaded => clear + free block immediately.
         //  - Entering Loaded => allocate block (fail-fast if capacity exhausted).
         if (prev == ResidencyState::Loaded && state != ResidencyState::Loaded) {
+#if !defined(NDEBUG)
+            assert(detail::chunkOverlapCountIsZero(*chunk) &&
+                   "FlatStorage: unload with active entities (coverage != 0)");
+#elif defined(SFML1_PROFILE)
+            if (!detail::chunkOverlapCountIsZero(*chunk)) [[unlikely]] {
+                LOG_PANIC(core::log::cat::ECS,
+                          "FlatStorage: unload with active entities (coverage={})",
+                          detail::chunkOverlapCountForLog(*chunk));
+            }
+#endif
             clearChunkData(*chunk);
 
 #if !defined(NDEBUG)
@@ -1363,7 +1482,7 @@ namespace core::spatial {
 
         for (Slot& slot : mSlots) {
             slot.chunk.cellsBlockIndex = kInvalidCellsBlockIndex;
-            slot.chunk.activeEntityCount = 0;
+            detail::resetChunkOverlapCount(slot.chunk);
             slot.chunk.state = ResidencyState::Unloaded;
             slot.coord = ChunkCoord{0, 0};
             slot.occupied = false;
@@ -1371,7 +1490,7 @@ namespace core::spatial {
 
         for (Slot& slot : mShiftScratch) {
             slot.chunk.cellsBlockIndex = kInvalidCellsBlockIndex;
-            slot.chunk.activeEntityCount = 0;
+            detail::resetChunkOverlapCount(slot.chunk);
             slot.chunk.state = ResidencyState::Unloaded;
             slot.coord = ChunkCoord{0, 0};
             slot.occupied = false;
@@ -1414,19 +1533,19 @@ namespace core::spatial {
     inline void SlidingWindowStorage::clearChunkDataInSlot(Slot& slot) noexcept {
         Cell* cells = cellsForChunk(slot.chunk);
         detail::clearChunkCells(cells, mCellsPerChunk, mOverflowPool);
-        slot.chunk.activeEntityCount = 0;
+        detail::resetChunkOverlapCount(slot.chunk);
     }
 
     inline void SlidingWindowStorage::clearSlot(Slot& slot) noexcept {
         if (slot.chunk.state == ResidencyState::Loaded) {
 #if !defined(NDEBUG)
-            assert(slot.chunk.activeEntityCount == 0 &&
-                   "SlidingWindowStorage: unload with active entities");
-#else
-            if (slot.chunk.activeEntityCount != 0) [[unlikely]] {
+            assert(detail::chunkOverlapCountIsZero(slot.chunk) &&
+                   "SlidingWindowStorage: unload with active entities (coverage != 0)");
+#elif defined(SFML1_PROFILE)
+            if (!detail::chunkOverlapCountIsZero(slot.chunk)) [[unlikely]] {
                 LOG_PANIC(core::log::cat::ECS,
-                          "SlidingWindowStorage: unload with active entities (count={})",
-                          slot.chunk.activeEntityCount);
+                          "SlidingWindowStorage: unload with active entities (coverage={})",
+                          detail::chunkOverlapCountForLog(slot.chunk));
             }
 #endif
         }
@@ -1437,7 +1556,7 @@ namespace core::spatial {
             slot.chunk.cellsBlockIndex = kInvalidCellsBlockIndex;
         }
 
-        slot.chunk.activeEntityCount = 0;
+        detail::resetChunkOverlapCount(slot.chunk);
         slot.chunk.state = ResidencyState::Unloaded;
         slot.occupied = false;
         slot.coord = ChunkCoord{0, 0};
@@ -1454,7 +1573,7 @@ namespace core::spatial {
 
         src.coord = ChunkCoord{0, 0};
         src.chunk.cellsBlockIndex = kInvalidCellsBlockIndex;
-        src.chunk.activeEntityCount = 0;
+        detail::resetChunkOverlapCount(src.chunk);
         src.chunk.state = ResidencyState::Unloaded;
         src.occupied = false;
     }
@@ -1481,7 +1600,7 @@ namespace core::spatial {
             slot.coord = coord;
             slot.occupied = true;
             slot.chunk.state = ResidencyState::Unloaded;
-            slot.chunk.activeEntityCount = 0;
+            detail::resetChunkOverlapCount(slot.chunk);
             slot.chunk.cellsBlockIndex = kInvalidCellsBlockIndex;
         }
 
@@ -1548,7 +1667,10 @@ namespace core::spatial {
         }
 
         // Для строгих deterministic-query: отсутствие слота трактуем как Unloaded.
-        const SpatialChunk unloadedChunk{kInvalidCellsBlockIndex, 0u, ResidencyState::Unloaded};
+        SpatialChunk unloadedChunk{};
+        unloadedChunk.cellsBlockIndex = kInvalidCellsBlockIndex;
+        unloadedChunk.state = ResidencyState::Unloaded;
+        detail::resetChunkOverlapCount(unloadedChunk);
 
         for (std::int32_t y = clampedMinY; y <= clampedMaxY; ++y) {
             for (std::int32_t x = clampedMinX; x <= clampedMaxX; ++x) {
@@ -1558,6 +1680,34 @@ namespace core::spatial {
                 const SpatialChunk& chunkRef = (slot != nullptr) ? slot->chunk : unloadedChunk;
 
                 if (!fn(coord, chunkRef)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    template <typename Fn>
+    inline bool SlidingWindowStorage::forEachChunkInRangeMut(const ChunkCoord minCoord,
+                                                             const ChunkCoord maxCoord, Fn&& fn) {
+        const std::int32_t clampedMinX = std::max(minCoord.x, mOrigin.x);
+        const std::int32_t clampedMinY = std::max(minCoord.y, mOrigin.y);
+        const std::int32_t clampedMaxX = std::min(maxCoord.x, mMaxXInclusive);
+        const std::int32_t clampedMaxY = std::min(maxCoord.y, mMaxYInclusive);
+
+        if (clampedMinX > clampedMaxX || clampedMinY > clampedMaxY) {
+            return true;
+        }
+
+        for (std::int32_t y = clampedMinY; y <= clampedMaxY; ++y) {
+            for (std::int32_t x = clampedMinX; x <= clampedMaxX; ++x) {
+                const ChunkCoord coord{x, y};
+                Slot* slot = ensureSlot(coord);
+                if (slot == nullptr) {
+                    continue;
+                }
+                if (!fn(coord, slot->chunk)) {
                     return false;
                 }
             }
@@ -1588,7 +1738,7 @@ namespace core::spatial {
             slot.coord = coord;
             slot.occupied = true;
             slot.chunk.state = ResidencyState::Unloaded;
-            slot.chunk.activeEntityCount = 0;
+            detail::resetChunkOverlapCount(slot.chunk);
             slot.chunk.cellsBlockIndex = kInvalidCellsBlockIndex;
         }
 
@@ -1601,13 +1751,13 @@ namespace core::spatial {
         //  - Only Loaded chunks may hold cell data (and therefore must own an allocated block).
         if (prev == ResidencyState::Loaded && state != ResidencyState::Loaded) {
 #if !defined(NDEBUG)
-            assert(slot.chunk.activeEntityCount == 0 &&
-                   "SlidingWindowStorage: unload with active entities");
-#else
-            if (slot.chunk.activeEntityCount != 0) [[unlikely]] {
+            assert(detail::chunkOverlapCountIsZero(slot.chunk) &&
+                   "SlidingWindowStorage: unload with active entities (coverage != 0)");
+#elif defined(SFML1_PROFILE)
+            if (!detail::chunkOverlapCountIsZero(slot.chunk)) [[unlikely]] {
                 LOG_PANIC(core::log::cat::ECS,
-                          "SlidingWindowStorage: unload with active entities (count={})",
-                          slot.chunk.activeEntityCount);
+                          "SlidingWindowStorage: unload with active entities (coverage={})",
+                          detail::chunkOverlapCountForLog(slot.chunk));
             }
 #endif
             clearChunkDataInSlot(slot);
@@ -1745,6 +1895,7 @@ namespace core::spatial {
     SpatialIndexV2<Storage, BoundsT>::init(const SpatialIndexConfig& config,
                                            const typename Storage::Config& storageConfig) {
         mConfig = config;
+        mActiveEntityCount = 0;
 
 #if !defined(NDEBUG)
         assert(validateConfig(config) && "SpatialIndexV2: invalid config");
@@ -1899,6 +2050,9 @@ namespace core::spatial {
         if (chunkRange.empty()) {
             record.bounds = bounds;
             record.registered = true;
+            assert(mActiveEntityCount < std::numeric_limits<std::uint32_t>::max() &&
+                   "SpatialIndexV2: activeEntityCount overflow");
+            ++mActiveEntityCount;
             return WriteResult::Success;
         }
 
@@ -1907,11 +2061,8 @@ namespace core::spatial {
         }
 
         const CellRange cellRange = computeCellRange(bounds);
-        WriteResult result = WriteResult::Success;
-        bool truncated = false;
-
-        std::int32_t lastIncrementedX = chunkRange.minX;
-        std::int32_t lastIncrementedY = chunkRange.minY - 1;
+        std::int32_t lastWrittenX = chunkRange.minX;
+        std::int32_t lastWrittenY = chunkRange.minY - 1;
 
         for (std::int32_t y = chunkRange.minY; y <= chunkRange.maxY; ++y) {
             for (std::int32_t x = chunkRange.minX; x <= chunkRange.maxX; ++x) {
@@ -1926,52 +2077,29 @@ namespace core::spatial {
 #endif
 
                 const WriteResult chunkResult =
-                    writeToChunk(*chunk, {x, y}, cellRange, id, truncated);
+                    writeToChunk(*chunk, {x, y}, cellRange, id);
 
                 if (chunkResult == WriteResult::Rejected) {
-                    // Rollback: remove all already written chunks in the same deterministic order.
-                    for (std::int32_t ry = chunkRange.minY; ry <= y; ++ry) {
-                        const std::int32_t maxX = (ry == y) ? x : chunkRange.maxX;
-                        for (std::int32_t rx = chunkRange.minX; rx <= maxX; ++rx) {
-                            SpatialChunk* rollbackChunk = mStorage.tryGetChunk({rx, ry});
-#if !defined(NDEBUG)
-                            assert(rollbackChunk != nullptr &&
-                                   "SpatialIndexV2: rollback chunk nullptr (internal error)");
-#else
-                            if (rollbackChunk == nullptr) [[unlikely]] {
-                                LOG_PANIC(core::log::cat::ECS,
-                                          "SpatialIndexV2: rollback chunk nullptr ({}, {})", rx,
-                                          ry);
-                            }
-#endif
-                            removeFromChunk(*rollbackChunk, {rx, ry}, cellRange, id);
-                        }
-                    }
-
-                    if (lastIncrementedY >= chunkRange.minY) {
-                        for (std::int32_t ry = chunkRange.minY; ry <= lastIncrementedY; ++ry) {
+                    // Rollback ONLY chunks we successfully wrote to (important: avoid removing
+                    // from unrelated overflow chains in a chunk we never touched).
+                    if (lastWrittenY >= chunkRange.minY) {
+                        for (std::int32_t ry = chunkRange.minY; ry <= lastWrittenY; ++ry) {
                             const std::int32_t maxX =
-                                (ry == lastIncrementedY) ? lastIncrementedX : chunkRange.maxX;
+                                (ry == lastWrittenY) ? lastWrittenX : chunkRange.maxX;
                             for (std::int32_t rx = chunkRange.minX; rx <= maxX; ++rx) {
                                 SpatialChunk* rollbackChunk = mStorage.tryGetChunk({rx, ry});
 #if !defined(NDEBUG)
                                 assert(rollbackChunk != nullptr &&
                                        "SpatialIndexV2: rollback chunk nullptr (internal error)");
-                                assert(rollbackChunk->activeEntityCount > 0 &&
-                                       "SpatialIndexV2: activeEntityCount underflow (rollback)");
 #else
                                 if (rollbackChunk == nullptr) [[unlikely]] {
                                     LOG_PANIC(core::log::cat::ECS,
-                                              "SpatialIndexV2: rollback chunk nullptr ({}, {})", rx,
-                                              ry);
-                                }
-                                if (rollbackChunk->activeEntityCount == 0) [[unlikely]] {
-                                    LOG_PANIC(core::log::cat::ECS,
-                                              "SpatialIndexV2: activeEntityCount underflow "
-                                              "(rollback)");
+                                              "SpatialIndexV2: rollback chunk nullptr ({}, {})",
+                                              rx, ry);
                                 }
 #endif
-                                --rollbackChunk->activeEntityCount;
+                                removeFromChunk(*rollbackChunk, {rx, ry}, cellRange, id);
+                                detail::decrementChunkOverlapCount(*rollbackChunk);
                             }
                         }
                     }
@@ -1979,19 +2107,18 @@ namespace core::spatial {
                     return WriteResult::Rejected;
                 }
 
-                if (chunkResult == WriteResult::PartialTruncated) {
-                    result = WriteResult::PartialTruncated;
-                }
-
-                ++chunk->activeEntityCount;
-                lastIncrementedX = x;
-                lastIncrementedY = y;
+                detail::incrementChunkOverlapCount(*chunk);
+                lastWrittenX = x;
+                lastWrittenY = y;
             }
         }
 
         record.bounds = bounds;
         record.registered = true;
-        return result;
+        assert(mActiveEntityCount < std::numeric_limits<std::uint32_t>::max() &&
+               "SpatialIndexV2: activeEntityCount overflow");
+        ++mActiveEntityCount;
+        return WriteResult::Success;
     }
 
     template <typename Storage, typename BoundsT>
@@ -2021,11 +2148,8 @@ namespace core::spatial {
         const CellRange oldCellRange = computeCellRange(record.bounds);
         const CellRange newCellRange = computeCellRange(newBounds);
 
-        WriteResult result = WriteResult::Success;
-        bool truncated = false;
-
-        std::int32_t lastIncrementedX = newChunkRange.minX;
-        std::int32_t lastIncrementedY = newChunkRange.minY - 1;
+        std::int32_t lastAddedX = newChunkRange.minX;
+        std::int32_t lastAddedY = newChunkRange.minY - 1;
 
         // Phase ADD: chunks in new \ old
         for (std::int32_t y = newChunkRange.minY; y <= newChunkRange.maxY; ++y) {
@@ -2043,46 +2167,21 @@ namespace core::spatial {
 #else
                 if (chunk == nullptr) [[unlikely]] {
                     LOG_PANIC(core::log::cat::ECS,
-                              "SpatialIndexV2: chunk nullptr after canWriteRange (ADD) ({}, {})", x,
-                              y);
+                              "SpatialIndexV2: chunk nullptr after canWriteRange (ADD) ({}, {})",
+                              x, y);
                 }
 #endif
 
                 const WriteResult addResult =
-                    writeToChunk(*chunk, {x, y}, newCellRange, id, truncated);
+                    writeToChunk(*chunk, {x, y}, newCellRange, id);
 
                 if (addResult == WriteResult::Rejected) {
-                    // Rollback already-added chunks (same deterministic order).
-                    for (std::int32_t ry = newChunkRange.minY; ry <= y; ++ry) {
-                        const std::int32_t maxX = (ry == y) ? x : newChunkRange.maxX;
-                        for (std::int32_t rx = newChunkRange.minX; rx <= maxX; ++rx) {
-                            const bool inOldRollback =
-                                rx >= oldChunkRange.minX && rx <= oldChunkRange.maxX &&
-                                ry >= oldChunkRange.minY && ry <= oldChunkRange.maxY;
-                            if (inOldRollback) {
-                                continue;
-                            }
-
-                            SpatialChunk* rollbackChunk = mStorage.tryGetChunk({rx, ry});
-#if !defined(NDEBUG)
-                            assert(rollbackChunk != nullptr &&
-                                   "SpatialIndexV2: rollback chunk nullptr (ADD rollback)");
-#else
-                            if (rollbackChunk == nullptr) [[unlikely]] {
-                                LOG_PANIC(core::log::cat::ECS,
-                                          "SpatialIndexV2: rollback chunk nullptr (ADD rollback) "
-                                          "({}, {})",
-                                          rx, ry);
-                            }
-#endif
-                            removeFromChunk(*rollbackChunk, {rx, ry}, newCellRange, id);
-                        }
-                    }
-
-                    if (lastIncrementedY >= newChunkRange.minY) {
-                        for (std::int32_t ry = newChunkRange.minY; ry <= lastIncrementedY; ++ry) {
+                    // Rollback ONLY chunks we successfully added (avoid touching unrelated
+                    // overflow chains in chunks we never modified).
+                    if (lastAddedY >= newChunkRange.minY) {
+                        for (std::int32_t ry = newChunkRange.minY; ry <= lastAddedY; ++ry) {
                             const std::int32_t maxX =
-                                (ry == lastIncrementedY) ? lastIncrementedX : newChunkRange.maxX;
+                                (ry == lastAddedY) ? lastAddedX : newChunkRange.maxX;
                             for (std::int32_t rx = newChunkRange.minX; rx <= maxX; ++rx) {
                                 const bool inOldRollback =
                                     rx >= oldChunkRange.minX && rx <= oldChunkRange.maxX &&
@@ -2094,24 +2193,18 @@ namespace core::spatial {
                                 SpatialChunk* rollbackChunk = mStorage.tryGetChunk({rx, ry});
 #if !defined(NDEBUG)
                                 assert(rollbackChunk != nullptr &&
-                                       "SpatialIndexV2: rollback chunk nullptr (count rollback)");
-                                assert(
-                                    rollbackChunk->activeEntityCount > 0 &&
-                                    "SpatialIndexV2: activeEntityCount underflow (count rollback)");
+                                       "SpatialIndexV2: rollback chunk nullptr (ADD rollback)");
 #else
                                 if (rollbackChunk == nullptr) [[unlikely]] {
                                     LOG_PANIC(core::log::cat::ECS,
-                                              "SpatialIndexV2: rollback chunk nullptr (count "
-                                              "rollback) ({}, {})",
+                                              "SpatialIndexV2: rollback chunk nullptr "
+                                              "(ADD rollback) "
+                                              "({}, {})",
                                               rx, ry);
                                 }
-                                if (rollbackChunk->activeEntityCount == 0) [[unlikely]] {
-                                    LOG_PANIC(core::log::cat::ECS,
-                                              "SpatialIndexV2: activeEntityCount underflow (count "
-                                              "rollback)");
-                                }
 #endif
-                                --rollbackChunk->activeEntityCount;
+                                removeFromChunk(*rollbackChunk, {rx, ry}, newCellRange, id);
+                                detail::decrementChunkOverlapCount(*rollbackChunk);
                             }
                         }
                     }
@@ -2119,13 +2212,9 @@ namespace core::spatial {
                     return WriteResult::Rejected;
                 }
 
-                if (addResult == WriteResult::PartialTruncated) {
-                    result = WriteResult::PartialTruncated;
-                }
-
-                ++chunk->activeEntityCount;
-                lastIncrementedX = x;
-                lastIncrementedY = y;
+                detail::incrementChunkOverlapCount(*chunk);
+                lastAddedX = x;
+                lastAddedY = y;
             }
         }
 
@@ -2174,23 +2263,7 @@ namespace core::spatial {
                             continue;
                         }
 
-                        bool localTruncated = false;
-                        if (!appendToCell(cells[rowOffset + cx], id, localTruncated)) {
-                            if (localTruncated) {
-                                result = WriteResult::PartialTruncated;
-                                continue;
-                            }
-
-                            // Non-truncate fail here is impossible-state (internal error).
-#if !defined(NDEBUG)
-                            assert(false && "SpatialIndexV2: KEEP add failed without truncation "
-                                            "(internal error)");
-#else
-                            LOG_PANIC(core::log::cat::ECS, "SpatialIndexV2: KEEP add failed "
-                                                           "without truncation (internal error)");
-#endif
-                            return WriteResult::Rejected;
-                        }
+                        appendToCell(cells[rowOffset + cx], id);
                     }
                 }
 
@@ -2221,27 +2294,23 @@ namespace core::spatial {
 #if !defined(NDEBUG)
                 assert(chunk != nullptr &&
                        "SpatialIndexV2: chunk nullptr after canWriteRange (REMOVE)");
-                assert(chunk->activeEntityCount > 0 &&
-                       "SpatialIndexV2: activeEntityCount underflow (update remove)");
 #else
                 if (chunk == nullptr) [[unlikely]] {
                     LOG_PANIC(core::log::cat::ECS,
                               "SpatialIndexV2: chunk nullptr after canWriteRange (REMOVE) ({}, {})",
                               x, y);
                 }
-                if (chunk->activeEntityCount == 0) [[unlikely]] {
-                    LOG_PANIC(core::log::cat::ECS,
-                              "SpatialIndexV2: activeEntityCount underflow (update remove)");
-                }
 #endif
 
                 removeFromChunk(*chunk, {x, y}, oldCellRange, id);
-                --chunk->activeEntityCount;
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                detail::decrementChunkOverlapCount(*chunk);
+#endif
             }
         }
 
         record.bounds = newBounds;
-        return result;
+        return WriteResult::Success;
     }
 
     template <typename Storage, typename BoundsT>
@@ -2269,8 +2338,6 @@ namespace core::spatial {
 #if !defined(NDEBUG)
                     assert(chunk != nullptr &&
                            "SpatialIndexV2: chunk nullptr after canWriteRange (unregister)");
-                    assert(chunk->activeEntityCount > 0 &&
-                           "SpatialIndexV2: activeEntityCount underflow (unregister)");
 #else
                     if (chunk == nullptr) [[unlikely]] {
                         LOG_PANIC(core::log::cat::ECS,
@@ -2278,58 +2345,39 @@ namespace core::spatial {
                                   "({}, {})",
                                   x, y);
                     }
-                    if (chunk->activeEntityCount == 0) [[unlikely]] {
-                        LOG_PANIC(core::log::cat::ECS,
-                                  "SpatialIndexV2: activeEntityCount underflow (unregister)");
-                    }
 #endif
 
                     removeFromChunk(*chunk, {x, y}, cellRange, id);
-                    --chunk->activeEntityCount;
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                    detail::decrementChunkOverlapCount(*chunk);
+#endif
                 }
             }
         }
 
         record.registered = false;
+        assert(mActiveEntityCount > 0 && "SpatialIndexV2: activeEntityCount underflow");
+        --mActiveEntityCount;
         return true;
     }
 
     template <typename Storage, typename BoundsT>
     inline WriteResult
-    SpatialIndexV2<Storage, BoundsT>::writeToChunk(SpatialChunk& chunk, const ChunkCoord coord,
-                                                   const CellRange& cellRange, const EntityId32 id,
-                                                   bool& outTruncated) {
+    SpatialIndexV2<Storage, BoundsT>::writeToChunk(SpatialChunk& chunk,
+                                                   const ChunkCoord coord,
+                                                   const CellRange& cellRange,
+                                                   const EntityId32 id) {
         if (chunk.state != ResidencyState::Loaded) {
             (void) coord;
             return WriteResult::Rejected;
         }
 
-        WriteResult result = WriteResult::Success;
-
         forEachCellInRange(chunk, coord, cellRange, [&](Cell& cell) {
-            if (result == WriteResult::Rejected) {
-                return false;
-            }
-
-            bool localTruncated = false;
-            if (!appendToCell(cell, id, localTruncated)) {
-                if (localTruncated) {
-                    outTruncated = true;
-                    result = WriteResult::PartialTruncated;
-                    return true;
-                }
-                result = WriteResult::Rejected;
-                return false;
-            }
-
+            appendToCell(cell, id); // void: either succeeds or PANICs
             return true;
         });
 
-        if (result == WriteResult::PartialTruncated) {
-            outTruncated = true;
-        }
-
-        return result;
+        return WriteResult::Success;
     }
 
     template <typename Storage, typename BoundsT>
@@ -2373,8 +2421,7 @@ namespace core::spatial {
     }
 
     template <typename Storage, typename BoundsT>
-    inline bool SpatialIndexV2<Storage, BoundsT>::appendToCell(Cell& cell, const EntityId32 id,
-                                                               bool& outTruncated) {
+    inline void SpatialIndexV2<Storage, BoundsT>::appendToCell(Cell& cell, const EntityId32 id) {
         if (cell.count < Cell::kInlineCapacity) {
             cell.entities[cell.count] = id;
             ++cell.count;
@@ -2383,17 +2430,14 @@ namespace core::spatial {
                 mDebugWorstCellDensity = cell.count;
             }
 #endif
-            return true;
+            return;
         }
 
         const bool ok = mOverflowPool.append(cell.overflowHandle, id);
         if (!ok) {
-            if (handleOverflowExhausted()) {
-                outTruncated = true;
-                return false;
-            }
-            return false;
+            handleOverflowExhausted(); // [[noreturn]]
         }
+
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         const std::uint32_t overflowCount = mOverflowPool.totalCount(cell.overflowHandle);
         const std::uint32_t total = static_cast<std::uint32_t>(cell.count) + overflowCount;
@@ -2401,7 +2445,6 @@ namespace core::spatial {
             mDebugWorstCellDensity = total;
         }
 #endif
-        return true;
     }
 
     template <typename Storage, typename BoundsT>
@@ -2447,27 +2490,11 @@ namespace core::spatial {
     }
 
     template <typename Storage, typename BoundsT>
-    inline bool SpatialIndexV2<Storage, BoundsT>::handleOverflowExhausted() const {
-#if !defined(NDEBUG)
-        if (mConfig.overflowPolicy == OverflowPolicy::Truncate) {
-            LOG_ERROR(core::log::cat::ECS, "SpatialIndexV2: overflow pool exhausted (truncate)");
-            return true;
-        }
-
-        LOG_CRITICAL(core::log::cat::ECS, "SpatialIndexV2: overflow pool exhausted (maxNodes={})",
-                     mOverflowPool.maxNodes());
-        assert(false && "SpatialIndexV2: overflow pool exhausted");
-        return false;
-#else
-        if (mConfig.overflowPolicy == OverflowPolicy::Truncate) {
-            LOG_ERROR(core::log::cat::ECS, "SpatialIndexV2: overflow pool exhausted (truncate)");
-            return true;
-        }
-
-        LOG_PANIC(core::log::cat::ECS, "SpatialIndexV2: overflow pool exhausted (maxNodes={})",
+    [[noreturn]] inline void SpatialIndexV2<Storage, BoundsT>::handleOverflowExhausted() const {
+        LOG_PANIC(core::log::cat::ECS,
+                  "SpatialIndexV2: overflow pool exhausted (maxNodes={}). "
+                  "Increase overflow pool capacity or reduce entity density/AABB coverage.",
                   mOverflowPool.maxNodes());
-        return false;
-#endif
     }
 
     template <typename Storage, typename BoundsT>

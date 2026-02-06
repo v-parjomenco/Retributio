@@ -137,11 +137,6 @@ namespace core::ecs {
                           isFinite ? 1 : 0, minChunk.x, minChunk.y, maxChunk.x, maxChunk.y,
                           firstBad.x, firstBad.y, static_cast<int>(firstBadState), winOrigin.x,
                           winOrigin.y, mIndex.windowWidth(), mIndex.windowHeight());
-            } else if (writeResult == core::spatial::WriteResult::PartialTruncated) {
-                releaseSpatialId(id);
-                LOG_PANIC(core::log::cat::ECS,
-                          "SpatialIndexSystem: registerEntity truncated (id={}, entity={})", id,
-                          core::ecs::toUint(entity));
             }
 
             // entity гарантированно не имел SpatialIdComponent (exclude<>), поэтому emplace
@@ -208,10 +203,6 @@ namespace core::ecs {
                     LOG_PANIC(core::log::cat::ECS,
                               "SpatialIndexSystem: updateEntity rejected (id={})", handleComp.id);
                 }
-                if (updResult == core::spatial::WriteResult::PartialTruncated) {
-                    LOG_PANIC(core::log::cat::ECS,
-                              "SpatialIndexSystem: updateEntity truncated (id={})", handleComp.id);
-                }
                 handleComp.lastAabb = newAabb;
             }
 
@@ -230,10 +221,6 @@ namespace core::ecs {
                 if (result == core::spatial::WriteResult::Rejected) {
                     LOG_PANIC(core::log::cat::ECS,
                               "SpatialIndexSystem: updateEntity rejected (id={})", handleComp.id);
-                }
-                if (result == core::spatial::WriteResult::PartialTruncated) {
-                    LOG_PANIC(core::log::cat::ECS,
-                              "SpatialIndexSystem: updateEntity truncated (id={})", handleComp.id);
                 }
                 handleComp.lastAabb = newAabb;
             }

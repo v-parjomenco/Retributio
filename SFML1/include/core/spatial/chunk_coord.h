@@ -3,7 +3,9 @@
 // Purpose: Unified chunk coordinate contract (tile-agnostic)
 // Used by: SpatialIndex v2, streaming, AI/visibility (future)
 // Related headers: (none)
-// Notes: Tile-agnostic POD; conversion helpers are constexpr-friendly where possible.
+// Notes:
+//  - Tile-agnostic POD; conversion helpers are constexpr-friendly where possible.
+//  - ChunkRectT aliases are reserved for future streaming/visibility ranges.
 // ================================================================================================
 #pragma once
 
