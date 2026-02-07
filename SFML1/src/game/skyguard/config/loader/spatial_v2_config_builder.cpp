@@ -63,16 +63,34 @@ namespace {
 
 #endif // defined(SFML1_PROFILE)
 
+    /// ceil(v * num / den) без float.
+    /// Вызывается ТОЛЬКО на cold path (config init). Входные диапазоны:
+    ///  v   ≤ activeSetCeiling (до ~10M при 32×32 × 8192 stress)
+    ///  num ≤ 5, den ≥ 1 → промежуточное v*num ≤ ~50M.
+    /// На x64 переполнение size_t невозможно; на x32 — нет, если v ≤ ~800M.
+    /// Для безопасности вызывающий код использует checkedMulSizeT() до вызова mulCeil().
     [[nodiscard]] constexpr std::size_t mulCeil(std::size_t v,
                                                std::size_t num,
                                                std::size_t den) noexcept {
-        // ceil(v * num / den) без float. Диапазоны проекта малы (десятки миллионов максимум),
-        // переполнение size_t здесь не ожидается.
         return (v * num + den - 1u) / den;
     }
 
     [[nodiscard]] constexpr std::size_t divCeil(std::size_t num, std::size_t den) noexcept {
         return (num + den - 1u) / den;
+    }
+
+    /// Checked size_t multiplication. Cold path only.
+    /// Переполнение size_t реально на x32 (4 GB ceiling) при больших окнах/бюджетах.
+    [[nodiscard]] std::size_t checkedMulSizeT(
+        const std::size_t a,
+        const std::size_t b,
+        const std::string_view context) {
+        if (a != 0u && b > (std::numeric_limits<std::size_t>::max() / a)) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexV2(SkyGuard): {} overflow (a={}, b={})",
+                      context, a, b);
+        }
+        return a * b;
     }
 
     [[nodiscard]] std::uint32_t computeExpectedMaxEntitiesSkyGuardFromActiveSet(
@@ -121,7 +139,7 @@ namespace game::skyguard::config {
 
         // StableIdService индексируется по raw EnTT index,
         // а назначение происходит в World::createEntity.
-        // В SkyGuard текущая “реальность” ≈ peak активного набора,
+        // В SkyGuard текущая "реальность" ≈ peak активного набора,
         // который уже ограничен SpatialIndex maxEntityId.
         std::size_t base = static_cast<std::size_t>(spatialCfg.maxEntityId) + 1u; // +1 sentinel
 
@@ -184,8 +202,10 @@ namespace game::skyguard::config {
                       visibleChunksX, visibleChunksY);
         }
 
-        const std::int32_t windowWidth = visibleChunksX + (kWindowMarginChunks * 2);
-        const std::int32_t windowHeight = visibleChunksY + (kWindowMarginChunks * 2);
+        // Mutable: Profile-стресс может переопределить через ENV
+        // (декаплинг окна стриминга от viewport камеры).
+        std::int32_t windowWidth = visibleChunksX + (kWindowMarginChunks * 2);
+        std::int32_t windowHeight = visibleChunksY + (kWindowMarginChunks * 2);
 
         if (windowWidth <= 0 || windowHeight <= 0) {
             LOG_PANIC(core::log::cat::ECS,
@@ -193,19 +213,10 @@ namespace game::skyguard::config {
                       windowWidth, windowHeight);
         }
 
-        const std::size_t windowChunksSizeT =
-            static_cast<std::size_t>(windowWidth) * static_cast<std::size_t>(windowHeight);
-
-        if (windowChunksSizeT == 0u ||
-            windowChunksSizeT > static_cast<std::size_t>(
-                std::numeric_limits<std::uint32_t>::max())) {
-                    LOG_PANIC(core::log::cat::ECS,
-                              "SpatialIndexV2: windowChunks overflow/invalid ({}x{})",
-                              windowWidth, windowHeight);
-        }
-
-        const std::uint32_t windowChunks = static_cast<std::uint32_t>(windowChunksSizeT);
-        const std::uint32_t maxResidentChunks = windowChunks;
+        // Viewport-derived: сколько чанков покрывает камера + margin.
+        // Сохраняем ДО возможного ENV-override — нужно для maxVisibleSprites.
+        const std::int32_t viewportWindowWidth = windowWidth;
+        const std::int32_t viewportWindowHeight = windowHeight;
 
         std::size_t maxEntitiesPerChunkCeiling = 0u;
 
@@ -237,15 +248,85 @@ namespace game::skyguard::config {
 
                 maxEntitiesPerChunkCeiling = static_cast<std::size_t>(perChunk);
 
-                const std::size_t activeSetCeilingTmp =
-                    windowChunksSizeT * maxEntitiesPerChunkCeiling;
+                // ENV-override: декаплинг размеров окна стриминга от viewport камеры.
+                // Titan-like сценарий: viewport маленький (1920×1080 → 3×3 chunks),
+                // окно стриминга большое (16×16 = 256 chunks → 2M entities).
+                // queryFast обходит только viewport-чанки; остальные загружены, но не видимы.
+                const auto envW = readEnvU32("SKYGUARD_STRESS_WINDOW_WIDTH");
+                const auto envH = readEnvU32("SKYGUARD_STRESS_WINDOW_HEIGHT");
 
-                // В стресс-режиме budgets должны соответствовать реальному active set.
-                maxVisibleSprites = activeSetCeilingTmp;
+                if (envW && (*envW > 0u)) {
+                    windowWidth = static_cast<std::int32_t>(*envW);
+                }
+                if (envH && (*envH > 0u)) {
+                    windowHeight = static_cast<std::int32_t>(*envH);
+                }
+
+                if (windowWidth <= 0 || windowHeight <= 0) {
+                    LOG_PANIC(core::log::cat::ECS,
+                              "SpatialIndexV2(SkyGuard): stress window dimensions invalid "
+                              "({}x{}) after ENV override",
+                              windowWidth, windowHeight);
+                }
+
+                const bool windowOverridden =
+                    (windowWidth != viewportWindowWidth ||
+                     windowHeight != viewportWindowHeight);
+
+                if (windowOverridden &&
+                    (windowWidth < viewportWindowWidth ||
+                     windowHeight < viewportWindowHeight)) {
+                    LOG_WARN(core::log::cat::ECS,
+                             "SpatialIndexV2(SkyGuard): stress window ({}x{}) меньше viewport "
+                             "window ({}x{}). Часть видимых чанков может быть non-Loaded.",
+                             windowWidth, windowHeight,
+                             viewportWindowWidth, viewportWindowHeight);
+                }
+
+                // Бюджеты:
+                //  - visible (query output) = viewport window (камера + margin).
+                //    Vertex buffer RenderSystem масштабируется по этому числу.
+                //  - dirty (active set)     = полное окно стриминга.
+                //    Определяет maxEntityId, marks, entity records.
+                const std::size_t stressWindowChunks = checkedMulSizeT(
+                    static_cast<std::size_t>(windowWidth),
+                    static_cast<std::size_t>(windowHeight),
+                    "stressWindowChunks");
+                const std::size_t activeSetCeilingTmp = checkedMulSizeT(
+                    stressWindowChunks, maxEntitiesPerChunkCeiling, "activeSetCeilingTmp");
+
+                if (windowOverridden) {
+                    const std::size_t viewportChunks = checkedMulSizeT(
+                        static_cast<std::size_t>(viewportWindowWidth),
+                        static_cast<std::size_t>(viewportWindowHeight),
+                        "viewportChunks");
+                    maxVisibleSprites = checkedMulSizeT(
+                        viewportChunks, maxEntitiesPerChunkCeiling, "maxVisibleSprites(viewport)");
+                } else {
+                    maxVisibleSprites = activeSetCeilingTmp;
+                }
                 maxDirtyEntities = activeSetCeilingTmp;
             }
         }
 #endif
+
+        // windowChunks вычисляется ПОСЛЕ возможного ENV-override окна стриминга.
+        // Один раз, const. Checked: на x32 size_t=uint32, int32×int32 может wraparound.
+        const std::size_t windowChunksSizeT = checkedMulSizeT(
+            static_cast<std::size_t>(windowWidth),
+            static_cast<std::size_t>(windowHeight),
+            "windowChunks");
+
+        if (windowChunksSizeT == 0u ||
+            windowChunksSizeT > static_cast<std::size_t>(
+                std::numeric_limits<std::uint32_t>::max())) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexV2: windowChunks overflow/invalid ({}x{})",
+                      windowWidth, windowHeight);
+        }
+
+        const std::uint32_t windowChunks = static_cast<std::uint32_t>(windowChunksSizeT);
+        const std::uint32_t maxResidentChunks = windowChunks;
 
         if (maxEntitiesPerChunkCeiling == 0u) {
             const std::size_t base = std::max(maxVisibleSprites, maxDirtyEntities);
@@ -259,17 +340,42 @@ namespace game::skyguard::config {
                 1u, divCeil(base, static_cast<std::size_t>(windowChunks)));
         }
 
-        const std::size_t activeSetCeiling =
-            static_cast<std::size_t>(windowChunks) * maxEntitiesPerChunkCeiling;
+        const std::size_t activeSetCeiling = checkedMulSizeT(
+            static_cast<std::size_t>(windowChunks), maxEntitiesPerChunkCeiling, "activeSetCeiling");
 
         const std::uint32_t expectedMaxEntities =
             computeExpectedMaxEntitiesSkyGuardFromActiveSet(activeSetCeiling);
 
-        const auto overflowMaxNodes = static_cast<std::uint32_t>(
-            std::max<std::size_t>(1u, maxVisibleSprites / core::spatial::Cell::kInlineCapacity));
+        // overflow.maxNodes: uint32 range guard (cold path, zero cost).
+        const std::size_t rawOverflowMaxNodes = std::max<std::size_t>(
+            1u, maxVisibleSprites / core::spatial::Cell::kInlineCapacity);
 
-        const std::uint32_t shiftBudget = static_cast<std::uint32_t>(
-            std::max<std::int32_t>(1, windowWidth + windowHeight - 1));
+        if (rawOverflowMaxNodes >
+            static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max())) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexV2(SkyGuard): overflow.maxNodes {} exceeds uint32 range",
+                      rawOverflowMaxNodes);
+        }
+        const auto overflowMaxNodes = static_cast<std::uint32_t>(rawOverflowMaxNodes);
+
+        // shiftBudget = максимальное количество чанков для load/unload за один сдвиг окна.
+        // При diagonal step это windowWidth + windowHeight - 1 (1 колонка + 1 строка минус угол).
+        //
+        // ОГРАНИЧЕНИЕ: бюджет по ЧАНКАМ, не по СУЩНОСТЯМ.
+        // int64: формально windowWidth + windowHeight может превысить INT32_MAX при экстремальных
+        // ENV override.
+        const std::int64_t shiftBudget64 =
+            static_cast<std::int64_t>(windowWidth) +
+            static_cast<std::int64_t>(windowHeight) - 1;
+
+        if (shiftBudget64 <= 0 ||
+            shiftBudget64 > static_cast<std::int64_t>(std::numeric_limits<std::uint32_t>::max())) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexV2(SkyGuard): shiftBudget {} invalid (window {}x{})",
+                      shiftBudget64, windowWidth, windowHeight);
+        }
+
+        const auto shiftBudget = static_cast<std::uint32_t>(shiftBudget64);
 
         core::ecs::SpatialIndexSystemConfig cfg{};
 
@@ -303,11 +409,13 @@ namespace game::skyguard::config {
         }
 
         LOG_INFO(core::log::cat::ECS,
-                 "SpatialIndexV2(SkyGuard): window {}x{} px, window {}x{} chunks, "
+                 "SpatialIndexV2(SkyGuard): display {}x{} px, viewport {}x{} chunks, "
+                 "streamWindow {}x{} chunks, "
                  "activeSetCeiling={} (maxPerChunk={}), expectedMaxEntities={}, "
                  "budgets(visible={}, dirty={}), maxResidentChunks={}, budgets(load={}, unload={}),"
                  " overflow(nodes={}, capacity={})",
                  windowPixelSize.x, windowPixelSize.y,
+                 viewportWindowWidth, viewportWindowHeight,
                  cfg.storage.width, cfg.storage.height,
                  activeSetCeiling, maxEntitiesPerChunkCeiling,
                  cfg.maxEntityId,

@@ -41,6 +41,18 @@ namespace game::skyguard::ecs {
      *  - Выполняется ДО SpatialIndexSystem::update().
      *  - Перед выгрузкой чанка снимает SpatialIdComponent (detach/unregister на стороне индекса).
      *  - Уничтожение сущностей — deferred (flushDestroyed в конце кадра).
+     *  - Initial load бюджетируется: не более maxLoadsPerFrame чанков за кадр.
+     *    Пока initial load не завершён, нормальный стриминг (сдвиг окна) не начинается.
+     *
+     * Гарантия отсутствия re-registration (streamed-out safety) — тройная защита:
+     *  1. EnTT view filter: SpatialIndexSystem::update() использует
+     *     entt::exclude<SpatialStreamedOutTag> в ОБОИХ view (newView и dirtyView).
+     *     Streamed-out сущности архитектурно невидимы для register/update path.
+     *  2. Execution order: SpatialStreamingSystem::update() выполняется ДО
+     *     SpatialIndexSystem::update(). unloadChunk() ставит SpatialStreamedOutTag
+     *     и снимает SpatialDirtyTag до того, как SpatialIndexSystem получит управление.
+     *  3. Debug assert: SpatialIndexSystem содержит assert(!SpatialStreamedOutTag)
+     *     в register loop (belt-and-suspenders, ловит регрессии при рефакторинге).
      */
     class SpatialStreamingSystem final : public core::ecs::ISystem {
       public:
@@ -72,15 +84,29 @@ namespace game::skyguard::ecs {
 
             const std::size_t windowSize =
                 static_cast<std::size_t>(mWindowWidth) * static_cast<std::size_t>(mWindowHeight);
-            mUnloadScratch.reserve(windowSize);
-            mLoadScratch.reserve(windowSize);
-            mDeferredDestroyReserve = windowSize;
 
-            if (config.maxVisibleSprites > 0) {
-                mDestroyScratch.reserve(config.maxVisibleSprites);
-                mDeferredDestroyReserve =
-                    std::max(mDeferredDestroyReserve, config.maxVisibleSprites);
+            if (windowSize == 0u ||
+                windowSize > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max())) {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialStreamingSystem: window size overflow/invalid ({}x{})",
+                          mWindowWidth, mWindowHeight);
             }
+
+            mWindowTotalChunks = static_cast<std::uint32_t>(windowSize);
+
+            // Scratch vectors: reserve по максимуму ОДНОГО сдвига (не по всему окну).
+            // Diagonal step = одна колонка (height) + одна строка (width) - 1 угловой чанк.
+            // Reserve width + height (с запасом на 1) — точный ceiling.
+            const std::size_t shiftMax =
+                static_cast<std::size_t>(mWindowWidth) +
+                static_cast<std::size_t>(mWindowHeight);
+
+            mUnloadScratch.reserve(shiftMax);
+            mLoadScratch.reserve(shiftMax);
+
+            // Базовый reserve очереди deferred-destroy (по числу чанков в полосе).
+            // Уточняем в bind(), когда станет известен maxEntitiesPerChunk.
+            mDeferredDestroyReserve = shiftMax;
         }
 
         void bind(core::ecs::SpatialIndexSystem* spatialSystem,
@@ -109,14 +135,15 @@ namespace game::skyguard::ecs {
                     mSpawnBuffer.resize(maxPerChunk);
                 } catch (const std::bad_alloc&) {
                     LOG_PANIC(core::log::cat::ECS,
-                              "SpatialStreamingSystem: failed to allocate spawn buffer (maxPerChunk={})",
+                              "SpatialStreamingSystem: failed to allocate spawn buffer "
+                              "(maxPerChunk={})",
                               maxPerChunk);
                 }
             }
 
             // ------------------------------------------------------------------------------------
-            // Streaming-owned chunk membership table.
-            // ВАЖНО: это - НЕ overlap по AABB. 
+            // Таблица "принадлежности" чанку (владение на стороне стриминга).
+            // ВАЖНО: это НЕ overlap по AABB.
             // Это "какие сущности были созданы провайдером для чанка".
             // ------------------------------------------------------------------------------------
             const std::size_t windowSize =
@@ -126,6 +153,7 @@ namespace game::skyguard::ecs {
                 LOG_PANIC(core::log::cat::ECS, "SpatialStreamingSystem: invalid window size");
             }
 
+            // x32 safety: size_t=uint32, windowSize × maxPerChunk может overflow.
             if (windowSize > (std::numeric_limits<std::size_t>::max() / maxPerChunk)) {
                 LOG_PANIC(core::log::cat::ECS,
                           "SpatialStreamingSystem: membership pool size overflow "
@@ -147,7 +175,7 @@ namespace game::skyguard::ecs {
                 if (mChunkEntities.size() != poolSize) {
                     mChunkEntities.assign(poolSize, core::ecs::NullEntity);
                 } else {
-                    // Не чистим весь poolSize каждый bind(), это может быть дорого.
+                    // Не чистим весь poolSize каждый bind() — это может быть дорого.
                     // Корректность обеспечивается mChunkEntityCounts + очисткой при unloadChunk().
                 }
             } catch (const std::bad_alloc&) {
@@ -157,7 +185,49 @@ namespace game::skyguard::ecs {
                           poolSize);
             }
 
+            // Reserve под уничтожаемые сущности на один шаг сдвига окна:
+            // maxUnloadsPerFrame чанков × maxEntitiesPerChunk сущностей.
+            if (mMaxUnloadsPerFrame > 0u) {
+                const std::size_t unloadChunks = static_cast<std::size_t>(mMaxUnloadsPerFrame);
 
+                // x32 safety.
+                if (unloadChunks > (std::numeric_limits<std::size_t>::max() / maxPerChunk)) {
+                    LOG_PANIC(core::log::cat::ECS,
+                              "SpatialStreamingSystem: destroy scratch size overflow "
+                              "(unloadChunks={}, maxPerChunk={})",
+                              unloadChunks, maxPerChunk);
+                }
+
+                const std::size_t maxDestroyPerShift = unloadChunks * maxPerChunk;
+
+                if (mDestroyScratch.capacity() < maxDestroyPerShift) {
+                    try {
+                        mDestroyScratch.reserve(maxDestroyPerShift);
+                    } catch (const std::bad_alloc&) {
+                        LOG_PANIC(core::log::cat::ECS,
+                                  "SpatialStreamingSystem: failed to reserve destroy scratch "
+                                  "(maxDestroyPerShift={})",
+                                  maxDestroyPerShift);
+                    }
+                }
+
+                // Очередь deferred destroy должна выдерживать один шаг выгрузки без realloc.
+                mDeferredDestroyReserve = std::max(mDeferredDestroyReserve, maxDestroyPerShift);
+            }
+
+            // Диагностика: оценка памяти membership pool (cold path, один раз при bind).
+            const std::size_t entitiesBytes = poolSize * sizeof(core::ecs::Entity);
+            const std::size_t countsBytes = windowSize * sizeof(std::uint32_t);
+            const std::size_t spawnBytes = maxPerChunk * sizeof(streaming::ChunkEntityDesc);
+            const std::size_t totalMembershipBytes = entitiesBytes + countsBytes + spawnBytes;
+
+            LOG_INFO(core::log::cat::ECS,
+                     "SpatialStreamingSystem: membership pool allocated "
+                     "(window={}, stride={}, poolSize={}, "
+                     "entities={} KB, counts={} KB, spawnBuf={} KB, total={} KB)",
+                     windowSize, mChunkEntityStride, poolSize,
+                     entitiesBytes / 1024u, countsBytes / 1024u,
+                     spawnBytes / 1024u, totalMembershipBytes / 1024u);
         }
 
         void update(core::ecs::World& world, float dt) override {
@@ -191,8 +261,15 @@ namespace game::skyguard::ecs {
                 if (desiredOrigin.x != currentOrigin.x || desiredOrigin.y != currentOrigin.y) {
                     index.setWindowOrigin(desiredOrigin);
                 }
-                initializeWindow(world);
+                beginInitialLoad(world);
                 mInitialized = true;
+            }
+
+            // Бюджетный initial load: грузим не более maxLoadsPerFrame чанков за кадр.
+            // Пока не завершён — нормальный стриминг (сдвиг окна) заблокирован.
+            if (!mInitialLoadComplete) {
+                continueInitialLoad(world);
+                return;
             }
 
             if (!hasPlayer) {
@@ -243,11 +320,26 @@ namespace game::skyguard::ecs {
                               coord.x, coord.y);
                 }
                 loadChunk(world, coord);
+                ++mLoadedChunkCount;
             }
         }
 
         void render(core::ecs::World&, sf::RenderWindow&) override {
         }
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        [[nodiscard]] std::uint32_t loadedChunkCount() const noexcept {
+            return mLoadedChunkCount;
+        }
+
+        [[nodiscard]] std::uint32_t windowTotalChunks() const noexcept {
+            return mWindowTotalChunks;
+        }
+
+        [[nodiscard]] bool isInitialLoadComplete() const noexcept {
+            return mInitialLoadComplete;
+        }
+#endif
 
       private:
         [[nodiscard]] core::spatial::ChunkCoord computeFocusChunk(const float x,
@@ -368,30 +460,66 @@ namespace game::skyguard::ecs {
             }
         }
 
-        void initializeWindow(core::ecs::World& world) {
+        /// Подготовка к бюджетному initial load.
+        /// Резервирует deferred destroy, инициализирует провайдер, устанавливает курсор.
+        /// НЕ загружает чанки — это делает continueInitialLoad().
+        void beginInitialLoad(core::ecs::World& world) {
             if (mContentProvider == nullptr) {
                 mContentProvider = &mEmptyProvider;
             }
-
-            auto& index = mSpatialSystem->index();
-            const core::spatial::ChunkCoord origin = index.windowOrigin();
-            const std::int32_t width = index.windowWidth();
-            const std::int32_t height = index.windowHeight();
 
             if (mDeferredDestroyReserve > 0) {
                 world.reserveDeferredDestroyQueue(mDeferredDestroyReserve);
             }
 
-            for (std::int32_t y = origin.y; y < origin.y + height; ++y) {
-                for (std::int32_t x = origin.x; x < origin.x + width; ++x) {
-                    const core::spatial::ChunkCoord coord{x, y};
-                    if (!index.setChunkState(coord, core::spatial::ResidencyState::Loaded)) {
-                        LOG_PANIC(core::log::cat::ECS,
-                                  "SpatialStreamingSystem: failed to set chunk Loaded ({}, {})",
-                                  coord.x, coord.y);
-                    }
-                    loadChunk(world, coord);
+            mInitLoadCursor = 0;
+            mInitialLoadComplete = false;
+            mLoadedChunkCount = 0;
+        }
+
+        /// Загружает до maxLoadsPerFrame чанков за один вызов.
+        /// Вызывается из update() каждый кадр до завершения initial load.
+        void continueInitialLoad(core::ecs::World& world) {
+            auto& index = mSpatialSystem->index();
+            const core::spatial::ChunkCoord origin = index.windowOrigin();
+
+            // mWindowTotalChunks уже вычислен и checked в конструкторе.
+            // Не пересчитываем width*height каждый кадр (DRY + x32 wraparound safety).
+            const std::uint32_t total = mWindowTotalChunks;
+            const auto width = static_cast<std::uint32_t>(mWindowWidth);
+
+            std::uint32_t loaded = 0;
+
+            while (mInitLoadCursor < total && loaded < mMaxLoadsPerFrame) {
+                const std::int32_t localX =
+                    static_cast<std::int32_t>(mInitLoadCursor % width);
+                const std::int32_t localY =
+                    static_cast<std::int32_t>(mInitLoadCursor / width);
+                const core::spatial::ChunkCoord coord{origin.x + localX, origin.y + localY};
+
+                if (!index.setChunkState(coord, core::spatial::ResidencyState::Loaded)) {
+                    LOG_PANIC(core::log::cat::ECS,
+                              "SpatialStreamingSystem: failed to set chunk Loaded ({}, {})"
+                              " during initial load",
+                              coord.x, coord.y);
                 }
+                loadChunk(world, coord);
+
+                ++loaded;
+                ++mInitLoadCursor;
+                ++mLoadedChunkCount;
+            }
+
+            if (mInitLoadCursor >= total) {
+                mInitialLoadComplete = true;
+
+                LOG_INFO(core::log::cat::ECS,
+                         "SpatialStreamingSystem: initial load complete "
+                         "({} chunks, {} frames)",
+                         total,
+                         (mMaxLoadsPerFrame > 0u)
+                             ? ((total + mMaxLoadsPerFrame - 1u) / mMaxLoadsPerFrame)
+                             : 0u);
             }
         }
 
@@ -409,8 +537,8 @@ namespace game::skyguard::ecs {
             const auto st = index.chunkState(coord);
             if (st != core::spatial::ResidencyState::Loaded) {
                 LOG_PANIC(core::log::cat::ECS,
-                          "SpatialStreamingSystem: loadChunk() called for non-Loaded chunk ({}, "
-                          "{}) state={}",
+                          "SpatialStreamingSystem: loadChunk() called for non-Loaded chunk "
+                          "({}, {}) state={}",
                           coord.x, coord.y, static_cast<int>(st));
             }
 
@@ -437,8 +565,7 @@ namespace game::skyguard::ecs {
             }
             if (mChunkEntityStride == 0u || mChunkEntities.empty()) {
                 LOG_PANIC(core::log::cat::ECS,
-                          "SpatialStreamingSystem: membership pool not initialized "
-                          "(stride=0)");
+                          "SpatialStreamingSystem: membership pool not initialized (stride=0)");
             }
             if (mChunkEntityCounts[slot] != 0u) {
                 LOG_PANIC(core::log::cat::ECS,
@@ -460,9 +587,12 @@ namespace game::skyguard::ecs {
                 // validate-on-write (включая Release): NaN/Inf здесь приведут к мусору в AABB и
                 // потенциальному UB в последующих сортировках/сравнениях.
                 const bool finite = std::isfinite(desc.localPos.x) &&
-                                    std::isfinite(desc.localPos.y) && std::isfinite(desc.scale.x) &&
-                                    std::isfinite(desc.scale.y) && std::isfinite(desc.origin.x) &&
-                                    std::isfinite(desc.origin.y) && std::isfinite(desc.zOrder);
+                                    std::isfinite(desc.localPos.y) &&
+                                    std::isfinite(desc.scale.x) &&
+                                    std::isfinite(desc.scale.y) &&
+                                    std::isfinite(desc.origin.x) &&
+                                    std::isfinite(desc.origin.y) &&
+                                    std::isfinite(desc.zOrder);
 
                 if (!finite) {
                     LOG_PANIC(core::log::cat::ECS,
@@ -507,7 +637,7 @@ namespace game::skyguard::ecs {
                 world.addComponent<core::ecs::TransformComponent>(entity, tr);
                 world.addComponent<core::ecs::SpriteComponent>(entity, sp);
 
-                // Streaming membership: entity “belongs” to this chunk by construction.
+                // Принадлежность чанку: сущность создана провайдером "внутри" этого чанка.
                 mChunkEntities[base + i] = entity;
             }
 
@@ -517,7 +647,7 @@ namespace game::skyguard::ecs {
         void unloadChunk(core::ecs::World& world, const core::spatial::ChunkCoord coord) {
             auto& index = mSpatialSystem->index();
 
-            // Membership cleanup — only when provider actually spawns entities.
+            // Membership cleanup — только когда провайдер реально создаёт сущности.
             if (mMaxEntitiesPerChunk > 0u) {
                 const std::size_t slot = membershipSlot(coord);
                 assert(slot < mChunkEntityCounts.size() &&
@@ -561,6 +691,10 @@ namespace game::skyguard::ecs {
                           coord.x, coord.y);
             }
 
+            if (mLoadedChunkCount > 0u) {
+                --mLoadedChunkCount;
+            }
+
             mContentProvider->onChunkUnloaded(coord);
         }
 
@@ -579,6 +713,14 @@ namespace game::skyguard::ecs {
         std::size_t mDeferredDestroyReserve = 0;
 
         std::size_t mMaxEntitiesPerChunk = 0;
+
+        // Бюджетный initial load: курсор — flat index в сетке окна [0..windowTotal).
+        std::uint32_t mInitLoadCursor = 0;
+        bool mInitialLoadComplete = false;
+
+        // Счётчик загруженных чанков (инкремент в load, декремент в unload).
+        std::uint32_t mLoadedChunkCount = 0;
+        std::uint32_t mWindowTotalChunks = 0;
 
         std::vector<core::spatial::ChunkCoord> mUnloadScratch{};
         std::vector<core::spatial::ChunkCoord> mLoadScratch{};

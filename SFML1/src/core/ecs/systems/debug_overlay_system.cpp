@@ -19,6 +19,7 @@
 // RenderSystem нужен только для Debug/Profile (статистика рендера).
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
     #include "core/ecs/systems/render_system.h"
+    #include "core/ecs/systems/spatial_index_system.h"
 #endif
 
 #if defined(SFML1_PROFILE)
@@ -37,7 +38,7 @@ namespace {
 
         const std::uint64_t denom = (1ull << shift);   // shift гарантированно < 64
         const std::uint64_t mask  = (denom - 1);       // denom == 2^shift
-        const std::uint64_t half  = (denom >> 1);      // округление
+        const std::uint64_t half  = (denom >> 1);       // округление
 
         const auto roundDivPow2 = [shift, mask, half](const std::uint64_t diff) noexcept {
             const std::uint64_t q = (diff >> shift);
@@ -62,7 +63,7 @@ namespace core::ecs {
         mFpsText.emplace(font);
 
         mTextBuffer.clear();
-        mTextBuffer.reserve(512);
+        mTextBuffer.reserve(768);
         mExtraTextBuffer.clear();
         mExtraTextBuffer.reserve(512);
 
@@ -231,6 +232,26 @@ namespace core::ecs {
             mTextBuffer.append(" | draw ");
             core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSDrawUs);
     #endif
+        }
+
+        // ----------------------------------------------------------------------------------------
+        // Spatial index метрики — только Debug/Profile.
+        // Показываем activeEntityCount (зарегистрированные) и window dimensions.
+        // Позволяет отличить "2M загружено, 70K видно" от "70K загружено, 70K видно".
+        // ----------------------------------------------------------------------------------------
+        if (mSpatialIndexSystem) {
+            const auto& idx = mSpatialIndexSystem->index();
+
+            mTextBuffer.append("\nSpatial: active ");
+            core::utils::format::appendU64(
+                mTextBuffer, static_cast<std::uint64_t>(idx.activeEntityCount()));
+
+            mTextBuffer.append(" | window ");
+            core::utils::format::appendU64(
+                mTextBuffer, static_cast<std::uint64_t>(idx.windowWidth()));
+            mTextBuffer.push_back('x');
+            core::utils::format::appendU64(
+                mTextBuffer, static_cast<std::uint64_t>(idx.windowHeight()));
         }
 #endif // !defined(NDEBUG) || defined(SFML1_PROFILE)
 

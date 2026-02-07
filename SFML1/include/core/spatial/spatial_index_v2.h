@@ -158,8 +158,10 @@ struct SpatialChunk final {
             return idx + 1u;
         }
 
-        [[nodiscard]] std::uint32_t entryOffset(const std::uint32_t idx) const noexcept {
-            return idx * mNodeCapacity;
+        // Возвращает size_t — расширяем ДО умножения, исключая переполнение uint32
+        // при больших пулах (mMaxNodes * mNodeCapacity > UINT32_MAX).
+        [[nodiscard]] std::size_t entryOffset(const std::uint32_t idx) const noexcept {
+            return static_cast<std::size_t>(idx) * mNodeCapacity;
         }
 
         std::uint32_t mNodeCapacity = 0;
@@ -683,7 +685,8 @@ struct SpatialChunk final {
         mEntries.resize(static_cast<std::size_t>(mMaxNodes) * mNodeCapacity, 0u);
         mNext.assign(mMaxNodes, 0u);
         mCounts.assign(mMaxNodes, 0u);
-        mTailByHead.assign(mMaxNodes + 1u, 0u);
+        // Расширяем до size_t ДО сложения — mMaxNodes == UINT32_MAX не обернётся в 0.
+        mTailByHead.assign(static_cast<std::size_t>(mMaxNodes) + 1u, 0u);
 
         mFreeStack.resize(mMaxNodes);
         mFreeCount = 0;
@@ -797,7 +800,7 @@ struct SpatialChunk final {
             idx = nodeIndex(newHandle);
         }
 
-        const std::uint32_t offset = entryOffset(idx);
+        const std::size_t offset = entryOffset(idx);
         mEntries[offset + mCounts[idx]] = id;
         ++mCounts[idx];
         return true;
@@ -825,7 +828,7 @@ struct SpatialChunk final {
 
         while (handle != 0u) {
             const std::uint32_t idx = nodeIndex(handle);
-            const std::uint32_t offset = entryOffset(idx);
+            const std::size_t offset = entryOffset(idx);
             const std::uint32_t count = mCounts[idx];
 
             for (std::uint32_t i = 0; i < count; ++i) {
@@ -923,7 +926,7 @@ struct SpatialChunk final {
         std::uint32_t handle = headHandle;
         while (handle != 0u) {
             const std::uint32_t idx = nodeIndex(handle);
-            const std::uint32_t offset = entryOffset(idx);
+            const std::size_t offset = entryOffset(idx);
             const std::uint32_t count = mCounts[idx];
             for (std::uint32_t i = 0; i < count; ++i) {
                 if (!fn(mEntries[offset + i])) {
@@ -2404,9 +2407,11 @@ struct SpatialChunk final {
                 continue;
             }
 
-            for (std::uint8_t j = static_cast<std::uint8_t>(i + 1u); j < cell.count; ++j) {
-                cell.entities[j - 1u] = cell.entities[j];
-            }
+        for (std::uint8_t j = static_cast<std::uint8_t>(i + 1u); j < cell.count; ++j) {
+            // static_cast: расширяем j до size_t ДО вычитания — silences lnt-arithmetic-overflow.
+            // Loop invariant: j >= 1 (начинается с i + 1, где i >= 0).
+            cell.entities[static_cast<std::size_t>(j) - 1u] = cell.entities[j];
+        }
             --cell.count;
             return;
         }

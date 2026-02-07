@@ -45,6 +45,7 @@ namespace core {
 namespace core::ecs {
 
     class RenderSystem;
+    class SpatialIndexSystem;
 
     class DebugOverlaySystem final : public ISystem {
       public:
@@ -70,6 +71,20 @@ namespace core::ecs {
         void setRenderSystem(const RenderSystem*) noexcept {
             // Release: без действия. Статистика RenderSystem не собирается, показывать нечего.
         }
+#endif
+
+        /**
+         * @brief Привязать SpatialIndexSystem для отображения spatial-метрик.
+         *
+         * Debug/Profile: показывает activeEntityCount, window size.
+         * Release: no-op.
+         */
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        void setSpatialIndexSystem(const SpatialIndexSystem* system) noexcept {
+            mSpatialIndexSystem = system;
+        }
+#else
+        void setSpatialIndexSystem(const SpatialIndexSystem*) noexcept {}
 #endif
 
         void setEnabled(bool enabled) noexcept {
@@ -128,10 +143,11 @@ namespace core::ecs {
         std::uint8_t mSmoothingShift = 3;
 
         // ----------------------------------------------------------------------------------------
-        // Только для Debug/Profile: статистика рендера из RenderSystem
+        // Только для Debug/Profile: статистика рендера и spatial index
         // ----------------------------------------------------------------------------------------
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         const RenderSystem* mRenderSystem{nullptr}; // не владеем
+        const SpatialIndexSystem* mSpatialIndexSystem{nullptr}; // не владеем
 #endif
 
 #if defined(SFML1_PROFILE)

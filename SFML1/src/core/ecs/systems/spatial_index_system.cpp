@@ -2,6 +2,7 @@
 
 #include "core/ecs/systems/spatial_index_system.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 
@@ -18,7 +19,9 @@
 namespace {
 
     [[nodiscard]] core::spatial::Aabb2 computeEntityAabb(
-        const core::ecs::TransformComponent& tr, const core::ecs::SpriteComponent& sp) noexcept {
+        const core::ecs::TransformComponent& tr,
+        const core::ecs::SpriteComponent& sp) noexcept {
+
         const float rotationDegrees = tr.rotationDegrees;
         if (rotationDegrees == 0.f) {
             return core::ecs::render::computeSpriteAabbNoRotation(
@@ -73,6 +76,12 @@ namespace core::ecs {
             entt::exclude<SpatialIdComponent, SpatialStreamedOutTag>);
 
         for (auto [entity, transform, sprite] : newView.each()) {
+#if !defined(NDEBUG)
+            // Двойная страховка от будущих регрессий: streamed-out сущности не должны
+            // попадать в регистрацию. В Release/Profile нулевой overhead.
+            assert(!registry.any_of<SpatialStreamedOutTag>(entity) &&
+                   "SpatialIndexSystem: streamed-out entity must not be registered");
+#endif
             assert(core::ecs::render::hasExplicitRect(sprite.textureRect) &&
                    "SpatialIndexSystem: SpriteComponent.textureRect must be explicit");
 
@@ -139,17 +148,16 @@ namespace core::ecs {
                           winOrigin.y, mIndex.windowWidth(), mIndex.windowHeight());
             }
 
-            // entity гарантированно не имел SpatialIdComponent (exclude<>), поэтому emplace
-            // достаточно.
+            // entity гарантированно не имел SpatialIdComponent (exclude<>), поэтому emplace достаточно.
             // Инвариант после emplace: SpatialIdComponent.id != 0 и mapping[id] == entity.
             registry.emplace<SpatialIdComponent>(entity, SpatialIdComponent{id, aabb});
         }
 
         auto dirtyView = registry.view<SpatialIdComponent,
-                               SpatialDirtyTag,
-                               TransformComponent,
-                               SpriteComponent>(
-                               entt::exclude<SpatialStreamedOutTag>);
+                                       SpatialDirtyTag,
+                                       TransformComponent,
+                                       SpriteComponent>(
+                                       entt::exclude<SpatialStreamedOutTag>);
 
         bool hadDirty = false;
 
@@ -346,12 +354,12 @@ namespace core::ecs {
 
     void SpatialIndexSystem::setMapping(const core::spatial::EntityId32 id,
                                         const Entity entity) noexcept {
-        assert(id != 0 && 
-            "SpatialIndexSystem: SpatialId32 must be non-zero");
-        assert(id < mEntityBySpatialId.size() && 
-            "SpatialIndexSystem: SpatialId32 out of range");
-        assert(entity != core::ecs::NullEntity && 
-            "SpatialIndexSystem: mapping NullEntity forbidden");
+        assert(id != 0 &&
+               "SpatialIndexSystem: SpatialId32 must be non-zero");
+        assert(id < mEntityBySpatialId.size() &&
+               "SpatialIndexSystem: SpatialId32 out of range");
+        assert(entity != core::ecs::NullEntity &&
+               "SpatialIndexSystem: mapping NullEntity forbidden");
         mEntityBySpatialId[id] = entity;
     }
 
