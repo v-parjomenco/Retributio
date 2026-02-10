@@ -566,17 +566,55 @@ struct SpatialChunk final {
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         struct DebugQueryStats final {
+            std::uint32_t chunksVisited = 0;
+            std::uint32_t chunksLoadedVisited = 0;
+            std::uint32_t chunksSkippedNonLoaded = 0;
             std::uint32_t cellVisits = 0;
             std::uint32_t overflowCellVisits = 0;
             std::uint32_t overflowEntitiesVisited = 0;
-            std::uint32_t candidatesVisited = 0;
+            std::uint32_t entriesScanned = 0;
+            std::uint32_t uniqueAdded = 0;
+            std::uint32_t dupHits = 0;
+            std::uint32_t outTruncated = 0;
+            std::int32_t chunkMinX = 0;
+            std::int32_t chunkMinY = 0;
+            std::int32_t chunkMaxX = -1;
+            std::int32_t chunkMaxY = -1;
+            std::int32_t cellMinX = 0;
+            std::int32_t cellMinY = 0;
+            std::int32_t cellMaxX = -1;
+            std::int32_t cellMaxY = -1;
+        };
+
+        struct DebugCellHealth final {
+            std::uint32_t loaded = 0;
+            std::uint32_t totalCells = 0;
+            std::uint32_t maxCellLen = 0;
+            std::uint32_t sumCellLen = 0;
+            std::uint32_t dupApprox = 0;
         };
 
         struct DebugStats final {
             DebugQueryStats lastQuery{};
             std::uint32_t worstCellDensity = 0;
+            std::uint32_t dupInsertDetected = 0;
             OverflowPool::DebugStats overflow{};
         };
+
+        [[nodiscard]] const DebugQueryStats& debugLastQueryStatsRef() const noexcept {
+            return mDebugLastQueryStats;
+        }
+
+        [[nodiscard]] std::uint32_t debugDupInsertDetected() const noexcept {
+            return mDebugDupInsertDetected;
+        }
+
+        [[nodiscard]] DebugCellHealth
+        debugCellHealthForChunk(const ChunkCoord coord) const noexcept;
+
+        [[nodiscard]] bool debugWasInLastQuery(const EntityId32 id) const noexcept {
+            return (id < mMarks.size()) && (mMarks[id] == mQueryStamp);
+        }
 
         [[nodiscard]] DebugStats debugStats() const noexcept;
 #endif
@@ -655,6 +693,7 @@ struct SpatialChunk final {
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         mutable DebugQueryStats mDebugLastQueryStats{};
         std::uint32_t mDebugWorstCellDensity = 0;
+        std::uint32_t mDebugDupInsertDetected = 0;
 #endif
     };
 
@@ -2427,6 +2466,30 @@ struct SpatialChunk final {
 
     template <typename Storage, typename BoundsT>
     inline void SpatialIndexV2<Storage, BoundsT>::appendToCell(Cell& cell, const EntityId32 id) {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        bool alreadyPresent = false;
+        for (std::uint8_t i = 0; i < cell.count; ++i) {
+            if (cell.entities[i] == id) {
+                alreadyPresent = true;
+                break;
+            }
+        }
+        if (!alreadyPresent && cell.overflowHandle != 0u) {
+            (void) mOverflowPool.forEach(cell.overflowHandle, [&](const EntityId32 existing) {
+                if (existing == id) {
+                    alreadyPresent = true;
+                    return false;
+                }
+                return true;
+            });
+        }
+        if (alreadyPresent) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexV2: duplicate entity in cell (id={}). "
+                      "This indicates write-path corruption (failed remove or double-insert).",
+                      id);
+        }
+#endif
         if (cell.count < Cell::kInlineCapacity) {
             cell.entities[cell.count] = id;
             ++cell.count;
@@ -2632,7 +2695,7 @@ struct SpatialChunk final {
                                                                       Fn&& fn) const {
         for (std::uint8_t i = 0; i < cell.count; ++i) {
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
-            ++mDebugLastQueryStats.candidatesVisited;
+            ++mDebugLastQueryStats.entriesScanned;
 #endif
             if (!fn(cell.entities[i])) {
                 return false;
@@ -2642,7 +2705,7 @@ struct SpatialChunk final {
         if (cell.overflowHandle != 0u) {
             return mOverflowPool.forEach(cell.overflowHandle, [&](const EntityId32 id) {
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
-                ++mDebugLastQueryStats.candidatesVisited;
+                ++mDebugLastQueryStats.entriesScanned;
                 ++mDebugLastQueryStats.overflowEntitiesVisited;
 #endif
                 return fn(id);
@@ -2711,6 +2774,16 @@ struct SpatialChunk final {
             return 0;
         }
         const CellRange cellRange = computeCellRange(area);
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        mDebugLastQueryStats.chunkMinX = chunkRange.minX;
+        mDebugLastQueryStats.chunkMinY = chunkRange.minY;
+        mDebugLastQueryStats.chunkMaxX = chunkRange.maxX;
+        mDebugLastQueryStats.chunkMaxY = chunkRange.maxY;
+        mDebugLastQueryStats.cellMinX = cellRange.minX;
+        mDebugLastQueryStats.cellMinY = cellRange.minY;
+        mDebugLastQueryStats.cellMaxX = cellRange.maxX;
+        mDebugLastQueryStats.cellMaxY = cellRange.maxY;
+#endif
 
         std::size_t outCount = 0;
         bool stop = false;
@@ -2721,9 +2794,18 @@ struct SpatialChunk final {
                 if (stop) {
                     return false;
                 }
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                ++mDebugLastQueryStats.chunksVisited;
+#endif
                 if (chunk.state != ResidencyState::Loaded) {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                    ++mDebugLastQueryStats.chunksSkippedNonLoaded;
+#endif
                     return true;
                 }
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                ++mDebugLastQueryStats.chunksLoadedVisited;
+#endif
                 return forEachCellInRange(chunk, coord, cellRange, [&](const Cell& cell) {
                     if (stop) {
                         return false;
@@ -2736,17 +2818,30 @@ struct SpatialChunk final {
 #endif
                     return forEachEntityInCell(cell, [&](const EntityId32 id) {
                         if (outCount >= out.size()) {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                            mDebugLastQueryStats.outTruncated = 1;
+#endif
                             stop = true;
                             return false;
                         }
 #if !defined(NDEBUG)
                         assert(id < mMarks.size() && "SpatialIndexV2: marks table too small");
 #endif
+                        if (id >= mMarks.size()) [[unlikely]] {
+                            LOG_PANIC(core::log::cat::ECS,
+                                      "SpatialIndexV2: marks table too small (id={})", id);
+                        }
                         if (mMarks[id] == mQueryStamp) {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                            ++mDebugLastQueryStats.dupHits;
+#endif
                             return true;
                         }
                         mMarks[id] = mQueryStamp;
                         out[outCount++] = id;
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                        ++mDebugLastQueryStats.uniqueAdded;
+#endif
                         return true;
                     });
                 });
@@ -2825,7 +2920,13 @@ struct SpatialChunk final {
                 if (stop) {
                     return false;
                 }
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                ++mDebugLastQueryStats.chunksVisited;
+#endif
                 if (chunk.state != ResidencyState::Loaded) {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                    ++mDebugLastQueryStats.chunksSkippedNonLoaded;
+#endif
 #if defined(NDEBUG)
                     handleNonLoadedChunk(coord);
 #else
@@ -2834,6 +2935,9 @@ struct SpatialChunk final {
                     return false;
 #endif
                 }
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                ++mDebugLastQueryStats.chunksLoadedVisited;
+#endif
                 return forEachCellInRange(chunk, coord, cellRange, [&](const Cell& cell) {
                     if (stop) {
                         return false;
@@ -2846,10 +2950,12 @@ struct SpatialChunk final {
 #endif
                     return forEachEntityInCell(cell, [&](const EntityId32 id) {
                         if (outCount >= out.size()) {
-#if defined(NDEBUG)
-                            handleOutputOverflow();
-#else
-                            handleOutputOverflow();
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                            mDebugLastQueryStats.outTruncated = 1;
+#endif
+                            handleOutputOverflow(); // [[noreturn]]
+#if !defined(NDEBUG)
+                            // Defensive (unreachable after PANIC)
                             stop = true;
                             return false;
 #endif
@@ -2857,11 +2963,21 @@ struct SpatialChunk final {
 #if !defined(NDEBUG)
                         assert(id < mMarks.size() && "SpatialIndexV2: marks table too small");
 #endif
+                        if (id >= mMarks.size()) [[unlikely]] {
+                            LOG_PANIC(core::log::cat::ECS,
+                                      "SpatialIndexV2: marks table too small (id={})", id);
+                        }
                         if (mMarks[id] == mQueryStamp) {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                            ++mDebugLastQueryStats.dupHits;
+#endif
                             return true;
                         }
                         mMarks[id] = mQueryStamp;
                         out[outCount++] = id;
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                        ++mDebugLastQueryStats.uniqueAdded;
+#endif
                         return true;
                     });
                 });
@@ -2872,10 +2988,76 @@ struct SpatialChunk final {
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
     template <typename Storage, typename BoundsT>
+    inline typename SpatialIndexV2<Storage, BoundsT>::DebugCellHealth
+    SpatialIndexV2<Storage, BoundsT>::debugCellHealthForChunk(
+        const ChunkCoord coord) const noexcept {
+        DebugCellHealth out{};
+        out.totalCells = static_cast<std::uint32_t>(mCellsPerChunk);
+
+        const SpatialChunk* chunk = mStorage.tryGetChunk(coord);
+        if (chunk == nullptr || chunk->state != ResidencyState::Loaded) {
+            return out;
+        }
+        out.loaded = 1;
+
+        const Cell* cells = cellsForChunk(*chunk);
+        if (cells == nullptr) {
+            return out;
+        }
+
+        constexpr std::uint32_t kSampleCap = 64;
+        std::array<EntityId32, kSampleCap> sample{};
+
+        for (std::size_t i = 0; i < mCellsPerChunk; ++i) {
+            const Cell& cell = cells[i];
+            std::uint32_t len = static_cast<std::uint32_t>(cell.count);
+            if (cell.overflowHandle != 0u) {
+                len += mOverflowPool.totalCount(cell.overflowHandle);
+            }
+
+            out.sumCellLen += len;
+            if (len > out.maxCellLen) {
+                out.maxCellLen = len;
+            }
+
+            if (len == 0) {
+                continue;
+            }
+
+            if (len <= kSampleCap) {
+                std::uint32_t sampleCount = 0;
+                for (std::uint8_t j = 0; j < cell.count; ++j) {
+                    sample[sampleCount++] = cell.entities[j];
+                }
+                if (cell.overflowHandle != 0u) {
+                    (void) mOverflowPool.forEach(cell.overflowHandle, [&](const EntityId32 id) {
+                        if (sampleCount < kSampleCap) {
+                            sample[sampleCount++] = id;
+                            return true;
+                        }
+                        return false;
+                    });
+                }
+
+                for (std::uint32_t a = 0; a < sampleCount; ++a) {
+                    for (std::uint32_t b = a + 1u; b < sampleCount; ++b) {
+                        if (sample[a] == sample[b]) {
+                            ++out.dupApprox;
+                        }
+                    }
+                }
+            }
+        }
+
+        return out;
+    }
+
+    template <typename Storage, typename BoundsT>
     inline typename SpatialIndexV2<Storage, BoundsT>::DebugStats
     SpatialIndexV2<Storage, BoundsT>::debugStats() const noexcept {
         return DebugStats{.lastQuery = mDebugLastQueryStats,
                           .worstCellDensity = mDebugWorstCellDensity,
+                          .dupInsertDetected = mDebugDupInsertDetected,
                           .overflow = mOverflowPool.debugStats()};
     }
 #endif

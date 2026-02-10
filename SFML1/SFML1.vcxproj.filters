@@ -456,6 +456,9 @@
     <ClCompile Include="src\game\skyguard\dev\stress_chunk_content_provider.cpp">
       <Filter>src\game\skyguard\dev</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\ecs\world.cpp">
+      <Filter>src\core\ecs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\resources\resource_manager.h">

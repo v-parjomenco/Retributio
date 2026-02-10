@@ -397,6 +397,9 @@ namespace core::ecs {
         std::size_t totalCandidates = 0;
         std::size_t culled = 0;
         std::size_t textureSwitches = 0;
+        std::size_t mapNull = 0;
+        std::size_t missingComponents = 0;
+        std::size_t fineCullFail = 0;
 #endif
 
 #if defined(SFML1_PROFILE)
@@ -443,6 +446,26 @@ namespace core::ecs {
 
         auto ecsView = world.view<TransformComponent, SpriteComponent, SpatialIdComponent>();
 
+        // ----------------------------------------------------------------------------------------
+        // Детерминизм: drawOrdinal tie-breaker
+        // ----------------------------------------------------------------------------------------
+        //  - drawOrdinal = монотонный per-frame счётчик (0..N-1)
+        //  - Каждый спрайт получает уникальный tieBreak в порядке gather
+        //  - Компаратор (zOrder, texture, tieBreak) → строгий total order
+        //
+        // ПРЕИМУЩЕСТВА:
+        //  - Нет коллизий (каждый спрайт = уникальный drawOrdinal)
+        //  - Детерминизм (порядок gather = порядок отрисовки при равных zOrder/texture)
+        //  - ZERO COST (инкремент uint32 = 1 CPU cycle)
+        //  - Компактно (uint32, не uint64 → cache-friendly, 16 bytes RenderKey)
+        //
+        // ДЕТЕРМИНИЗМ ГАРАНТИИ:
+        //  - Порядок gather определяется порядком итерации по mQueryBuffer
+        //  - mQueryBuffer заполняется SpatialIndex::queryFast() детерминированно
+        //  - SpatialIndex детерминирован (фиксированный chunkSize, cellSize, windowOrigin)
+        //  → drawOrdinal детерминирован → sort детерминирован → рендер детерминирован
+        std::uint32_t drawOrdinal = 0;
+
         // Итерация по mQueryBuffer (уже отфильтровано SpatialIndexV2).
         // Если число видимых сущностей будет постоянно превышать 50k, поменять на:
         //  packed iteration через view.each() + inline culling.
@@ -453,9 +476,15 @@ namespace core::ecs {
                    "RenderSystem: SpatialId32 out of range (mapping)");
             const Entity entity = mEntitiesBySpatialId[id];
             if (entity == core::ecs::NullEntity) {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                ++mapNull;
+#endif
                 continue;
             }
             if (!ecsView.contains(entity)) {
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+                ++missingComponents;
+#endif
                 continue;
             }
             assert(ecsView.contains(entity) && "RenderSystem: SpatialIndex вернул entity без "
@@ -489,6 +518,7 @@ namespace core::ecs {
             if (!core::spatial::intersectsInclusive(sh.lastAabb, viewAabb)) {
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
                 ++culled;
+                ++fineCullFail;
 #endif
                 continue;
             }
@@ -521,7 +551,7 @@ namespace core::ecs {
 
             mKeys.push_back(RenderKey{.zOrder = spr.zOrder,
                                       .texture = spr.texture,
-                                      .tieBreak = core::ecs::toUint(entity),
+                                      .tieBreak = drawOrdinal++,
                                       .packetIndex = static_cast<std::uint32_t>(packetIdx)});
         }
 
@@ -546,6 +576,20 @@ namespace core::ecs {
             stats.uniqueTexturePointers = 0;
             stats.textureCacheSize = mFrameTexturePtr.size();
             stats.resourceLookupsThisFrame = resourceLookupsThisFrame;
+            stats.renderMapNull = mapNull;
+            stats.renderMissingComponents = missingComponents;
+            stats.renderFineCullFail = fineCullFail;
+            stats.renderDrawn = 0;
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+            const auto& qstats = mSpatialIndex->debugLastQueryStatsRef();
+            stats.spatialEntriesScanned = qstats.entriesScanned;
+            stats.spatialQueryUnique = qstats.uniqueAdded;
+            stats.spatialDupHits = qstats.dupHits;
+            stats.spatialCellsVisited = qstats.cellVisits;
+            stats.spatialChunksVisited = qstats.chunksVisited;
+            stats.spatialChunksSkipped = qstats.chunksSkippedNonLoaded;
+            stats.spatialOutTruncated = qstats.outTruncated;
+#endif
             mLastStats = stats;
 #endif
             return;
@@ -681,6 +725,22 @@ namespace core::ecs {
         stats.uniqueTexturePointers = mUniqueTexturesThisFrame;
         stats.textureCacheSize = mFrameTexturePtr.size();
         stats.resourceLookupsThisFrame = resourceLookupsThisFrame;
+        stats.renderMapNull = mapNull;
+        stats.renderMissingComponents = missingComponents;
+        stats.renderFineCullFail = fineCullFail;
+        stats.renderDrawn = mKeys.size();
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        {
+            const auto& qstats = mSpatialIndex->debugLastQueryStatsRef();
+            stats.spatialEntriesScanned = qstats.entriesScanned;
+            stats.spatialQueryUnique = qstats.uniqueAdded;
+            stats.spatialDupHits = qstats.dupHits;
+            stats.spatialCellsVisited = qstats.cellVisits;
+            stats.spatialChunksVisited = qstats.chunksVisited;
+            stats.spatialChunksSkipped = qstats.chunksSkippedNonLoaded;
+            stats.spatialOutTruncated = qstats.outTruncated;
+        }
+#endif
 
 #if defined(SFML1_PROFILE)
         {

@@ -49,18 +49,19 @@ namespace core::ecs {
     }
 
     /**
-     * @brief Преобразование Entity в uint32_t для логирования/отладки.
+     * @brief Преобразование Entity в uint64_t для логирования/отладки.
      *
      * ВАЖНО:
      *  - Это НЕ persistent ID (для сейвов нужен StableID сервис + маппинг).
      *  - Это просто числовое представление handle'а (включая generation биты).
      */
-    [[nodiscard]] constexpr std::uint32_t toUint(const Entity entity) noexcept {
+    [[nodiscard]] constexpr std::uint64_t toUint(const Entity entity) noexcept {
         using underlying_type = std::underlying_type_t<Entity>;
-        static_assert(sizeof(underlying_type) <= sizeof(std::uint32_t),
-                      "core::ecs::Entity underlying type must fit into uint32_t");
-
-        return static_cast<std::uint32_t>(entt::to_integral(entity));
+        
+        static_assert(sizeof(underlying_type) <= sizeof(std::uint64_t),
+                      "core::ecs::Entity underlying type must fit into uint64_t");
+        
+        return static_cast<std::uint64_t>(entt::to_integral(entity));
     }
 
 } // namespace core::ecs

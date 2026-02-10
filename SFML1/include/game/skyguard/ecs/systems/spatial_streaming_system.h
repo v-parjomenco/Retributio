@@ -41,8 +41,16 @@ namespace game::skyguard::ecs {
      *  - Выполняется ДО SpatialIndexSystem::update().
      *  - Перед выгрузкой чанка снимает SpatialIdComponent (detach/unregister на стороне индекса).
      *  - Уничтожение сущностей — deferred (flushDestroyed в конце кадра).
-     *  - Initial load бюджетируется: не более maxLoadsPerFrame чанков за кадр.
-     *    Пока initial load не завершён, нормальный стриминг (сдвиг окна) не начинается.
+     *
+     * Initial load — двухфазный:
+     *  - Phase 1 (SettingLoaded): все чанки окна переводятся в Loaded state БЕЗ создания
+     *    сущностей. SpatialIndexSystem не видит новых сущностей → нет registerEntity.
+     *    Бюджет: maxLoadsPerFrame чанков/кадр.
+     *  - Phase 2 (SpawningEntities): сущности создаются для всех чанков (уже Loaded).
+     *    SpatialIndexSystem регистрирует их — canWriteRange() всегда true,
+     *    потому что ВСЕ соседние чанки гарантированно Loaded.
+     *    Бюджет: maxInitSpawnChunksPerFrame чанков/кадр (entity-aware).
+     *  - Пока initial load не завершён, нормальный стриминг (сдвиг окна) заблокирован.
      *
      * Гарантия отсутствия re-registration (streamed-out safety) — тройная защита:
      *  1. EnTT view filter: SpatialIndexSystem::update() использует
@@ -56,6 +64,23 @@ namespace game::skyguard::ecs {
      */
     class SpatialStreamingSystem final : public core::ecs::ISystem {
       public:
+        /// Фазы initial load. Двухфазный протокол гарантирует, что SpatialIndexSystem
+        /// никогда не встретит non-Loaded chunk при registerEntity во время init.
+        enum class InitPhase : std::uint8_t {
+            NotStarted = 0,
+
+            /// Phase 1: все чанки окна переводятся в Loaded (cell blocks выделяются),
+            /// но сущности НЕ создаются. SpatialIndexSystem idle.
+            SettingLoaded,
+
+            /// Phase 2: сущности создаются для чанков (все уже Loaded).
+            /// SpatialIndexSystem регистрирует их — canWriteRange() всегда true.
+            SpawningEntities,
+
+            /// Initial load завершён. Нормальный стриминг (сдвиг окна) разблокирован.
+            Complete
+        };
+
         explicit SpatialStreamingSystem(const core::ecs::SpatialIndexSystemConfig& config) noexcept
             : mChunkSizeWorld(config.index.chunkSizeWorld),
               mWindowWidth(config.storage.width),
@@ -127,6 +152,7 @@ namespace game::skyguard::ecs {
                 mChunkEntityStride = 0;
                 mChunkEntityCounts.clear();
                 mChunkEntities.clear();
+                mMaxInitSpawnChunksPerFrame = mMaxLoadsPerFrame;
                 return;
             }
 
@@ -135,8 +161,7 @@ namespace game::skyguard::ecs {
                     mSpawnBuffer.resize(maxPerChunk);
                 } catch (const std::bad_alloc&) {
                     LOG_PANIC(core::log::cat::ECS,
-                              "SpatialStreamingSystem: failed to allocate spawn buffer "
-                              "(maxPerChunk={})",
+                              "SpatialStreamingSystem: failed to allocate spawn buffer (maxPerChunk={})",
                               maxPerChunk);
                 }
             }
@@ -215,6 +240,29 @@ namespace game::skyguard::ecs {
                 mDeferredDestroyReserve = std::max(mDeferredDestroyReserve, maxDestroyPerShift);
             }
 
+            // ------------------------------------------------------------------------------------
+            // Entity-aware budget для Phase 2 initial load.
+            // При высокой плотности (512+ per chunk) × chunk budget (255 для 128×128)
+            // = 130K+ entities/frame — гарантированный хитч. Ограничиваем по сущностям.
+            //
+            // kMaxInitEntitiesPerFrame = 50K — эмпирический ceiling:
+            //   50K entities × ~100ns (createEntity + 2 addComponent) ≈ 5ms.
+            //   При 60fps = ~30% frame budget. При 240fps = всё frame budget.
+            //   Для Titan-like stress test на init это приемлемо.
+            //
+            // Chunk budget для Phase 2 = min(chunk_budget, 50K / density).
+            // При density=64: 50000/64=781 → capped at mMaxLoadsPerFrame (255). No change.
+            // При density=512: 50000/512=97 → Phase 2 ограничена 97 чанками/кадр.
+            // При density=8192: 50000/8192=6 → Phase 2 ограничена 6 чанками/кадр.
+            // ------------------------------------------------------------------------------------
+            constexpr std::size_t kMaxInitEntitiesPerFrame = 50'000;
+
+            const std::size_t chunksForEntityBudget =
+                std::max<std::size_t>(1u, kMaxInitEntitiesPerFrame / maxPerChunk);
+
+            mMaxInitSpawnChunksPerFrame = static_cast<std::uint32_t>(
+                std::min<std::size_t>(mMaxLoadsPerFrame, chunksForEntityBudget));
+
             // Диагностика: оценка памяти membership pool (cold path, один раз при bind).
             const std::size_t entitiesBytes = poolSize * sizeof(core::ecs::Entity);
             const std::size_t countsBytes = windowSize * sizeof(std::uint32_t);
@@ -224,10 +272,12 @@ namespace game::skyguard::ecs {
             LOG_INFO(core::log::cat::ECS,
                      "SpatialStreamingSystem: membership pool allocated "
                      "(window={}, stride={}, poolSize={}, "
-                     "entities={} KB, counts={} KB, spawnBuf={} KB, total={} KB)",
+                     "entities={} KB, counts={} KB, spawnBuf={} KB, total={} KB, "
+                     "initSpawnBudget={} chunks/frame)",
                      windowSize, mChunkEntityStride, poolSize,
                      entitiesBytes / 1024u, countsBytes / 1024u,
-                     spawnBytes / 1024u, totalMembershipBytes / 1024u);
+                     spawnBytes / 1024u, totalMembershipBytes / 1024u,
+                     mMaxInitSpawnChunksPerFrame);
         }
 
         void update(core::ecs::World& world, float dt) override {
@@ -265,9 +315,8 @@ namespace game::skyguard::ecs {
                 mInitialized = true;
             }
 
-            // Бюджетный initial load: грузим не более maxLoadsPerFrame чанков за кадр.
-            // Пока не завершён — нормальный стриминг (сдвиг окна) заблокирован.
-            if (!mInitialLoadComplete) {
+            // Двухфазный initial load. Пока не завершён — сдвиг окна заблокирован.
+            if (mInitPhase != InitPhase::Complete) {
                 continueInitialLoad(world);
                 return;
             }
@@ -337,11 +386,16 @@ namespace game::skyguard::ecs {
         }
 
         [[nodiscard]] bool isInitialLoadComplete() const noexcept {
-            return mInitialLoadComplete;
+            return mInitPhase == InitPhase::Complete;
+        }
+
+        [[nodiscard]] InitPhase initPhase() const noexcept {
+            return mInitPhase;
         }
 #endif
 
       private:
+
         [[nodiscard]] core::spatial::ChunkCoord computeFocusChunk(const float x,
                                                                   const float y) const noexcept {
             const float invChunk = 1.0f / static_cast<float>(mChunkSizeWorld);
@@ -460,7 +514,17 @@ namespace game::skyguard::ecs {
             }
         }
 
-        /// Подготовка к бюджетному initial load.
+        /// Координата чанка из flat-cursor (row-major order от window origin).
+        [[nodiscard]] core::spatial::ChunkCoord cursorToChunkCoord(
+            const std::uint32_t cursor,
+            const core::spatial::ChunkCoord origin) const noexcept {
+            const auto width = static_cast<std::uint32_t>(mWindowWidth);
+            const std::int32_t localX = static_cast<std::int32_t>(cursor % width);
+            const std::int32_t localY = static_cast<std::int32_t>(cursor / width);
+            return core::spatial::ChunkCoord{origin.x + localX, origin.y + localY};
+        }
+
+        /// Подготовка к двухфазному initial load.
         /// Резервирует deferred destroy, инициализирует провайдер, устанавливает курсор.
         /// НЕ загружает чанки — это делает continueInitialLoad().
         void beginInitialLoad(core::ecs::World& world) {
@@ -472,13 +536,24 @@ namespace game::skyguard::ecs {
                 world.reserveDeferredDestroyQueue(mDeferredDestroyReserve);
             }
 
-            mInitLoadCursor = 0;
-            mInitialLoadComplete = false;
+            mInitCursor = 0;
+            mInitPhase = InitPhase::SettingLoaded;
             mLoadedChunkCount = 0;
         }
 
-        /// Загружает до maxLoadsPerFrame чанков за один вызов.
-        /// Вызывается из update() каждый кадр до завершения initial load.
+        /// Двухфазный initial load. Вызывается из update() каждый кадр до завершения.
+        ///
+        /// Phase 1 (SettingLoaded):
+        ///   Переводит чанки в Loaded state без создания сущностей.
+        ///   setChunkState(Loaded) = O(1) per chunk (cell block allocation из bump allocator).
+        ///   SpatialIndexSystem не видит новых сущностей → никаких registerEntity.
+        ///   Бюджет: mMaxLoadsPerFrame чанков/кадр.
+        ///
+        /// Phase 2 (SpawningEntities):
+        ///   Создаёт сущности для чанков (все уже Loaded).
+        ///   Когда SpatialIndexSystem регистрирует сущность, canWriteRange() проверяет
+        ///   соседние чанки — они гарантированно Loaded → Rejected невозможен.
+        ///   Бюджет: mMaxInitSpawnChunksPerFrame чанков/кадр (entity-aware, computed in bind).
         void continueInitialLoad(core::ecs::World& world) {
             auto& index = mSpatialSystem->index();
             const core::spatial::ChunkCoord origin = index.windowOrigin();
@@ -486,40 +561,89 @@ namespace game::skyguard::ecs {
             // mWindowTotalChunks уже вычислен и checked в конструкторе.
             // Не пересчитываем width*height каждый кадр (DRY + x32 wraparound safety).
             const std::uint32_t total = mWindowTotalChunks;
-            const auto width = static_cast<std::uint32_t>(mWindowWidth);
 
-            std::uint32_t loaded = 0;
+            switch (mInitPhase) {
 
-            while (mInitLoadCursor < total && loaded < mMaxLoadsPerFrame) {
-                const std::int32_t localX =
-                    static_cast<std::int32_t>(mInitLoadCursor % width);
-                const std::int32_t localY =
-                    static_cast<std::int32_t>(mInitLoadCursor / width);
-                const core::spatial::ChunkCoord coord{origin.x + localX, origin.y + localY};
+            case InitPhase::SettingLoaded: {
+                // Phase 1: только state transitions + cell block allocation.
+                // Никаких entity creation, никаких component additions.
+                std::uint32_t processed = 0;
 
-                if (!index.setChunkState(coord, core::spatial::ResidencyState::Loaded)) {
-                    LOG_PANIC(core::log::cat::ECS,
-                              "SpatialStreamingSystem: failed to set chunk Loaded ({}, {})"
-                              " during initial load",
-                              coord.x, coord.y);
+                while (mInitCursor < total && processed < mMaxLoadsPerFrame) {
+                    const core::spatial::ChunkCoord coord =
+                        cursorToChunkCoord(mInitCursor, origin);
+
+                    if (!index.setChunkState(coord, core::spatial::ResidencyState::Loaded)) {
+                        LOG_PANIC(core::log::cat::ECS,
+                                  "SpatialStreamingSystem: failed to set chunk Loaded ({}, {})"
+                                  " during initial load phase 1",
+                                  coord.x, coord.y);
+                    }
+
+                    ++processed;
+                    ++mInitCursor;
+                    ++mLoadedChunkCount;
                 }
-                loadChunk(world, coord);
 
-                ++loaded;
-                ++mInitLoadCursor;
-                ++mLoadedChunkCount;
+                if (mInitCursor >= total) {
+                    LOG_INFO(core::log::cat::ECS,
+                             "SpatialStreamingSystem: initial load phase 1 complete "
+                             "({} chunks set to Loaded, {} frames)",
+                             total,
+                             (mMaxLoadsPerFrame > 0u)
+                                 ? ((total + mMaxLoadsPerFrame - 1u) / mMaxLoadsPerFrame)
+                                 : 0u);
+
+                    mInitPhase = InitPhase::SpawningEntities;
+                    mInitCursor = 0; // reset для phase 2
+                }
+                break;
             }
 
-            if (mInitLoadCursor >= total) {
-                mInitialLoadComplete = true;
+            case InitPhase::SpawningEntities: {
+                // Phase 2: entity creation. Все чанки уже Loaded.
+                // Budget: mMaxInitSpawnChunksPerFrame (entity-aware, computed in bind).
+                std::uint32_t processed = 0;
 
-                LOG_INFO(core::log::cat::ECS,
-                         "SpatialStreamingSystem: initial load complete "
-                         "({} chunks, {} frames)",
-                         total,
-                         (mMaxLoadsPerFrame > 0u)
-                             ? ((total + mMaxLoadsPerFrame - 1u) / mMaxLoadsPerFrame)
-                             : 0u);
+                while (mInitCursor < total && processed < mMaxInitSpawnChunksPerFrame) {
+                    const core::spatial::ChunkCoord coord =
+                        cursorToChunkCoord(mInitCursor, origin);
+
+                    loadChunk(world, coord);
+
+                    ++processed;
+                    ++mInitCursor;
+                }
+
+                if (mInitCursor >= total) {
+                    mInitPhase = InitPhase::Complete;
+
+                    // Итоговая статистика initial load.
+                    const std::uint32_t phase1Frames =
+                        (mMaxLoadsPerFrame > 0u)
+                            ? ((total + mMaxLoadsPerFrame - 1u) / mMaxLoadsPerFrame)
+                            : 0u;
+                    const std::uint32_t phase2Frames =
+                        (mMaxInitSpawnChunksPerFrame > 0u)
+                            ? ((total + mMaxInitSpawnChunksPerFrame - 1u) /
+                               mMaxInitSpawnChunksPerFrame)
+                            : 0u;
+
+                    LOG_INFO(core::log::cat::ECS,
+                             "SpatialStreamingSystem: initial load complete "
+                             "({} chunks, phase1={} frames, phase2={} frames, total={} frames, "
+                             "spawnBudget={} chunks/frame)",
+                             total, phase1Frames, phase2Frames,
+                             phase1Frames + phase2Frames,
+                             mMaxInitSpawnChunksPerFrame);
+                }
+                break;
+            }
+
+            case InitPhase::Complete:
+            case InitPhase::NotStarted:
+                // Shouldn't reach here (update() gates on mInitPhase != Complete).
+                break;
             }
         }
 
@@ -537,8 +661,7 @@ namespace game::skyguard::ecs {
             const auto st = index.chunkState(coord);
             if (st != core::spatial::ResidencyState::Loaded) {
                 LOG_PANIC(core::log::cat::ECS,
-                          "SpatialStreamingSystem: loadChunk() called for non-Loaded chunk "
-                          "({}, {}) state={}",
+                          "SpatialStreamingSystem: loadChunk() called for non-Loaded chunk ({}, {}) state={}",
                           coord.x, coord.y, static_cast<int>(st));
             }
 
@@ -714,9 +837,14 @@ namespace game::skyguard::ecs {
 
         std::size_t mMaxEntitiesPerChunk = 0;
 
-        // Бюджетный initial load: курсор — flat index в сетке окна [0..windowTotal).
-        std::uint32_t mInitLoadCursor = 0;
-        bool mInitialLoadComplete = false;
+        // Двухфазный initial load.
+        InitPhase mInitPhase = InitPhase::NotStarted;
+        std::uint32_t mInitCursor = 0; // flat index [0..windowTotal), used in both phases
+
+        // Entity-aware budget для Phase 2 (computed in bind).
+        // Phase 1 использует mMaxLoadsPerFrame (state transitions дешёвые).
+        // Phase 2 может быть медленнее при высокой плотности.
+        std::uint32_t mMaxInitSpawnChunksPerFrame = 0;
 
         // Счётчик загруженных чанков (инкремент в load, декремент в unload).
         std::uint32_t mLoadedChunkCount = 0;

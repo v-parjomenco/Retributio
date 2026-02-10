@@ -73,7 +73,7 @@ namespace core::ecs {
         auto& registry = world.registry();
 
         auto newView = registry.view<TransformComponent, SpriteComponent>(
-            entt::exclude<SpatialIdComponent, SpatialStreamedOutTag>);
+                    entt::exclude<SpatialIdComponent, SpatialStreamedOutTag>);
 
         for (auto [entity, transform, sprite] : newView.each()) {
 #if !defined(NDEBUG)
@@ -92,6 +92,7 @@ namespace core::ecs {
                 LOG_PANIC(core::log::cat::ECS,
                           "SpatialIndexSystem: SpatialId32 pool exhausted (maxEntityId={})",
                           mEntityBySpatialId.size() - 1u);
+                // Unreachable: LOG_PANIC is [[noreturn]], но закрывающая скобка обязательна
             }
 
             // КРИТИЧЕСКИЙ КОНТРАКТ (state machine):
@@ -146,9 +147,11 @@ namespace core::ecs {
                           isFinite ? 1 : 0, minChunk.x, minChunk.y, maxChunk.x, maxChunk.y,
                           firstBad.x, firstBad.y, static_cast<int>(firstBadState), winOrigin.x,
                           winOrigin.y, mIndex.windowWidth(), mIndex.windowHeight());
+                // Unreachable: LOG_PANIC is [[noreturn]]
             }
 
-            // entity гарантированно не имел SpatialIdComponent (exclude<>), поэтому emplace достаточно.
+            // entity гарантированно не имел SpatialIdComponent (exclude<>),
+            // поэтому emplace достаточно.
             // Инвариант после emplace: SpatialIdComponent.id != 0 и mapping[id] == entity.
             registry.emplace<SpatialIdComponent>(entity, SpatialIdComponent{id, aabb});
         }

@@ -343,8 +343,35 @@ namespace game::skyguard::config {
         const std::size_t activeSetCeiling = checkedMulSizeT(
             static_cast<std::size_t>(windowChunks), maxEntitiesPerChunkCeiling, "activeSetCeiling");
 
+        std::size_t nonStreamingHeadroom = 0u;
+
+#if defined(SFML1_PROFILE)
+        // Profile stress: fixed large buffer to handle any spike
+        if (activeSetCeiling >= 100'000u) {
+            nonStreamingHeadroom = 100'000u; // Fixed 100K for mega-stress
+        } else {
+            nonStreamingHeadroom = activeSetCeiling / 10u; // 10% for smaller scenarios
+        }
+#else
+        // Debug/Release: conservative scaling
+        constexpr std::size_t kBaseHeadroom = 2048u;
+        const std::size_t scalingHeadroom =
+            std::min<std::size_t>(activeSetCeiling / 100u, 16384u);
+        nonStreamingHeadroom = kBaseHeadroom + scalingHeadroom;
+#endif
+
+        // Checked addition (x32 safety).
+        if (activeSetCeiling > (std::numeric_limits<std::size_t>::max() - nonStreamingHeadroom)) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "SpatialIndexV2(SkyGuard): activeSetCeiling + headroom overflow "
+                      "(activeSetCeiling={}, headroom={})",
+                      activeSetCeiling, nonStreamingHeadroom);
+        }
+
+        const std::size_t adjustedCeiling = activeSetCeiling + nonStreamingHeadroom;
+
         const std::uint32_t expectedMaxEntities =
-            computeExpectedMaxEntitiesSkyGuardFromActiveSet(activeSetCeiling);
+            computeExpectedMaxEntitiesSkyGuardFromActiveSet(adjustedCeiling);
 
         // overflow.maxNodes: uint32 range guard (cold path, zero cost).
         const std::size_t rawOverflowMaxNodes = std::max<std::size_t>(
@@ -411,13 +438,15 @@ namespace game::skyguard::config {
         LOG_INFO(core::log::cat::ECS,
                  "SpatialIndexV2(SkyGuard): display {}x{} px, viewport {}x{} chunks, "
                  "streamWindow {}x{} chunks, "
-                 "activeSetCeiling={} (maxPerChunk={}), expectedMaxEntities={}, "
+                 "activeSetCeiling={} (streaming={}, nonStreamingHeadroom={}), "
+                 "maxEntitiesPerChunk={}, expectedMaxEntities={}, "
                  "budgets(visible={}, dirty={}), maxResidentChunks={}, budgets(load={}, unload={}),"
                  " overflow(nodes={}, capacity={})",
                  windowPixelSize.x, windowPixelSize.y,
                  viewportWindowWidth, viewportWindowHeight,
                  cfg.storage.width, cfg.storage.height,
-                 activeSetCeiling, maxEntitiesPerChunkCeiling,
+                 adjustedCeiling, activeSetCeiling, nonStreamingHeadroom,
+                 maxEntitiesPerChunkCeiling,
                  cfg.maxEntityId,
                  cfg.maxVisibleSprites, cfg.maxDirtyEntities,
                  cfg.storage.maxResidentChunks,

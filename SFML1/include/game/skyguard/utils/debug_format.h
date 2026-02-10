@@ -11,6 +11,14 @@
 #include <string_view>
 #include <system_error> // std::errc
 
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+    #include <SFML/Graphics/View.hpp>
+    #include <SFML/System/Vector2.hpp>
+    #include "core/spatial/aabb2.h"
+    #include "core/spatial/chunk_coord.h"
+    #include "core/spatial/spatial_index_v2.h"
+#endif
+
 namespace game::skyguard::presentation {
     class BackgroundRenderer;
 }
@@ -67,6 +75,30 @@ namespace game::skyguard::utils {
             return true;
         }
 
+        inline bool appendFixed1(char*& it, char* end, float value) noexcept {
+            const float scaledF = value * 10.0f;
+            const float adj = (scaledF >= 0.0f) ? 0.5f : -0.5f;
+            const std::int64_t scaled = static_cast<std::int64_t>(scaledF + adj);
+
+            const std::int64_t intPart = scaled / 10;
+            const std::int64_t fracAbs = (scaled >= 0) ? (scaled % 10) : (-(scaled % 10));
+
+            if (!appendNumber(it, end, intPart)) {
+                return false;
+            }
+            if (it >= end) {
+                return false;
+            }
+            *it++ = '.';
+            if (end - it < 1) {
+                return false;
+            }
+
+            const char d1 = static_cast<char>('0' + static_cast<int>(fracAbs % 10));
+            *it++ = d1;
+            return true;
+        }
+
     } // namespace detail
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
@@ -74,6 +106,62 @@ namespace game::skyguard::utils {
     [[nodiscard]] std::size_t
     formatBackgroundStatsLine(char* buf, std::size_t cap,
                               const presentation::BackgroundRenderer& backgroundRenderer) noexcept;
+
+    [[nodiscard]] std::size_t
+    formatStreamingStatsLine(char* buf, std::size_t cap,
+                             const sf::View& view,
+                             core::spatial::ChunkCoord windowOrigin,
+                             std::int32_t chunkSizeWorld) noexcept;
+
+    [[nodiscard]] std::size_t
+    formatCellHealthLine(char* buf, std::size_t cap,
+                         std::uint32_t maxLen,
+                         std::uint32_t sumLen,
+                         std::uint32_t dupApprox,
+                         std::uint32_t loaded) noexcept;
+
+    [[nodiscard]] std::size_t
+    formatPlayerWatchLine(char* buf, std::size_t cap,
+                          std::uint64_t entityId,
+                          bool hasSpatialId,
+                          std::uint32_t spatialId,
+                          bool hasDirty,
+                          bool hasStreamedOut,
+                          const sf::Vector2f& position,
+                          const core::spatial::Aabb2& lastAabb,
+                          const core::spatial::Aabb2& newAabb,
+                          bool fineCullPass,
+                          bool inQuery,
+                          bool drawn) noexcept;
+
+    [[nodiscard]] std::size_t
+    formatDensityLine(char* buf, std::size_t cap,
+                      float effectivePerChunk,
+                      std::size_t configuredPerChunk,
+                      std::int32_t chunkSizeWorld,
+                      std::int32_t cellSizeWorld,
+                      const sf::Vector2f& viewSize) noexcept;
+
+    [[nodiscard]] std::size_t
+    formatRangeLine(char* buf, std::size_t cap,
+                    std::int32_t chunkMinX, std::int32_t chunkMinY,
+                    std::int32_t chunkMaxX, std::int32_t chunkMaxY,
+                    std::int32_t cellMinX, std::int32_t cellMinY,
+                    std::int32_t cellMaxX, std::int32_t cellMaxY) noexcept;
+
+    [[nodiscard]] std::size_t
+    formatResidencyLine(char* buf, std::size_t cap,
+                        const core::spatial::ChunkCoord& viewChunk,
+                        core::spatial::ResidencyState viewState,
+                        const core::spatial::ChunkCoord& playerChunk,
+                        core::spatial::ResidencyState playerState,
+                        const core::spatial::ChunkCoord& focusChunk,
+                        core::spatial::ResidencyState focusState,
+                        const core::spatial::ChunkCoord& originCurrent,
+                        const core::spatial::ChunkCoord& originDesired,
+                        std::uint32_t initialLoadRemaining,
+                        std::uint32_t loadsThisFrame,
+                        std::uint32_t unloadsThisFrame) noexcept;
 
 #endif
 

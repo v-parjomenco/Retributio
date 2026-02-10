@@ -41,26 +41,23 @@ namespace core::ecs {
         [[nodiscard]] core::spatial::SpatialIndexV2Sliding& index() noexcept {
             return mIndex;
         }
-
+    
         [[nodiscard]] const core::spatial::SpatialIndexV2Sliding& index() const noexcept { 
             return mIndex;
         }
-
+    
         [[nodiscard]] std::span<const Entity> entitiesBySpatialId() const noexcept {
             return mEntityBySpatialId;
         }
 
         void ensureDestroyConnection(World& world);
-
         void update(World& world, float dt) override;
-        void render(World&, sf::RenderWindow&) override {
-        }
+        void render(World&, sf::RenderWindow&) override {}
 
       private:
-
         using StableId = std::uint64_t;
-        void onHandleDestroyed(entt::registry& registry, Entity entity) noexcept;
 
+        void onHandleDestroyed(entt::registry& registry, Entity entity) noexcept;
         [[nodiscard]] core::spatial::EntityId32 allocateSpatialId();
         void releaseSpatialId(core::spatial::EntityId32 id) noexcept;
         void setMapping(core::spatial::EntityId32 id, Entity entity) noexcept;

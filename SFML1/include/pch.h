@@ -8,18 +8,24 @@
 // ================================================================================================
 #pragma once
 
-// clang-format off
+// КРИТИЧНО:
+//  - Этот define ОБЯЗАН быть ДО любых EnTT includes (иначе ODR violation)
+//  - pch.h гарантированно первый include во всех TU (forced /Yu в MSVC)
+//
+#include <cstdint>
+#ifndef ENTT_ID_TYPE
+#define ENTT_ID_TYPE std::uint64_t
+#endif
 
+// ------------------------------------------------------------------------------------------------
+// clang-format off
 // Критически важные системные заголовки - строгий порядок
 #include "core/compiler/warnings.h"
 #include "core/compiler/platform/windows.h"
-
 // clang-format on
 
 // STD
-
 #include <algorithm>     // содержит min, max и базовые алгоритмы, н-р сортировку
-#include <cstdint>       // фиксированные целочисленные типы (uint32_t и т.п.)
 #include <functional>    // уже используется и точно будет расти по применению (фабрики, коллбеки)
 #include <memory>        // умные указатели, make_unique, etc.
 #include <optional>      // очень удобен для API, которые могут "не вернуть значение"
@@ -32,10 +38,10 @@
 
 // SFML
 #ifdef _MSC_VER
-    #pragma warning(push)
-    #pragma warning(disable : 4868)
+#pragma warning(push)
+#pragma warning(disable : 4868)
 #endif
 #include <SFML/Graphics.hpp> // подтягивает System и Window
 #ifdef _MSC_VER
-    #pragma warning(pop)
+#pragma warning(pop)
 #endif

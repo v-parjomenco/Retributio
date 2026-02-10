@@ -97,7 +97,62 @@ namespace core::ecs {
      */
     class World {
       public:
-        World() = default;
+        /**
+         * @brief Параметры создания World (capacity prewarm, feature toggles).
+         *
+         * АРХИТЕКТУРНОЕ РЕШЕНИЕ (AAA/Titan-first):
+         *  - World владеет registry → World отвечает за его capacity policy
+         *  - Game остаётся дирижёром: передаёт expectedMaxEntities, не лезет в registry
+         *  - Единая точка истины для capacity (одна write-boundary, детерминизм)
+         *
+         * ЗАЧЕМ НУЖЕН reserveEntities:
+         *  - EnTT создаёт entities через free-list с динамическим ростом
+         *  - Без prewarm: каждая 10-я create() вызывает realloc (cache miss, heap churn)
+         *  - С prewarm: вся память выделяется заранее (zero allocations в hot-path)
+         *
+         * КРИТИЧНО ДЛЯ ПРОИЗВОДИТЕЛЬНОСТИ:
+         *  - Без reserve(): ~1.6M entities = ~160 heap allocations за игровой цикл
+         *  - С reserve(1.6M): ~1.6M entities = 0 heap allocations (вся память из prewarm)
+         *  - Стандарт Unity/Unreal: все пулы резервируются при загрузке уровня
+         */
+        struct CreateInfo final {
+            /**
+             * @brief Ожидаемое максимальное количество живых entities (для prewarm).
+             *
+             * КОНТРАКТ:
+             *  - 0 = без prewarm (дефолтное поведение EnTT, динамический рост)
+             *  - >0 = prewarm до указанной capacity (fail-fast если превышает лимит EnTT)
+             *
+             * ОТКУДА БРАТЬ ЗНАЧЕНИЕ:
+             *  - SkyGuard: SpatialIndexSystemConfig::maxEntityId (включает headroom)
+             *  - Общий случай: max(streaming entities, non-streaming entities) × safety margin
+             *
+             * ВАЖНО:
+             *  - Это НЕ hard limit (EnTT может расти дальше при необходимости)
+             *  - Это capacity hint для избежания realloc в типичных сценариях
+             */
+            std::size_t reserveEntities = 0;
+        };
+
+        /**
+         * @brief Дефолтный конструктор (без prewarm, динамический рост).
+         *
+         * Эквивалентно World(CreateInfo{}).
+         */
+        World() noexcept;
+
+        /**
+         * @brief Конструктор с параметрами (capacity prewarm, feature toggles).
+         *
+         * КРИТИЧНО:
+         *  - reserve() выполняется ДО любых registry.create()
+         *  - reserve() выполняется ДО любых storage<T>.reserve()
+         *  - Fail-fast при превышении EnTT limit или bad_alloc
+         *
+         * @param info Параметры создания (reserveEntities и т.п.)
+         */
+        explicit World(const CreateInfo& info) noexcept;
+
         ~World() = default;
 
         // World — единственный владелец реестра, копирование запрещаем.
@@ -419,6 +474,19 @@ namespace core::ecs {
         [[nodiscard]] std::size_t aliveEntityCount() const noexcept {
             return mAliveEntityCount;
         }
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        /**
+         * @brief Debug/Profile: O(1) storage size for component/tag.
+         *
+         * Используется только в диагностике (overlay), без аллокаций.
+         */
+        template <typename T>
+        [[nodiscard]] std::size_t debugStorageSize() const noexcept {
+            const auto* storage = mRegistry.storage<T>();
+            return storage ? storage->size() : 0u;
+        }
+#endif
 
         /**
          * @brief Уничтожить все сущности и сбросить счётчики (bulk reset).
@@ -832,6 +900,31 @@ namespace core::ecs {
         }
 
       private:
+        /**
+         * @brief Prewarm EnTT entity pool (избегает heap churn в hot-path).
+         *
+         * АРХИТЕКТУРА (AAA/Titan-first):
+         *  - Единственная write-boundary для capacity policy
+         *  - Вызывается в конструкторе World (cold-path, до любых entity operations)
+         *  - Fail-fast при превышении EnTT limit или bad_alloc
+         *
+         * ЗАЧЕМ:
+         *  - Без reserve: каждая 10-я create() вызывает realloc (heap churn, cache miss)
+         *  - С reserve: вся память выделяется заранее (zero allocations в hot-path)
+         *
+         * КРИТИЧНО ДЛЯ ПРОИЗВОДИТЕЛЬНОСТИ:
+         *  - 1.6M entities без reserve = ~160 heap allocations за игровой цикл
+         *  - 1.6M entities с reserve(1.6M) = 0 heap allocations (вся память из prewarm)
+         *
+         * КОНТРАКТ:
+         *  - reserveEntities == 0 → skip (дефолтное поведение EnTT)
+         *  - reserveEntities > EnTT limit → LOG_PANIC (fail-fast, не запускаем игру)
+         *  - bad_alloc → LOG_PANIC (не можем работать без памяти)
+         *
+         * @param reserveEntities Ожидаемое максимальное количество живых entities
+         */
+        void prewarmRegistry_(std::size_t reserveEntities) noexcept;
+
         entt::registry mRegistry{};
         SystemManager mSystems{};
         StableIdService mStableIds{};

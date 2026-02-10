@@ -27,10 +27,12 @@
 namespace core::ecs {
     class DebugOverlaySystem;
     class RenderSystem;
+    class SpatialIndexSystem;
 } // namespace core::ecs
 
 namespace game::skyguard::ecs {
     class AircraftControlSystem;
+    class SpatialStreamingSystem;
 } // namespace game::skyguard::ecs
 
 namespace game::skyguard {
@@ -73,7 +75,7 @@ namespace game::skyguard {
         core::config::EngineSettings mEngineSettings;
 
         core::time::TimeService mTime; // сервис времени (вне ECS)
-        core::ecs::World mWorld;       // ECS-мир
+        std::unique_ptr<core::ecs::World> mWorld;
         presentation::ViewManager mViewManager;
         presentation::BackgroundRenderer mBackgroundRenderer;
 
@@ -92,8 +94,10 @@ namespace game::skyguard {
         //  - Реаллокации std::vector двигают unique_ptr, но НЕ двигают сами объекты систем.
         //  - Поэтому эти raw pointers стабильны по адресу, пока живёт World/SystemManager.
         game::skyguard::ecs::AircraftControlSystem* mAircraftControlSystem{nullptr};
+        game::skyguard::ecs::SpatialStreamingSystem* mSpatialStreamingSystem{nullptr};
         core::ecs::DebugOverlaySystem* mDebugOverlay{nullptr};
         core::ecs::RenderSystem* mRenderSystem{nullptr};
+        core::ecs::SpatialIndexSystem* mSpatialIndexSystem{nullptr};
         std::unique_ptr<streaming::IChunkContentProvider> mChunkContentProvider{};
 
         game::skyguard::config::UserSettings mUserSettings{};

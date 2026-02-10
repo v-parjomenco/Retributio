@@ -12,6 +12,11 @@
 
 #include "core/config/properties/debug_overlay_runtime_properties.h"
 #include "core/config/properties/text_properties.h"
+#include "core/ecs/components/spatial_dirty_tag.h"
+#include "core/ecs/components/spatial_id_component.h"
+#include "core/ecs/components/spatial_streamed_out_tag.h"
+#include "core/ecs/components/sprite_component.h"
+#include "core/ecs/components/transform_component.h"
 #include "core/ecs/world.h"
 #include "core/time/time_service.h"
 #include "core/utils/format/append_numbers.h"
@@ -193,8 +198,8 @@ namespace core::ecs {
                                            static_cast<std::uint64_t>(stats.textureCacheSize));
 
             mTextBuffer.append("  SlowResolves: ");
-            core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(stats.resourceLookupsThisFrame));
+            core::utils::format::appendU64(mTextBuffer,
+                                        static_cast<std::uint64_t>(stats.resourceLookupsThisFrame));
 
             mTextBuffer.append("\nCulling: ");
             core::utils::format::appendU64(mTextBuffer,
@@ -205,6 +210,44 @@ namespace core::ecs {
             mTextBuffer.push_back('/');
             core::utils::format::appendU64(mTextBuffer,
                                            static_cast<std::uint64_t>(stats.culledSpriteCount));
+
+            mTextBuffer.append("\nSpatialQuery: scanned=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.spatialEntriesScanned));
+            mTextBuffer.append(" unique=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.spatialQueryUnique));
+            mTextBuffer.append(" dup=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.spatialDupHits));
+            mTextBuffer.append(" cells=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.spatialCellsVisited));
+            mTextBuffer.append(" chunks=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.spatialChunksVisited));
+            mTextBuffer.append(" skipNL=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.spatialChunksSkipped));
+            mTextBuffer.append(" trunc=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.spatialOutTruncated));
+
+            mTextBuffer.append("\nRenderFilter: in=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.spatialQueryUnique));
+            mTextBuffer.append(" null=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.renderMapNull));
+            mTextBuffer.append(" miss=");
+            core::utils::format::appendU64(
+                mTextBuffer, static_cast<std::uint64_t>(stats.renderMissingComponents));
+            mTextBuffer.append(" fineFail=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.renderFineCullFail));
+            mTextBuffer.append(" drawn=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(stats.renderDrawn));
 
     #if defined(SFML1_PROFILE)
             // Тайминги CPU — только Profile (Debug не имеет таймингов).
@@ -252,6 +295,42 @@ namespace core::ecs {
             mTextBuffer.push_back('x');
             core::utils::format::appendU64(
                 mTextBuffer, static_cast<std::uint64_t>(idx.windowHeight()));
+            const auto& qstats = idx.debugLastQueryStatsRef();
+            mTextBuffer.append("\nQueryChunks: ");
+            core::utils::format::appendU64(
+                mTextBuffer, static_cast<std::uint64_t>(qstats.chunksLoadedVisited));
+            mTextBuffer.push_back('/');
+            core::utils::format::appendU64(
+                mTextBuffer, static_cast<std::uint64_t>(qstats.chunksVisited));
+            mTextBuffer.append("  Cells: ");
+            core::utils::format::appendU64(
+                mTextBuffer, static_cast<std::uint64_t>(qstats.cellVisits));
+            mTextBuffer.append("  OvCells: ");
+            core::utils::format::appendU64(
+                mTextBuffer, static_cast<std::uint64_t>(qstats.overflowCellVisits));
+            mTextBuffer.append("\nCounts: tr ");
+            core::utils::format::appendU64(
+                mTextBuffer,
+                static_cast<std::uint64_t>(world.debugStorageSize<TransformComponent>()));
+            mTextBuffer.append(" spr ");
+            core::utils::format::appendU64(
+                mTextBuffer,
+                static_cast<std::uint64_t>(world.debugStorageSize<SpriteComponent>()));
+            mTextBuffer.append(" spatialId ");
+            core::utils::format::appendU64(
+                mTextBuffer,
+                static_cast<std::uint64_t>(world.debugStorageSize<SpatialIdComponent>()));
+            mTextBuffer.append(" streamedOut ");
+            core::utils::format::appendU64(
+                mTextBuffer,
+                static_cast<std::uint64_t>(world.debugStorageSize<SpatialStreamedOutTag>()));
+            mTextBuffer.append(" dirty ");
+            core::utils::format::appendU64(
+                mTextBuffer,
+                static_cast<std::uint64_t>(world.debugStorageSize<SpatialDirtyTag>()));
+            mTextBuffer.append(" dupIns ");
+            core::utils::format::appendU64(
+                mTextBuffer, static_cast<std::uint64_t>(idx.debugDupInsertDetected()));
         }
 #endif // !defined(NDEBUG) || defined(SFML1_PROFILE)
 

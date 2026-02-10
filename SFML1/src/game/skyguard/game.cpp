@@ -20,15 +20,23 @@
 #include "core/config/loader/debug_overlay_loader.h"
 #include "core/config/loader/engine_settings_loader.h"
 #include "core/debug/debug_config.h"
+#include "core/ecs/entity.h"
 #include "core/ecs/components/sprite_component.h"
+#include "core/ecs/components/spatial_dirty_tag.h"
+#include "core/ecs/components/spatial_id_component.h"
+#include "core/ecs/components/spatial_streamed_out_tag.h"
 #include "core/ecs/components/transform_component.h"
+#include "core/ecs/render/sprite_bounds.h"
 #include "core/ecs/systems/debug_overlay_system.h"
 #include "core/ecs/systems/movement_system.h"
 #include "core/ecs/systems/render_system.h"
 #include "core/ecs/systems/spatial_index_system.h"
 #include "core/log/log_macros.h"
 #include "core/resources/registry/resource_registry.h"
+#include "core/spatial/aabb2.h"
+#include "core/spatial/chunk_coord.h"
 #include "core/time/time_config.h"
+#include "core/utils/math_constants.h"
 #include "game/skyguard/bootstrap/scene_bootstrap.h"
 #include "game/skyguard/config/config_paths.h"
 #include "game/skyguard/config/loader/app_config_loader.h"
@@ -223,23 +231,30 @@ namespace game::skyguard {
             game::skyguard::bootstrap::preloadAndResolveInitialScene(mResources, bootCfg);
 
         // ----------------------------------------------------------------------------------------
-        // Determinism/stable IDs wiring ДОЛЖНО происходить до создания любой сущности.
-        // Guard + enable + prewarm до любых addSystem(), чтобы будущий рефактор
-        // (например, создание сущностей в ctor системы) не мог случайно обойти контракт.
+        // SpatialIndexSystem config (определяет expectedMaxEntities)
         // ----------------------------------------------------------------------------------------
         const core::ecs::SpatialIndexSystemConfig spatialCfg =
             config::buildSpatialIndexV2ConfigSkyGuard(
                 mEngineSettings, mViewManager.getWorldLogicalSize(), mWindow.getSize());
 
+        // ----------------------------------------------------------------------------------------
+        // Создание World с Prewarm
+        // ----------------------------------------------------------------------------------------
+        core::ecs::World::CreateInfo worldInfo{};
+        worldInfo.reserveEntities = spatialCfg.maxEntityId;
+        
+        mWorld = std::make_unique<core::ecs::World>(worldInfo);
+        // ----------------------------------------------------------------------------------------
+
 #if !defined(NDEBUG)
         if (spatialCfg.determinismEnabled) {
-            mWorld.requireStableIdsForDeterminism();
+            mWorld->requireStableIdsForDeterminism();
         }
 #endif
 
         // Deterministic wiring — включаем StableID сервис один раз до первого createEntity().
         if (spatialCfg.determinismEnabled) {
-            auto& ids = mWorld.stableIds();
+            auto& ids = mWorld->stableIds();
             ids.enable();
 
             const std::size_t capacity = config::computeStableIdCapacitySkyGuard(spatialCfg);
@@ -255,13 +270,13 @@ namespace game::skyguard {
 
         // PlayerInitSystem сам создаёт сущности на первом тике и больше не работает.
         // ВАЖНО: система строго data-only (без ResourceManager): все derived поля уже resolved.
-        mWorld.addSystem<game::skyguard::ecs::PlayerInitSystem>(std::move(players));
+        mWorld->addSystem<game::skyguard::ecs::PlayerInitSystem>(std::move(players));
 
         // ВАЖНО: AircraftControl должен обновляться ДО Movement, т.к. пишет VelocityComponent,
         // а Movement читает VelocityComponent в этом же тике.
-        mAircraftControlSystem = &mWorld.addSystem<game::skyguard::ecs::AircraftControlSystem>();
-        mWorld.addSystem<core::ecs::MovementSystem>();
-        mWorld.addSystem<game::skyguard::ecs::PlayerBoundsSystem>(
+        mAircraftControlSystem = &mWorld->addSystem<game::skyguard::ecs::AircraftControlSystem>();
+        mWorld->addSystem<core::ecs::MovementSystem>();
+        mWorld->addSystem<game::skyguard::ecs::PlayerBoundsSystem>(
             mViewManager.getWorldLogicalSize(), playerFloorY);
 
 #if defined(SFML1_PROFILE)
@@ -280,14 +295,16 @@ namespace game::skyguard {
 #endif
 
         auto& streamingSystem =
-            mWorld.addSystem<game::skyguard::ecs::SpatialStreamingSystem>(spatialCfg);
+            mWorld->addSystem<game::skyguard::ecs::SpatialStreamingSystem>(spatialCfg);
+        mSpatialStreamingSystem = &streamingSystem;
 
-        auto& spatialSystem = mWorld.addSystem<core::ecs::SpatialIndexSystem>(spatialCfg);
+        auto& spatialSystem = mWorld->addSystem<core::ecs::SpatialIndexSystem>(spatialCfg);
+        mSpatialIndexSystem = &spatialSystem;
 
         streamingSystem.bind(&spatialSystem, mChunkContentProvider.get());
 
         // 1) Создаём систему рендеринга конструктором по умолчанию (без аргументов).
-        auto& renderSys = mWorld.addSystem<core::ecs::RenderSystem>();
+        auto& renderSys = mWorld->addSystem<core::ecs::RenderSystem>();
         // 2) Привязываем зависимости через bind().
         renderSys.bind(&spatialSystem.index(),
                        spatialSystem.entitiesBySpatialId(),
@@ -302,7 +319,7 @@ namespace game::skyguard {
 
         // Эти системы требуют прямого доступа (onResize, onKeyEvent),
         // поэтому сохраняем указатели.
-        mDebugOverlay = &mWorld.addSystem<core::ecs::DebugOverlaySystem>();
+        mDebugOverlay = &mWorld->addSystem<core::ecs::DebugOverlaySystem>();
 
         // Привязываем оверлей к сервису времени и шрифту (resident-only).
         // Важно: ресурсы резолвим один раз при старте, не в hot-path.
@@ -311,6 +328,7 @@ namespace game::skyguard {
 
             mDebugOverlay->bind(mTime, font);
             mDebugOverlay->setRenderSystem(mRenderSystem);
+            mDebugOverlay->setSpatialIndexSystem(mSpatialIndexSystem);
 
             // Грузим конфиг для DebugOverlay (dev/косметика, не должен валить игру).
             const auto overlayCfg = cfg::loadDebugOverlayBlueprint(skycfg_paths::DEBUG_OVERLAY);
@@ -449,7 +467,7 @@ namespace game::skyguard {
                         core::ecs::Entity e{};
                         const core::ecs::TransformComponent* tr = nullptr;
 
-                        if (!tryGetLocalPlayerTransform(mWorld, e, tr)) {
+                        if (!tryGetLocalPlayerTransform(*mWorld, e, tr)) {
                             LOG_DEBUG(core::log::cat::Gameplay, "CamDebug: no local player");
                         } else {
                             const auto& vw = mViewManager.getWorldView();
@@ -532,16 +550,16 @@ namespace game::skyguard {
     void Game::update(const sf::Time& dt) {
         const float dtSeconds = dt.asSeconds();
         assert(dtSeconds > 0.0f); // фиксированный шаг должен быть положительным
-        mWorld.update(dtSeconds); // обновляем все ECS-системы
+        mWorld->update(dtSeconds); // обновляем все ECS-системы
         updateCamera();
-        mWorld.flushDestroyed();
+        mWorld->flushDestroyed();
     }
 
     void Game::updateCamera() {
         core::ecs::Entity e{};
         const core::ecs::TransformComponent* tr = nullptr;
 
-        const bool foundPlayer = tryGetLocalPlayerTransform(mWorld, e, tr);
+        const bool foundPlayer = tryGetLocalPlayerTransform(*mWorld, e, tr);
         if (foundPlayer) {
             mViewManager.updateCamera(tr->position);
         }
@@ -568,7 +586,7 @@ namespace game::skyguard {
         mBackgroundRenderer.update(mViewManager.getWorldView());
         mBackgroundRenderer.draw(mWindow);
         if (mRenderSystem) {
-            mRenderSystem->render(mWorld, mWindow);
+            mRenderSystem->render(*mWorld, mWindow);
         }
     }
 
@@ -605,7 +623,7 @@ namespace game::skyguard {
                 core::ecs::Entity e{};
                 const core::ecs::TransformComponent* tr = nullptr;
 
-                if (tryGetLocalPlayerTransform(mWorld, e, tr)) {
+                if (tryGetLocalPlayerTransform(*mWorld, e, tr)) {
                     std::array<char, 256> camBuf{};
                     const auto& vw = mViewManager.getWorldView();
                     const sf::Vector2f off = mViewManager.getCameraOffset();
@@ -620,10 +638,96 @@ namespace game::skyguard {
                 }
             }
 #endif
+
+            if (mSpatialIndexSystem) {
+                std::array<char, 256> streamBuf{};
+                const auto& worldView = mViewManager.getWorldView();
+                const std::int32_t chunkSize = mSpatialIndexSystem->index().chunkSizeWorld();
+                const auto origin = mSpatialIndexSystem->index().windowOrigin();
+                const std::size_t streamSize = utils::formatStreamingStatsLine(
+                    streamBuf.data(), streamBuf.size(), worldView, origin, chunkSize);
+                if (streamSize > 0) {
+                    mDebugOverlay->appendExtraLine(std::string_view(streamBuf.data(), streamSize));
+                }
+
+                const sf::Vector2f viewCenter = worldView.getCenter();
+                const core::spatial::ChunkCoord viewChunk = core::spatial::worldToChunk(
+                    core::spatial::WorldPosf{viewCenter.x, viewCenter.y}, chunkSize);
+                const auto health = mSpatialIndexSystem->index().debugCellHealthForChunk(viewChunk);
+
+                std::array<char, 256> healthBuf{};
+                const std::size_t healthSize = utils::formatCellHealthLine(
+                    healthBuf.data(), healthBuf.size(), health.maxCellLen, health.sumCellLen,
+                    health.dupApprox, health.loaded);
+                if (healthSize > 0) {
+                    mDebugOverlay->appendExtraLine(std::string_view(healthBuf.data(), healthSize));
+                }
+            }
+
+            {
+                core::ecs::Entity e{};
+                const core::ecs::TransformComponent* tr = nullptr;
+
+                if (tryGetLocalPlayerTransform(*mWorld, e, tr)) {
+                    const sf::View& worldView = mViewManager.getWorldView();
+                    const sf::Vector2f viewSize = worldView.getSize();
+                    const sf::Vector2f viewCenter = worldView.getCenter();
+                    const sf::Vector2f topLeft{viewCenter.x - viewSize.x * 0.5f,
+                                               viewCenter.y - viewSize.y * 0.5f};
+                    core::spatial::Aabb2 viewAabb{};
+                    viewAabb.minX = topLeft.x;
+                    viewAabb.minY = topLeft.y;
+                    viewAabb.maxX = topLeft.x + viewSize.x;
+                    viewAabb.maxY = topLeft.y + viewSize.y;
+
+                    const auto* spatialId = mWorld->tryGetComponent<core::ecs::SpatialIdComponent>(e);
+                    const bool hasSpatialId = (spatialId != nullptr);
+                    const std::uint32_t spatialIdVal = hasSpatialId
+                        ? static_cast<std::uint32_t>(spatialId->id)
+                        : 0u;
+                    const bool hasDirty = mWorld->hasTag<core::ecs::SpatialDirtyTag>(e);
+                    const bool hasStreamedOut =
+                        mWorld->hasTag<core::ecs::SpatialStreamedOutTag>(e);
+                    const core::spatial::Aabb2 lastAabb =
+                        hasSpatialId ? spatialId->lastAabb : core::spatial::Aabb2{};
+                    const auto* sprite = mWorld->tryGetComponent<core::ecs::SpriteComponent>(e);
+                    core::spatial::Aabb2 newAabb = lastAabb;
+                    if (sprite != nullptr) {
+                        const float rotationDegrees = tr->rotationDegrees;
+                        if (rotationDegrees == 0.f) {
+                            newAabb = core::ecs::render::computeSpriteAabbNoRotation(
+                                tr->position, sprite->origin, sprite->scale, sprite->textureRect);
+                        } else {
+                            const float radians = rotationDegrees * core::utils::kDegToRad;
+                            const float cachedSin = std::sin(radians);
+                            const float cachedCos = std::cos(radians);
+                            newAabb = core::ecs::render::computeSpriteAabbRotated(
+                                tr->position, sprite->origin, sprite->scale, sprite->textureRect,
+                                cachedSin, cachedCos);
+                        }
+                    }
+                    const bool fineCullPass = hasSpatialId
+                        ? core::spatial::intersectsInclusive(lastAabb, viewAabb)
+                        : false;
+                    const bool inQuery = (hasSpatialId && mSpatialIndexSystem)
+                        ? mSpatialIndexSystem->index().debugWasInLastQuery(spatialId->id)
+                        : false;
+                    const bool drawn = inQuery && !hasStreamedOut;
+
+                    std::array<char, 512> watchBuf{};
+                    const std::size_t watchSize = utils::formatPlayerWatchLine(
+                        watchBuf.data(), watchBuf.size(), core::ecs::toUint(e), hasSpatialId,
+                        spatialIdVal, hasDirty, hasStreamedOut, tr->position, lastAabb, newAabb,
+                        fineCullPass, inQuery, drawn);
+                    if (watchSize > 0) {
+                        mDebugOverlay->appendExtraLine(std::string_view(watchBuf.data(), watchSize));
+                    }
+                }
+            }
         }
 #endif
 
-        mDebugOverlay->prepareFrame(mWorld);
+        mDebugOverlay->prepareFrame(*mWorld);
         mDebugOverlay->draw(mWindow);
     }
 
