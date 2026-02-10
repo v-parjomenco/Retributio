@@ -6,8 +6,8 @@
 
 #include <SFML/Graphics/Rect.hpp>
 
-#include "game/skyguard/presentation/background_renderer.h"
 #include "core/spatial/chunk_coord.h"
+#include "game/skyguard/presentation/background_renderer.h"
 
 namespace game::skyguard::utils {
 
@@ -29,21 +29,21 @@ namespace game::skyguard::utils {
         char* it = buf;
         char* end = buf + cap;
 
-        if (!detail::appendLiteral(it, end, "Background: tiles ")) {
+        if (!detail::appendLiteral(it, end, "Background: tiles=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, stats.tilesCovered)) {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  draws ")) {
+        if (!detail::appendLiteral(it, end, " draws=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, stats.drawCalls)) {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  tile ")) {
+        if (!detail::appendLiteral(it, end, " tile=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, stats.tileSize.x)) {
@@ -56,7 +56,7 @@ namespace game::skyguard::utils {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  view ")) {
+        if (!detail::appendLiteral(it, end, " view=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, viewW)) {
@@ -69,7 +69,7 @@ namespace game::skyguard::utils {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  pos ")) {
+        if (!detail::appendLiteral(it, end, " pos=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, posX)) {
@@ -102,33 +102,33 @@ namespace game::skyguard::utils {
         char* it = buf;
         char* end = buf + cap;
 
-        if (!detail::appendLiteral(it, end, "View: center ")) {
+        if (!detail::appendLiteral(it, end, "View: centerX=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendFixed2(it, end, center.x)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, ",")) {
+        if (!detail::appendLiteral(it, end, " centerY=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendFixed2(it, end, center.y)) {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  size ")) {
+        if (!detail::appendLiteral(it, end, " sizeX=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendFixed2(it, end, size.x)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, "x")) {
+        if (!detail::appendLiteral(it, end, " sizeY=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendFixed2(it, end, size.y)) {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  viewChunk ")) {
+        if (!detail::appendLiteral(it, end, " viewChunk=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, viewChunk.x)) {
@@ -141,7 +141,7 @@ namespace game::skyguard::utils {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  winOrigin ")) {
+        if (!detail::appendLiteral(it, end, " winOrigin=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, windowOrigin.x)) {
@@ -169,25 +169,25 @@ namespace game::skyguard::utils {
         char* it = buf;
         char* end = buf + cap;
 
-        if (!detail::appendLiteral(it, end, "CellsHealth(viewChunk): maxLen ")) {
+        if (!detail::appendLiteral(it, end, "CellsHealth: maxLen=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, maxLen)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, "  sumLen ")) {
+        if (!detail::appendLiteral(it, end, " sumLen=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, sumLen)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, "  dupApprox ")) {
+        if (!detail::appendLiteral(it, end, " dupApprox=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, dupApprox)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, "  loaded ")) {
+        if (!detail::appendLiteral(it, end, " loaded=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, loaded)) {
@@ -197,18 +197,13 @@ namespace game::skyguard::utils {
         return static_cast<std::size_t>(it - buf);
     }
 
-    std::size_t formatPlayerWatchLine(char* buf, std::size_t cap,
-                                      const std::uint64_t entityId,
-                                      const bool hasSpatialId,
-                                      const std::uint32_t spatialId,
-                                      const bool hasDirty,
-                                      const bool hasStreamedOut,
-                                      const sf::Vector2f& position,
-                                      const core::spatial::Aabb2& lastAabb,
-                                      const core::spatial::Aabb2& newAabb,
-                                      const bool fineCullPass,
-                                      const bool inQuery,
-                                      const bool drawn) noexcept {
+    std::size_t formatPlayerWatchStateLine(char* buf, std::size_t cap,
+                                           const std::uint64_t entityId,
+                                           const bool hasSpatialId,
+                                           const std::uint32_t spatialId,
+                                           const bool hasDirty,
+                                           const bool hasStreamedOut,
+                                           const sf::Vector2f& position) noexcept {
         if (cap == 0) {
             return 0;
         }
@@ -216,116 +211,141 @@ namespace game::skyguard::utils {
         char* it = buf;
         char* end = buf + cap;
 
-        if (!detail::appendLiteral(it, end, "PlayerWatch: e ")) {
+        if (!detail::appendLiteral(it, end, "Player: entity=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, entityId)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, " spId ")) {
+
+        if (!detail::appendLiteral(it, end, " spatialId=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (hasSpatialId) {
             if (!detail::appendNumber(it, end, spatialId)) {
                 return static_cast<std::size_t>(it - buf);
             }
-        } else if (!detail::appendLiteral(it, end, "-")) {
+        } else {
+            if (!detail::appendLiteral(it, end, "-")) {
+                return static_cast<std::size_t>(it - buf);
+            }
+        }
+
+        if (!detail::appendLiteral(it, end, " posX=")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendFixed1(it, end, position.x)) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendLiteral(it, end, " posY=")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendFixed1(it, end, position.y)) {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, " dirty ")) {
+        if (!detail::appendLiteral(it, end, " dirty=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, static_cast<std::uint32_t>(hasDirty))) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, " streamOut ")) {
+
+        if (!detail::appendLiteral(it, end, " streamedOut=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, static_cast<std::uint32_t>(hasStreamedOut))) {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, " pos ")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendFixed2(it, end, position.x)) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, ",")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendFixed2(it, end, position.y)) {
-            return static_cast<std::size_t>(it - buf);
+        return static_cast<std::size_t>(it - buf);
+    }
+
+    std::size_t formatPlayerWatchVisibilityLine(char* buf, std::size_t cap,
+                                                const core::spatial::Aabb2& lastAabb,
+                                                const core::spatial::Aabb2& newAabb,
+                                                const bool fineCullPass,
+                                                const bool inQuery,
+                                                const bool eligible) noexcept {
+        if (cap == 0) {
+            return 0;
         }
 
-        if (!detail::appendLiteral(it, end, " aabb ")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendFixed2(it, end, lastAabb.minX)) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, ",")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendFixed2(it, end, lastAabb.minY)) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, " .. ")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendFixed2(it, end, lastAabb.maxX)) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, ",")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendFixed2(it, end, lastAabb.maxY)) {
-            return static_cast<std::size_t>(it - buf);
-        }
+        char* it = buf;
+        char* end = buf + cap;
 
-        if (!detail::appendLiteral(it, end, " newAabb ")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendFixed2(it, end, newAabb.minX)) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, ",")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendFixed2(it, end, newAabb.minY)) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, " .. ")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendFixed2(it, end, newAabb.maxX)) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendLiteral(it, end, ",")) {
-            return static_cast<std::size_t>(it - buf);
-        }
-        if (!detail::appendFixed2(it, end, newAabb.maxY)) {
-            return static_cast<std::size_t>(it - buf);
-        }
-
-        if (!detail::appendLiteral(it, end, " fine ")) {
+        if (!detail::appendLiteral(it, end, "PlayerVis: fineCullPass=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, static_cast<std::uint32_t>(fineCullPass))) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, " inQ ")) {
+        if (!detail::appendLiteral(it, end, " inQuery=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, static_cast<std::uint32_t>(inQuery))) {
             return static_cast<std::size_t>(it - buf);
         }
-
-        if (!detail::appendLiteral(it, end, " drawn ")) {
+        if (!detail::appendLiteral(it, end, " eligible=")) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendNumber(it, end, static_cast<std::uint32_t>(drawn))) {
+        if (!detail::appendNumber(it, end, static_cast<std::uint32_t>(eligible))) {
+            return static_cast<std::size_t>(it - buf);
+        }
+
+        if (!detail::appendLiteral(it, end, " last=(")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, static_cast<std::int32_t>(lastAabb.minX))) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendLiteral(it, end, ",")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, static_cast<std::int32_t>(lastAabb.minY))) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendLiteral(it, end, ")->(")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, static_cast<std::int32_t>(lastAabb.maxX))) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendLiteral(it, end, ",")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, static_cast<std::int32_t>(lastAabb.maxY))) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendLiteral(it, end, ")")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+
+        if (!detail::appendLiteral(it, end, " new=(")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, static_cast<std::int32_t>(newAabb.minX))) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendLiteral(it, end, ",")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, static_cast<std::int32_t>(newAabb.minY))) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendLiteral(it, end, ")->(")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, static_cast<std::int32_t>(newAabb.maxX))) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendLiteral(it, end, ",")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, static_cast<std::int32_t>(newAabb.maxY))) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendLiteral(it, end, ")")) {
             return static_cast<std::size_t>(it - buf);
         }
 
@@ -345,31 +365,31 @@ namespace game::skyguard::utils {
         char* it = buf;
         char* end = buf + cap;
 
-        if (!detail::appendLiteral(it, end, "Density: eff ")) {
+        if (!detail::appendLiteral(it, end, "Density: effectivePerChunk=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendFixed1(it, end, effectivePerChunk)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, " cfg ")) {
+        if (!detail::appendLiteral(it, end, " configuredPerChunk=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, configuredPerChunk)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, " chunk ")) {
+        if (!detail::appendLiteral(it, end, " chunkSize=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, chunkSizeWorld)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, " cell ")) {
+        if (!detail::appendLiteral(it, end, " cellSize=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, cellSizeWorld)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, " view ")) {
+        if (!detail::appendLiteral(it, end, " view=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendFixed1(it, end, viewSize.x)) {
@@ -397,7 +417,7 @@ namespace game::skyguard::utils {
         char* it = buf;
         char* end = buf + cap;
 
-        if (!detail::appendLiteral(it, end, "Range: chunk ")) {
+        if (!detail::appendLiteral(it, end, "Range: chunkMin=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, chunkMinX)) {
@@ -409,7 +429,8 @@ namespace game::skyguard::utils {
         if (!detail::appendNumber(it, end, chunkMinY)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, " .. ")) {
+
+        if (!detail::appendLiteral(it, end, " chunkMax=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, chunkMaxX)) {
@@ -422,7 +443,7 @@ namespace game::skyguard::utils {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  cell ")) {
+        if (!detail::appendLiteral(it, end, " cellMin=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, cellMinX)) {
@@ -434,7 +455,8 @@ namespace game::skyguard::utils {
         if (!detail::appendNumber(it, end, cellMinY)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, " .. ")) {
+
+        if (!detail::appendLiteral(it, end, " cellMax=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, cellMaxX)) {
@@ -485,20 +507,31 @@ namespace game::skyguard::utils {
         char* it = buf;
         char* end = buf + cap;
 
-        if (!detail::appendLiteral(it, end, "Residency: V")) {
+        if (!detail::appendLiteral(it, end, "Residency: V=")) {
             return static_cast<std::size_t>(it - buf);
         }
-        *it = residencyShort(viewState);
-        if (!detail::appendLiteral(it, end, " P")) {
+        if (it >= end) {
             return static_cast<std::size_t>(it - buf);
         }
-        *it = residencyShort(playerState);
-        if (!detail::appendLiteral(it, end, " F")) {
+        *it++ = residencyShort(viewState);
+
+        if (!detail::appendLiteral(it, end, " P=")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (it >= end) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        *it++ = residencyShort(playerState);
+
+        if (!detail::appendLiteral(it, end, " F=")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (it >= end) {
             return static_cast<std::size_t>(it - buf);
         }
         *it++ = residencyShort(focusState);
 
-        if (!detail::appendLiteral(it, end, "  view ")) {
+        if (!detail::appendLiteral(it, end, " view=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, viewChunk.x)) {
@@ -511,7 +544,7 @@ namespace game::skyguard::utils {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  player ")) {
+        if (!detail::appendLiteral(it, end, " player=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, playerChunk.x)) {
@@ -524,7 +557,7 @@ namespace game::skyguard::utils {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  focus ")) {
+        if (!detail::appendLiteral(it, end, " focus=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, focusChunk.x)) {
@@ -537,7 +570,7 @@ namespace game::skyguard::utils {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  origin ")) {
+        if (!detail::appendLiteral(it, end, " origin=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, originCurrent.x)) {
@@ -562,19 +595,21 @@ namespace game::skyguard::utils {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  remain ")) {
+        if (!detail::appendLiteral(it, end, " initialLoadRemaining=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, initialLoadRemaining)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, " load ")) {
+
+        if (!detail::appendLiteral(it, end, " loadsThisFrame=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, loadsThisFrame)) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, " unload ")) {
+
+        if (!detail::appendLiteral(it, end, " unloadsThisFrame=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendNumber(it, end, unloadsThisFrame)) {

@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string_view>
-#include <system_error> // std::errc
+#include <system_error>
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
     #include <SFML/Graphics/View.hpp>
@@ -90,7 +90,7 @@ namespace game::skyguard::utils {
                 return false;
             }
             *it++ = '.';
-            if (end - it < 1) {
+            if (it >= end) {
                 return false;
             }
 
@@ -121,18 +121,24 @@ namespace game::skyguard::utils {
                          std::uint32_t loaded) noexcept;
 
     [[nodiscard]] std::size_t
-    formatPlayerWatchLine(char* buf, std::size_t cap,
-                          std::uint64_t entityId,
-                          bool hasSpatialId,
-                          std::uint32_t spatialId,
-                          bool hasDirty,
-                          bool hasStreamedOut,
-                          const sf::Vector2f& position,
-                          const core::spatial::Aabb2& lastAabb,
-                          const core::spatial::Aabb2& newAabb,
-                          bool fineCullPass,
-                          bool inQuery,
-                          bool drawn) noexcept;
+    formatPlayerWatchStateLine(char* buf, std::size_t cap,
+                               std::uint64_t entityId,
+                               bool hasSpatialId,
+                               std::uint32_t spatialId,
+                               bool hasDirty,
+                               bool hasStreamedOut,
+                               const sf::Vector2f& position) noexcept;
+
+    // ВАЖНО:
+    // eligible != "реально отрисовано".
+    // eligible = "по известным нам условиям в UI-pass объект должен был попасть в render-pass".
+    [[nodiscard]] std::size_t
+    formatPlayerWatchVisibilityLine(char* buf, std::size_t cap,
+                                    const core::spatial::Aabb2& lastAabb,
+                                    const core::spatial::Aabb2& newAabb,
+                                    bool fineCullPass,
+                                    bool inQuery,
+                                    bool eligible) noexcept;
 
     [[nodiscard]] std::size_t
     formatDensityLine(char* buf, std::size_t cap,
@@ -176,35 +182,35 @@ namespace game::skyguard::utils {
         char* it = buf;
         char* end = buf + cap;
 
-        if (!detail::appendLiteral(it, end, "Camera: playerY ")) {
+        if (!detail::appendLiteral(it, end, "Camera: playerY=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendFixed2(it, end, playerY)) {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  centerY ")) {
+        if (!detail::appendLiteral(it, end, " centerY=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendFixed2(it, end, viewCenterY)) {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  sizeY ")) {
+        if (!detail::appendLiteral(it, end, " sizeY=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendFixed2(it, end, viewSizeY)) {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  offsetY ")) {
+        if (!detail::appendLiteral(it, end, " offsetY=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendFixed2(it, end, cameraOffsetY)) {
             return static_cast<std::size_t>(it - buf);
         }
 
-        if (!detail::appendLiteral(it, end, "  maxY ")) {
+        if (!detail::appendLiteral(it, end, " maxY=")) {
             return static_cast<std::size_t>(it - buf);
         }
         if (!detail::appendFixed2(it, end, cameraCenterYMax)) {

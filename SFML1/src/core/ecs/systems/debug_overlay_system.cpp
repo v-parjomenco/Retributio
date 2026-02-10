@@ -1,14 +1,10 @@
 #include "pch.h"
 
 #include "core/ecs/systems/debug_overlay_system.h"
-
-#include <array>
-#include <charconv>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <string>
-#include <system_error>
+#include <string_view>
 
 #include "core/config/properties/debug_overlay_runtime_properties.h"
 #include "core/config/properties/text_properties.h"
@@ -23,14 +19,13 @@
 
 // RenderSystem нужен только для Debug/Profile (статистика рендера).
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
-    #include "core/ecs/systems/render_system.h"
-    #include "core/ecs/systems/spatial_index_system.h"
+#include "core/ecs/systems/render_system.h"
+#include "core/ecs/systems/spatial_index_system.h"
 #endif
 
 #if defined(SFML1_PROFILE)
 namespace {
-    [[nodiscard]] std::uint64_t emaPow2(std::uint64_t prev,
-                                        std::uint64_t sample,
+    [[nodiscard]] std::uint64_t emaPow2(std::uint64_t prev, std::uint64_t sample,
                                         const std::uint8_t shift) noexcept {
         // EMA без float: alpha = 1 / (2^shift)
         // shift==0 => без сглаживания.
@@ -41,9 +36,9 @@ namespace {
             return sample;
         }
 
-        const std::uint64_t denom = (1ull << shift);   // shift гарантированно < 64
-        const std::uint64_t mask  = (denom - 1);       // denom == 2^shift
-        const std::uint64_t half  = (denom >> 1);       // округление
+        const std::uint64_t denom = (1ull << shift); // shift гарантированно < 64
+        const std::uint64_t mask = (denom - 1);      // denom == 2^shift
+        const std::uint64_t half = (denom >> 1);     // округление
 
         const auto roundDivPow2 = [shift, mask, half](const std::uint64_t diff) noexcept {
             const std::uint64_t q = (diff >> shift);
@@ -61,6 +56,16 @@ namespace {
 } // namespace
 #endif
 
+namespace {
+
+    // Жёсткие бюджеты на строки оверлея:
+    // - без realloc в hot-path,
+    // - без fragile assert на capacity при росте extra-строк.
+    constexpr std::size_t kTextReserveBytes = 2048;
+    constexpr std::size_t kExtraTextReserveBytes = 2048;
+
+} // namespace
+
 namespace core::ecs {
 
     void DebugOverlaySystem::bind(core::time::TimeService& timeService, const sf::Font& font) {
@@ -68,9 +73,10 @@ namespace core::ecs {
         mFpsText.emplace(font);
 
         mTextBuffer.clear();
-        mTextBuffer.reserve(768);
+        mTextBuffer.reserve(kTextReserveBytes);
+
         mExtraTextBuffer.clear();
-        mExtraTextBuffer.reserve(512);
+        mExtraTextBuffer.reserve(kExtraTextReserveBytes);
 
         mRenderClock.restart();
         mAccumulatedTime = mUpdateInterval; // чтобы первая отрисовка сразу обновила текст
@@ -85,6 +91,7 @@ namespace core::ecs {
         assert(props.smoothingShift <=
                    core::config::properties::DebugOverlayRuntimeProperties::kMaxSmoothingShift &&
                "smoothingShift violates contract (must be clamped in loader)");
+
         // 0 ms => обновлять каждый кадр.
         if (props.updateIntervalMs == 0) {
             mUpdateInterval = sf::Time::Zero;
@@ -105,11 +112,11 @@ namespace core::ecs {
 #endif
         // И таймер тоже, чтобы изменение применилось сразу.
         mRenderClock.restart();
-        mAccumulatedTime = mUpdateInterval;        
+        mAccumulatedTime = mUpdateInterval;
     }
 
-    void DebugOverlaySystem::applyTextProperties(
-        const core::config::properties::TextProperties& props) {
+    void
+    DebugOverlaySystem::applyTextProperties(const core::config::properties::TextProperties& props) {
         if (!mFpsText) {
             return;
         }
@@ -123,8 +130,8 @@ namespace core::ecs {
         // Render-only система.
         // Важно: update() может вызываться 0..N раз за кадр (фиксированный timestep),
         // поэтому любые "per-frame" метрики/строки обновляем в prepareFrame() ровно один раз.
-        (void)world;
-        (void)dt;
+        (void) world;
+        (void) dt;
     }
 
     void DebugOverlaySystem::prepareFrame(World& world) {
@@ -144,25 +151,18 @@ namespace core::ecs {
         // ----------------------------------------------------------------------------------------
         // FPS — показываем ВСЕГДА (Debug/Profile/Release)
         // ----------------------------------------------------------------------------------------
+        mTextBuffer.append("fps=");
         if (mTime) {
             const int fpsRounded = static_cast<int>(mTime->getSmoothedFps());
-            mTextBuffer.append("FPS: ");
-
-            std::array<char, 32> buf{};
-            auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + buf.size(), fpsRounded);
-            if (ec == std::errc{}) {
-                mTextBuffer.append(buf.data(), static_cast<std::size_t>(ptr - buf.data()));
-            } else {
-                mTextBuffer.append("?");
-            }
+            core::utils::format::appendU64(mTextBuffer, static_cast<std::uint64_t>(fpsRounded));
         } else {
-            mTextBuffer.append("FPS: ?");
+            mTextBuffer.append("?");
         }
 
         // ----------------------------------------------------------------------------------------
-        // Entity count — показываем ВСЕГДА (O(1) чтение, полезно для диагностики/аналитики)
+        // Entity count — показываем ВСЕГДА (O(1) чтение)
         // ----------------------------------------------------------------------------------------
-        mTextBuffer.append("\nEntities: ");
+        mTextBuffer.append("\nECS: alive=");
         core::utils::format::appendU64(mTextBuffer,
                                        static_cast<std::uint64_t>(world.aliveEntityCount()));
 
@@ -173,169 +173,155 @@ namespace core::ecs {
         if (mRenderSystem) {
             const auto& stats = mRenderSystem->getLastFrameStatsRef();
 
-            mTextBuffer.append("  Sprites: ");
+            // Каноническое "сколько реально отрисовано спрайтов" = stats.spriteCount.
+            // Никаких дублей "drawn" в других блоках.
+            mTextBuffer.append("\nRender: sprites=");
             core::utils::format::appendU64(mTextBuffer,
                                            static_cast<std::uint64_t>(stats.spriteCount));
-
-            mTextBuffer.append("  Vertices: ");
+            mTextBuffer.append(" vertices=");
             core::utils::format::appendU64(mTextBuffer,
                                            static_cast<std::uint64_t>(stats.vertexCount));
-
-            mTextBuffer.append("\nDrawCalls: ");
+            mTextBuffer.append(" drawCalls=");
             core::utils::format::appendU64(mTextBuffer,
                                            static_cast<std::uint64_t>(stats.batchDrawCalls));
 
-            mTextBuffer.append("  TexSwitches: ");
+            mTextBuffer.append("\nTextures: switches=");
             core::utils::format::appendU64(mTextBuffer,
                                            static_cast<std::uint64_t>(stats.textureSwitches));
-
-            mTextBuffer.append("  UniqueTex*: ");
+            mTextBuffer.append(" unique=");
             core::utils::format::appendU64(mTextBuffer,
                                            static_cast<std::uint64_t>(stats.uniqueTexturePointers));
-
-            mTextBuffer.append("  TexCache: ");
+            mTextBuffer.append(" cacheSize=");
             core::utils::format::appendU64(mTextBuffer,
                                            static_cast<std::uint64_t>(stats.textureCacheSize));
+            mTextBuffer.append(" residentFetches=");
+            core::utils::format::appendU64(
+                mTextBuffer, static_cast<std::uint64_t>(stats.resourceLookupsThisFrame));
 
-            mTextBuffer.append("  SlowResolves: ");
-            core::utils::format::appendU64(mTextBuffer,
-                                        static_cast<std::uint64_t>(stats.resourceLookupsThisFrame));
-
-            mTextBuffer.append("\nCulling: ");
+            // Culling: key=value, без "A/B/C" формата.
+            // candidates = сколько кандидатов дошло до gather (без mapNull/missingComponents).
+            // culled = сколько отсекли fine-cull/invalid data.
+            mTextBuffer.append("\nCulling: drawn=");
             core::utils::format::appendU64(mTextBuffer,
                                            static_cast<std::uint64_t>(stats.spriteCount));
-            mTextBuffer.push_back('/');
+            mTextBuffer.append(" candidates=");
             core::utils::format::appendU64(mTextBuffer,
                                            static_cast<std::uint64_t>(stats.totalSpriteCount));
-            mTextBuffer.push_back('/');
+            mTextBuffer.append(" culled=");
             core::utils::format::appendU64(mTextBuffer,
                                            static_cast<std::uint64_t>(stats.culledSpriteCount));
 
-            mTextBuffer.append("\nSpatialQuery: scanned=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.spatialEntriesScanned));
-            mTextBuffer.append(" unique=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.spatialQueryUnique));
-            mTextBuffer.append(" dup=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.spatialDupHits));
-            mTextBuffer.append(" cells=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.spatialCellsVisited));
-            mTextBuffer.append(" chunks=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.spatialChunksVisited));
-            mTextBuffer.append(" skipNL=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.spatialChunksSkipped));
-            mTextBuffer.append(" trunc=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.spatialOutTruncated));
-
-            mTextBuffer.append("\nRenderFilter: in=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.spatialQueryUnique));
-            mTextBuffer.append(" null=");
+            // RenderFilter: причины "почему не дошло до draw".
+            // ВАЖНО: не дублируем drawn/sprites.
+            mTextBuffer.append("\nRenderFilter: mapNull=");
             core::utils::format::appendU64(mTextBuffer,
                                            static_cast<std::uint64_t>(stats.renderMapNull));
-            mTextBuffer.append(" miss=");
+            mTextBuffer.append(" missingComponents=");
             core::utils::format::appendU64(
                 mTextBuffer, static_cast<std::uint64_t>(stats.renderMissingComponents));
-            mTextBuffer.append(" fineFail=");
+            mTextBuffer.append(" fineCullFail=");
             core::utils::format::appendU64(mTextBuffer,
                                            static_cast<std::uint64_t>(stats.renderFineCullFail));
-            mTextBuffer.append(" drawn=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.renderDrawn));
 
-    #if defined(SFML1_PROFILE)
-            // Тайминги CPU — только Profile (Debug не имеет таймингов).
+#if defined(SFML1_PROFILE)
+            // Тайминги CPU — только Profile.
             mSmoothedCpuTotalUs = emaPow2(mSmoothedCpuTotalUs, stats.cpuTotalUs, mSmoothingShift);
-            mSmoothedCpuDrawUs  = emaPow2(mSmoothedCpuDrawUs,  stats.cpuDrawUs,  mSmoothingShift);
+            mSmoothedCpuDrawUs = emaPow2(mSmoothedCpuDrawUs, stats.cpuDrawUs, mSmoothingShift);
 
-            mTextBuffer.append("\nCPU: ");
+            mTextBuffer.append("\nCPU: totalMs=");
             core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedCpuTotalUs);
-            mTextBuffer.append(" ms  (draw ");
+            mTextBuffer.append(" drawMs=");
             core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedCpuDrawUs);
-            mTextBuffer.append(" ms)");
 
-            // Разбивка статистики RenderSystem: gather/sort/build/draw (в миллисекундах).
+            // Разбивка RenderSystem (gather/sort/build/draw).
             mSmoothedRSGatherUs = emaPow2(mSmoothedRSGatherUs, stats.cpuGatherUs, mSmoothingShift);
             mSmoothedRSSortUs = emaPow2(mSmoothedRSSortUs, stats.cpuSortUs, mSmoothingShift);
             mSmoothedRSBuildUs = emaPow2(mSmoothedRSBuildUs, stats.cpuBuildUs, mSmoothingShift);
             mSmoothedRSDrawUs = emaPow2(mSmoothedRSDrawUs, stats.cpuDrawUs, mSmoothingShift);
 
-            mTextBuffer.append("\nRender(ms): gather ");
+            mTextBuffer.append("\nRenderCPU: gatherMs=");
             core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSGatherUs);
-            mTextBuffer.append(" | sort ");
+            mTextBuffer.append(" sortMs=");
             core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSSortUs);
-            mTextBuffer.append(" | build ");
+            mTextBuffer.append(" buildMs=");
             core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSBuildUs);
-            mTextBuffer.append(" | draw ");
+            mTextBuffer.append(" drawMs=");
             core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSDrawUs);
-    #endif
+#endif
         }
 
         // ----------------------------------------------------------------------------------------
         // Spatial index метрики — только Debug/Profile.
-        // Показываем activeEntityCount (зарегистрированные) и window dimensions.
-        // Позволяет отличить "2M загружено, 70K видно" от "70K загружено, 70K видно".
+        // SpatialActive != ECSAlive: count зарегистрированных в индексе entity.
         // ----------------------------------------------------------------------------------------
         if (mSpatialIndexSystem) {
             const auto& idx = mSpatialIndexSystem->index();
 
-            mTextBuffer.append("\nSpatial: active ");
-            core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(idx.activeEntityCount()));
+            mTextBuffer.append("\nSpatial: active=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(idx.activeEntityCount()));
 
-            mTextBuffer.append(" | window ");
-            core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(idx.windowWidth()));
+            mTextBuffer.append(" window=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(idx.windowWidth()));
             mTextBuffer.push_back('x');
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(idx.windowHeight()));
+
+            mTextBuffer.append(" dupInsertDetected=");
             core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(idx.windowHeight()));
-            const auto& qstats = idx.debugLastQueryStatsRef();
-            mTextBuffer.append("\nQueryChunks: ");
-            core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(qstats.chunksLoadedVisited));
-            mTextBuffer.push_back('/');
-            core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(qstats.chunksVisited));
-            mTextBuffer.append("  Cells: ");
-            core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(qstats.cellVisits));
-            mTextBuffer.append("  OvCells: ");
-            core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(qstats.overflowCellVisits));
-            mTextBuffer.append("\nCounts: tr ");
+                mTextBuffer, static_cast<std::uint64_t>(idx.debugDupInsertDetected()));
+
+            // Канонический блок query counters: только из SpatialIndex.
+            const auto& q = idx.debugLastQueryStatsRef();
+            mTextBuffer.append("\nSpatialQuery: entriesScanned=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(q.entriesScanned));
+            mTextBuffer.append(" unique=");
+            core::utils::format::appendU64(mTextBuffer, static_cast<std::uint64_t>(q.uniqueAdded));
+            mTextBuffer.append(" dupHits=");
+            core::utils::format::appendU64(mTextBuffer, static_cast<std::uint64_t>(q.dupHits));
+            mTextBuffer.append(" cells=");
+            core::utils::format::appendU64(mTextBuffer, static_cast<std::uint64_t>(q.cellVisits));
+            mTextBuffer.append(" ovCells=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(q.overflowCellVisits));
+            mTextBuffer.append(" chunksLoaded=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(q.chunksLoadedVisited));
+            mTextBuffer.append(" chunks=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(q.chunksVisited));
+            mTextBuffer.append(" skippedNonLoaded=");
+            core::utils::format::appendU64(mTextBuffer,
+                                           static_cast<std::uint64_t>(q.chunksSkippedNonLoaded));
+            mTextBuffer.append(" truncated=");
+            core::utils::format::appendU64(mTextBuffer, static_cast<std::uint64_t>(q.outTruncated));
+
+            // Storages: sizes (диагностика компонентного состава).
+            mTextBuffer.append("\nStorages: transform=");
             core::utils::format::appendU64(
                 mTextBuffer,
                 static_cast<std::uint64_t>(world.debugStorageSize<TransformComponent>()));
-            mTextBuffer.append(" spr ");
+            mTextBuffer.append(" sprite=");
             core::utils::format::appendU64(
-                mTextBuffer,
-                static_cast<std::uint64_t>(world.debugStorageSize<SpriteComponent>()));
-            mTextBuffer.append(" spatialId ");
+                mTextBuffer, static_cast<std::uint64_t>(world.debugStorageSize<SpriteComponent>()));
+            mTextBuffer.append(" spatialId=");
             core::utils::format::appendU64(
                 mTextBuffer,
                 static_cast<std::uint64_t>(world.debugStorageSize<SpatialIdComponent>()));
-            mTextBuffer.append(" streamedOut ");
+            mTextBuffer.append(" streamedOut=");
             core::utils::format::appendU64(
                 mTextBuffer,
                 static_cast<std::uint64_t>(world.debugStorageSize<SpatialStreamedOutTag>()));
-            mTextBuffer.append(" dirty ");
+            mTextBuffer.append(" dirty=");
             core::utils::format::appendU64(
-                mTextBuffer,
-                static_cast<std::uint64_t>(world.debugStorageSize<SpatialDirtyTag>()));
-            mTextBuffer.append(" dupIns ");
-            core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(idx.debugDupInsertDetected()));
+                mTextBuffer, static_cast<std::uint64_t>(world.debugStorageSize<SpatialDirtyTag>()));
         }
 #endif // !defined(NDEBUG) || defined(SFML1_PROFILE)
 
         if (!mExtraTextBuffer.empty()) {
-            mTextBuffer.append("\n");
+            mTextBuffer.push_back('\n');
             mTextBuffer.append(mExtraTextBuffer);
         }
 
@@ -359,20 +345,28 @@ namespace core::ecs {
             return;
         }
 
-#if !defined(NDEBUG)
-        const std::size_t needed = 
-            mExtraTextBuffer.size() + 
-            (mExtraTextBuffer.empty() ? 0u : 1u) + 
-            line.size();
-        assert(needed <= mExtraTextBuffer.capacity() && 
-               "DebugOverlaySystem: mExtraTextBuffer would reallocate. "
-               "Increase reserve in bind().");
-#endif
+        // Hardening: никаких realloc/ассертов. Если не влезает — мягко обрезаем.
+        // Важно: std::string не обязан realloc'ать, пока finalSize <= capacity().
+        if (mExtraTextBuffer.size() >= mExtraTextBuffer.capacity()) {
+            return;
+        }
 
         if (!mExtraTextBuffer.empty()) {
+            if (mExtraTextBuffer.size() >= mExtraTextBuffer.capacity()) {
+                return;
+            }
             mExtraTextBuffer.push_back('\n');
         }
-        mExtraTextBuffer.append(line);
+
+        const std::size_t remaining = (mExtraTextBuffer.capacity() > mExtraTextBuffer.size())
+                                          ? (mExtraTextBuffer.capacity() - mExtraTextBuffer.size())
+                                          : 0u;
+        if (remaining == 0u) {
+            return;
+        }
+
+        const std::size_t toAppend = (line.size() <= remaining) ? line.size() : remaining;
+        mExtraTextBuffer.append(line.data(), toAppend);
     }
 
     void DebugOverlaySystem::draw(sf::RenderWindow& window) const {

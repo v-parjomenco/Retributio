@@ -712,15 +712,26 @@ namespace game::skyguard {
                     const bool inQuery = (hasSpatialId && mSpatialIndexSystem)
                         ? mSpatialIndexSystem->index().debugWasInLastQuery(spatialId->id)
                         : false;
-                    const bool drawn = inQuery && !hasStreamedOut;
+                    // eligible != "реально отрисовано": это лишь прогноз по доступным в UI-pass условиям.
+                    const bool eligible =
+                        (sprite != nullptr) && inQuery && fineCullPass && !hasStreamedOut;
 
-                    std::array<char, 512> watchBuf{};
-                    const std::size_t watchSize = utils::formatPlayerWatchLine(
-                        watchBuf.data(), watchBuf.size(), core::ecs::toUint(e), hasSpatialId,
-                        spatialIdVal, hasDirty, hasStreamedOut, tr->position, lastAabb, newAabb,
-                        fineCullPass, inQuery, drawn);
-                    if (watchSize > 0) {
-                        mDebugOverlay->appendExtraLine(std::string_view(watchBuf.data(), watchSize));
+                    std::array<char, 256> watchStateBuf{};
+                    const std::size_t watchStateSize = utils::formatPlayerWatchStateLine(
+                        watchStateBuf.data(), watchStateBuf.size(), core::ecs::toUint(e),
+                        hasSpatialId, spatialIdVal, hasDirty, hasStreamedOut, tr->position);
+                    if (watchStateSize > 0) {
+                        mDebugOverlay->appendExtraLine(
+                            std::string_view(watchStateBuf.data(), watchStateSize));
+                    }
+
+                    std::array<char, 256> watchVisBuf{};
+                    const std::size_t watchVisSize = utils::formatPlayerWatchVisibilityLine(
+                        watchVisBuf.data(), watchVisBuf.size(), lastAabb, newAabb, fineCullPass,
+                        inQuery, eligible);
+                    if (watchVisSize > 0) {
+                        mDebugOverlay->appendExtraLine(
+                            std::string_view(watchVisBuf.data(), watchVisSize));
                     }
                 }
             }
