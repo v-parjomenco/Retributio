@@ -712,8 +712,8 @@ namespace game::skyguard {
                     const bool inQuery = (hasSpatialId && mSpatialIndexSystem)
                         ? mSpatialIndexSystem->index().debugWasInLastQuery(spatialId->id)
                         : false;
-                    // eligible != "реально отрисовано": это лишь прогноз по доступным в UI-pass условиям.
-                    const bool eligible =
+                    // predictedVisible != "реально отрисовано": прогноз по условиям UI-pass.
+                    const bool predictedVisible =
                         (sprite != nullptr) && inQuery && fineCullPass && !hasStreamedOut;
 
                     std::array<char, 256> watchStateBuf{};
@@ -728,7 +728,7 @@ namespace game::skyguard {
                     std::array<char, 256> watchVisBuf{};
                     const std::size_t watchVisSize = utils::formatPlayerWatchVisibilityLine(
                         watchVisBuf.data(), watchVisBuf.size(), lastAabb, newAabb, fineCullPass,
-                        inQuery, eligible);
+                        inQuery, predictedVisible);
                     if (watchVisSize > 0) {
                         mDebugOverlay->appendExtraLine(
                             std::string_view(watchVisBuf.data(), watchVisSize));

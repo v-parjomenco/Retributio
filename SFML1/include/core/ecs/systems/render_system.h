@@ -66,17 +66,9 @@ namespace core::ecs {
             std::size_t uniqueTexturePointers{0};    ///< Уникальные текстуры за кадр по epoch cache
             std::size_t textureCacheSize{0};         ///< Размер per-frame epoch cache
             std::size_t resourceLookupsThisFrame{0}; ///< Уникальные resident-fetch по texture key
-            std::size_t spatialEntriesScanned{0};   ///< Сколько EntityId32 просмотрено в cell-lists
-            std::size_t spatialQueryUnique{0};       ///< Уникальные ID из SpatialIndex
-            std::size_t spatialDupHits{0};           ///< Дубликаты (marks hit)
-            std::size_t spatialCellsVisited{0};      ///< Посещённые ячейки
-            std::size_t spatialChunksVisited{0};     ///< Посещённые чанки
-            std::size_t spatialChunksSkipped{0};     ///< Пропущенные non-Loaded чанки
-            std::size_t spatialOutTruncated{0};      ///< 1, если outIds capacity исчерпан
             std::size_t renderMapNull{0};            ///< id->NullEntity
             std::size_t renderMissingComponents{0};  ///< !ecsView.contains
             std::size_t renderFineCullFail{0};       ///< lastAabb не пересёк viewAabb
-            std::size_t renderDrawn{0};              ///< Итог: отрисованные спрайты
 
             std::uint64_t cpuTotalUs{0};  ///< Общее время render() (только SFML1_PROFILE)
             std::uint64_t cpuDrawUs{0};   ///< Время в window.draw() (только SFML1_PROFILE)

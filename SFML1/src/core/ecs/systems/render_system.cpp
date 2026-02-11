@@ -579,17 +579,6 @@ namespace core::ecs {
             stats.renderMapNull = mapNull;
             stats.renderMissingComponents = missingComponents;
             stats.renderFineCullFail = fineCullFail;
-            stats.renderDrawn = 0;
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
-            const auto& qstats = mSpatialIndex->debugLastQueryStatsRef();
-            stats.spatialEntriesScanned = qstats.entriesScanned;
-            stats.spatialQueryUnique = qstats.uniqueAdded;
-            stats.spatialDupHits = qstats.dupHits;
-            stats.spatialCellsVisited = qstats.cellVisits;
-            stats.spatialChunksVisited = qstats.chunksVisited;
-            stats.spatialChunksSkipped = qstats.chunksSkippedNonLoaded;
-            stats.spatialOutTruncated = qstats.outTruncated;
-#endif
             mLastStats = stats;
 #endif
             return;
@@ -728,19 +717,6 @@ namespace core::ecs {
         stats.renderMapNull = mapNull;
         stats.renderMissingComponents = missingComponents;
         stats.renderFineCullFail = fineCullFail;
-        stats.renderDrawn = mKeys.size();
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
-        {
-            const auto& qstats = mSpatialIndex->debugLastQueryStatsRef();
-            stats.spatialEntriesScanned = qstats.entriesScanned;
-            stats.spatialQueryUnique = qstats.uniqueAdded;
-            stats.spatialDupHits = qstats.dupHits;
-            stats.spatialCellsVisited = qstats.cellVisits;
-            stats.spatialChunksVisited = qstats.chunksVisited;
-            stats.spatialChunksSkipped = qstats.chunksSkippedNonLoaded;
-            stats.spatialOutTruncated = qstats.outTruncated;
-        }
-#endif
 
 #if defined(SFML1_PROFILE)
         {

@@ -16,6 +16,7 @@
 //  и оставить DebugOverlay как подсистему или виджет.
 
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -95,6 +96,7 @@ namespace core::ecs {
         }
 
         void update(World&, float) override;
+
         /**
          * @brief Подготовить текст оверлея для текущего кадра.
          *
@@ -126,11 +128,31 @@ namespace core::ecs {
             const core::config::properties::DebugOverlayRuntimeProperties& props) noexcept;
 
       private:
+        // Жёсткие бюджеты на строки оверлея:
+        // - без realloc после bind(),
+        // - без краша/ассертов при росте числа метрик/строк.
+        static constexpr std::size_t kTextHardCapBytes = 4096;
+        static constexpr std::size_t kExtraTextHardCapBytes = 4096;
+        static constexpr std::string_view kTruncMarker = "\n[TRUNCATED]\n";
+
+        // Контракт: hard cap должен быть строго больше маркера, иначе underflow в CappedAppender.
+        static_assert(kTextHardCapBytes > kTruncMarker.size(),
+                      "kTextHardCapBytes must be larger than truncation marker");
+        static_assert(kExtraTextHardCapBytes > kTruncMarker.size(),
+                      "kExtraTextHardCapBytes must be larger than truncation marker");
+
         core::time::TimeService* mTime{nullptr}; // не владеем
         std::optional<sf::Text> mFpsText;
+
         std::string mTextBuffer; // scratch buffer (без аллокаций в каждом кадре)
         std::string mExtraTextBuffer;
+
         bool mEnabled{true};
+
+        // Явный stop при переполнении буфера (видимый маркер + один WARN без спама).
+        bool mTextTruncated{false};
+        bool mTextTruncLogged{false};
+        bool mExtraTextTruncated{false};
 
         // Обновляем строку не каждый кадр, чтобы не было дрожи и лишней работы.
         // Throttling — сознательная фича: снижает стоимость форматирования/EMA,
@@ -153,7 +175,6 @@ namespace core::ecs {
 #if defined(SFML1_PROFILE)
         // Сглаженные значения времени (EMA), чтобы цифры не "прыгали".
         std::uint64_t mSmoothedCpuTotalUs = 0;
-        std::uint64_t mSmoothedCpuDrawUs  = 0;
 
         // Сглаженная разбивка RenderSystem (raw/sm), только для Profile.
         std::uint64_t mSmoothedRSGatherUs = 0;
@@ -161,7 +182,6 @@ namespace core::ecs {
         std::uint64_t mSmoothedRSBuildUs  = 0;
         std::uint64_t mSmoothedRSDrawUs   = 0;
 #endif
-
     };
 
 } // namespace core::ecs

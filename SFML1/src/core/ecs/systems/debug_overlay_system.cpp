@@ -14,6 +14,7 @@
 #include "core/ecs/components/sprite_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/world.h"
+#include "core/log/log_macros.h"
 #include "core/time/time_service.h"
 #include "core/utils/format/append_numbers.h"
 
@@ -38,7 +39,7 @@ namespace {
 
         const std::uint64_t denom = (1ull << shift); // shift гарантированно < 64
         const std::uint64_t mask = (denom - 1);      // denom == 2^shift
-        const std::uint64_t half = (denom >> 1);     // округление
+        const std::uint64_t half = (denom >> 1);      // округление
 
         const auto roundDivPow2 = [shift, mask, half](const std::uint64_t diff) noexcept {
             const std::uint64_t q = (diff >> shift);
@@ -58,11 +59,99 @@ namespace {
 
 namespace {
 
-    // Жёсткие бюджеты на строки оверлея:
-    // - без realloc в hot-path,
-    // - без fragile assert на capacity при росте extra-строк.
-    constexpr std::size_t kTextReserveBytes = 2048;
-    constexpr std::size_t kExtraTextReserveBytes = 2048;
+    /**
+     * @brief Bounded appender для debug overlay text buffers.
+     *
+     * Предотвращает неограниченный рост буфера: при превышении hard cap
+     * дописывает видимый маркер "[TRUNCATED]" и прекращает все дальнейшие записи.
+     *
+     * Два режима:
+     *  - appendAtomic(): all-or-nothing (для структурированных key=value строк).
+     *  - appendClamped(): допускает частичную запись (для пользовательского extra text).
+     *
+     * ВАЖНО:
+     *  - maxBeforeMarkerBytes = hardCapBytes - truncMarker.size() (считается вызывающим).
+     *  - Контракт: hardCapBytes > truncMarker.size() (гарантируется static_assert в .h).
+     */
+    struct CappedAppender final {
+        std::string& dst;
+        const std::size_t maxBeforeMarkerBytes;
+        const std::string_view truncMarker;
+        bool& truncated;
+
+        void appendAtomic(const std::string_view s) {
+            if (!ensure(s.size())) {
+                return;
+            }
+            dst.append(s);
+        }
+
+        void pushBackAtomic(const char c) {
+            if (!ensure(1u)) {
+                return;
+            }
+            dst.push_back(c);
+        }
+
+        void appendU64Atomic(const std::uint64_t value) {
+            // uint64 max = 20 десятичных цифр.
+            if (!ensure(20u)) {
+                return;
+            }
+            core::utils::format::appendU64(dst, value);
+        }
+
+#if defined(SFML1_PROFILE)
+        void appendMs1DecimalFromUsAtomic(const std::uint64_t us) {
+            // Консервативно: "18446744073709551.6" + запас.
+            if (!ensure(32u)) {
+                return;
+            }
+            core::utils::format::appendMs1DecimalFromUs(dst, us);
+        }
+#endif
+
+        /// Допускает частичную запись: дописывает сколько влезает, затем truncation.
+        void appendClamped(const std::string_view s) {
+            if (truncated) {
+                return;
+            }
+
+            const std::size_t used = dst.size();
+            const std::size_t remaining =
+                (used < maxBeforeMarkerBytes) ? (maxBeforeMarkerBytes - used) : 0u;
+
+            if (s.size() <= remaining) {
+                dst.append(s);
+                return;
+            }
+
+            if (remaining > 0u) {
+                dst.append(s.data(), remaining);
+            }
+            truncateNow();
+        }
+
+      private:
+        [[nodiscard]] bool ensure(const std::size_t bytesToAppend) {
+            if (truncated) {
+                return false;
+            }
+            if (dst.size() + bytesToAppend > maxBeforeMarkerBytes) {
+                truncateNow();
+                return false;
+            }
+            return true;
+        }
+
+        void truncateNow() {
+            if (truncated) {
+                return;
+            }
+            truncated = true;
+            dst.append(truncMarker);
+        }
+    };
 
 } // namespace
 
@@ -73,10 +162,14 @@ namespace core::ecs {
         mFpsText.emplace(font);
 
         mTextBuffer.clear();
-        mTextBuffer.reserve(kTextReserveBytes);
+        mTextBuffer.reserve(kTextHardCapBytes);
 
         mExtraTextBuffer.clear();
-        mExtraTextBuffer.reserve(kExtraTextReserveBytes);
+        mExtraTextBuffer.reserve(kExtraTextHardCapBytes);
+
+        mTextTruncated = false;
+        mTextTruncLogged = false;
+        mExtraTextTruncated = false;
 
         mRenderClock.restart();
         mAccumulatedTime = mUpdateInterval; // чтобы первая отрисовка сразу обновила текст
@@ -104,12 +197,17 @@ namespace core::ecs {
         // При изменении режима сбрасываем сглаживание, чтобы не было "хвоста".
 #if defined(SFML1_PROFILE)
         mSmoothedCpuTotalUs = 0;
-        mSmoothedCpuDrawUs = 0;
         mSmoothedRSGatherUs = 0;
         mSmoothedRSSortUs = 0;
         mSmoothedRSBuildUs = 0;
         mSmoothedRSDrawUs = 0;
 #endif
+
+        // Truncation мог случиться при старых настройках — разрешаем лог заново.
+        mTextTruncated = false;
+        mTextTruncLogged = false;
+        mExtraTextTruncated = false;
+
         // И таймер тоже, чтобы изменение применилось сразу.
         mRenderClock.restart();
         mAccumulatedTime = mUpdateInterval;
@@ -147,91 +245,89 @@ namespace core::ecs {
         mAccumulatedTime = sf::Time::Zero;
 
         mTextBuffer.clear();
+        mTextTruncated = false;
+
+        CappedAppender out{mTextBuffer,
+                           kTextHardCapBytes - kTruncMarker.size(),
+                           kTruncMarker,
+                           mTextTruncated};
 
         // ----------------------------------------------------------------------------------------
         // FPS — показываем ВСЕГДА (Debug/Profile/Release)
         // ----------------------------------------------------------------------------------------
-        mTextBuffer.append("fps=");
+        out.appendAtomic("fps=");
         if (mTime) {
             const int fpsRounded = static_cast<int>(mTime->getSmoothedFps());
-            core::utils::format::appendU64(mTextBuffer, static_cast<std::uint64_t>(fpsRounded));
+            out.appendU64Atomic(static_cast<std::uint64_t>(fpsRounded));
         } else {
-            mTextBuffer.append("?");
+            out.appendAtomic("?");
         }
 
         // ----------------------------------------------------------------------------------------
-        // Entity count — показываем ВСЕГДА (O(1) чтение)
+        // Counts — ecsAlive всегда, spatialActive дописывается в Debug/Profile (если есть).
+        //
+        // Семантически разные registry: ecsAlive = все entity в EnTT,
+        // spatialActive = зарегистрированные в SpatialIndex.
+        // Расхождение диагностически ценно (streamed-out, сервисные entity, теги).
         // ----------------------------------------------------------------------------------------
-        mTextBuffer.append("\nECS: alive=");
-        core::utils::format::appendU64(mTextBuffer,
-                                       static_cast<std::uint64_t>(world.aliveEntityCount()));
+        out.appendAtomic("\nCounts: ecsAlive=");
+        out.appendU64Atomic(static_cast<std::uint64_t>(world.aliveEntityCount()));
+
+#if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        // spatialActive дописываем на ту же строку "Counts:" до блока render stats.
+        if (mSpatialIndexSystem) {
+            const auto& idx = mSpatialIndexSystem->index();
+            out.appendAtomic(" spatialActive=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(idx.activeEntityCount()));
+        }
 
         // ----------------------------------------------------------------------------------------
         // Статистика рендера — только Debug/Profile.
         // ----------------------------------------------------------------------------------------
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
         if (mRenderSystem) {
             const auto& stats = mRenderSystem->getLastFrameStatsRef();
 
             // Каноническое "сколько реально отрисовано спрайтов" = stats.spriteCount.
             // Никаких дублей "drawn" в других блоках.
-            mTextBuffer.append("\nRender: sprites=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.spriteCount));
-            mTextBuffer.append(" vertices=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.vertexCount));
-            mTextBuffer.append(" drawCalls=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.batchDrawCalls));
+            out.appendAtomic("\nRender: sprites=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(stats.spriteCount));
+            out.appendAtomic(" vertices=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(stats.vertexCount));
+            out.appendAtomic(" drawCalls=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(stats.batchDrawCalls));
 
-            mTextBuffer.append("\nTextures: switches=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.textureSwitches));
-            mTextBuffer.append(" unique=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.uniqueTexturePointers));
-            mTextBuffer.append(" cacheSize=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.textureCacheSize));
-            mTextBuffer.append(" residentFetches=");
-            core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(stats.resourceLookupsThisFrame));
+            out.appendAtomic("\nTextures: switches=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(stats.textureSwitches));
+            out.appendAtomic(" unique=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(stats.uniqueTexturePointers));
+            out.appendAtomic(" cacheSize=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(stats.textureCacheSize));
+            out.appendAtomic(" residentFetches=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(stats.resourceLookupsThisFrame));
 
             // Culling: key=value, без "A/B/C" формата.
             // candidates = сколько кандидатов дошло до gather (без mapNull/missingComponents).
             // culled = сколько отсекли fine-cull/invalid data.
-            mTextBuffer.append("\nCulling: drawn=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.spriteCount));
-            mTextBuffer.append(" candidates=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.totalSpriteCount));
-            mTextBuffer.append(" culled=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.culledSpriteCount));
+            out.appendAtomic("\nCulling: candidates=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(stats.totalSpriteCount));
+            out.appendAtomic(" culled=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(stats.culledSpriteCount));
 
             // RenderFilter: причины "почему не дошло до draw".
             // ВАЖНО: не дублируем drawn/sprites.
-            mTextBuffer.append("\nRenderFilter: mapNull=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.renderMapNull));
-            mTextBuffer.append(" missingComponents=");
-            core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(stats.renderMissingComponents));
-            mTextBuffer.append(" fineCullFail=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(stats.renderFineCullFail));
+            out.appendAtomic("\nRenderFilter: mapNull=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(stats.renderMapNull));
+            out.appendAtomic(" missingComponents=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(stats.renderMissingComponents));
+            out.appendAtomic(" fineCullFail=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(stats.renderFineCullFail));
 
 #if defined(SFML1_PROFILE)
-            // Тайминги CPU — только Profile.
+            // CPU: только totalMs (drawMs — в RenderCPU breakdown, без дублирования).
             mSmoothedCpuTotalUs = emaPow2(mSmoothedCpuTotalUs, stats.cpuTotalUs, mSmoothingShift);
-            mSmoothedCpuDrawUs = emaPow2(mSmoothedCpuDrawUs, stats.cpuDrawUs, mSmoothingShift);
 
-            mTextBuffer.append("\nCPU: totalMs=");
-            core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedCpuTotalUs);
-            mTextBuffer.append(" drawMs=");
-            core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedCpuDrawUs);
+            out.appendAtomic("\nCPU: totalMs=");
+            out.appendMs1DecimalFromUsAtomic(mSmoothedCpuTotalUs);
 
             // Разбивка RenderSystem (gather/sort/build/draw).
             mSmoothedRSGatherUs = emaPow2(mSmoothedRSGatherUs, stats.cpuGatherUs, mSmoothingShift);
@@ -239,90 +335,86 @@ namespace core::ecs {
             mSmoothedRSBuildUs = emaPow2(mSmoothedRSBuildUs, stats.cpuBuildUs, mSmoothingShift);
             mSmoothedRSDrawUs = emaPow2(mSmoothedRSDrawUs, stats.cpuDrawUs, mSmoothingShift);
 
-            mTextBuffer.append("\nRenderCPU: gatherMs=");
-            core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSGatherUs);
-            mTextBuffer.append(" sortMs=");
-            core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSSortUs);
-            mTextBuffer.append(" buildMs=");
-            core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSBuildUs);
-            mTextBuffer.append(" drawMs=");
-            core::utils::format::appendMs1DecimalFromUs(mTextBuffer, mSmoothedRSDrawUs);
+            out.appendAtomic("\nRenderCPU: gatherMs=");
+            out.appendMs1DecimalFromUsAtomic(mSmoothedRSGatherUs);
+            out.appendAtomic(" sortMs=");
+            out.appendMs1DecimalFromUsAtomic(mSmoothedRSSortUs);
+            out.appendAtomic(" buildMs=");
+            out.appendMs1DecimalFromUsAtomic(mSmoothedRSBuildUs);
+            out.appendAtomic(" drawMs=");
+            out.appendMs1DecimalFromUsAtomic(mSmoothedRSDrawUs);
 #endif
         }
 
         // ----------------------------------------------------------------------------------------
         // Spatial index метрики — только Debug/Profile.
-        // SpatialActive != ECSAlive: count зарегистрированных в индексе entity.
+        // Grid geometry/structure отделён от Counts для разгрузки строки.
         // ----------------------------------------------------------------------------------------
         if (mSpatialIndexSystem) {
             const auto& idx = mSpatialIndexSystem->index();
 
-            mTextBuffer.append("\nSpatial: active=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(idx.activeEntityCount()));
+            out.appendAtomic("\nSpatialGrid: window=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(idx.windowWidth()));
+            out.pushBackAtomic('x');
+            out.appendU64Atomic(static_cast<std::uint64_t>(idx.windowHeight()));
 
-            mTextBuffer.append(" window=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(idx.windowWidth()));
-            mTextBuffer.push_back('x');
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(idx.windowHeight()));
-
-            mTextBuffer.append(" dupInsertDetected=");
-            core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(idx.debugDupInsertDetected()));
+            out.appendAtomic(" dupInsertDetected=");
+            out.appendU64Atomic(
+                static_cast<std::uint64_t>(idx.debugDupInsertDetected()));
 
             // Канонический блок query counters: только из SpatialIndex.
             const auto& q = idx.debugLastQueryStatsRef();
-            mTextBuffer.append("\nSpatialQuery: entriesScanned=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(q.entriesScanned));
-            mTextBuffer.append(" unique=");
-            core::utils::format::appendU64(mTextBuffer, static_cast<std::uint64_t>(q.uniqueAdded));
-            mTextBuffer.append(" dupHits=");
-            core::utils::format::appendU64(mTextBuffer, static_cast<std::uint64_t>(q.dupHits));
-            mTextBuffer.append(" cells=");
-            core::utils::format::appendU64(mTextBuffer, static_cast<std::uint64_t>(q.cellVisits));
-            mTextBuffer.append(" ovCells=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(q.overflowCellVisits));
-            mTextBuffer.append(" chunksLoaded=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(q.chunksLoadedVisited));
-            mTextBuffer.append(" chunks=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(q.chunksVisited));
-            mTextBuffer.append(" skippedNonLoaded=");
-            core::utils::format::appendU64(mTextBuffer,
-                                           static_cast<std::uint64_t>(q.chunksSkippedNonLoaded));
-            mTextBuffer.append(" truncated=");
-            core::utils::format::appendU64(mTextBuffer, static_cast<std::uint64_t>(q.outTruncated));
+            out.appendAtomic("\nSpatialQuery: entriesScanned=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(q.entriesScanned));
+            out.appendAtomic(" unique=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(q.uniqueAdded));
+            out.appendAtomic(" dupHits=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(q.dupHits));
+            out.appendAtomic(" truncated=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(q.outTruncated));
+
+            out.appendAtomic("\nSpatialVisit: chunksLoaded=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(q.chunksLoadedVisited));
+            out.appendAtomic(" chunks=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(q.chunksVisited));
+            out.appendAtomic(" skippedNonLoaded=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(q.chunksSkippedNonLoaded));
+            out.appendAtomic(" cells=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(q.cellVisits));
+            out.appendAtomic(" overflowCells=");
+            out.appendU64Atomic(static_cast<std::uint64_t>(q.overflowCellVisits));
 
             // Storages: sizes (диагностика компонентного состава).
-            mTextBuffer.append("\nStorages: transform=");
-            core::utils::format::appendU64(
-                mTextBuffer,
+            out.appendAtomic("\nStorages: transform=");
+            out.appendU64Atomic(
                 static_cast<std::uint64_t>(world.debugStorageSize<TransformComponent>()));
-            mTextBuffer.append(" sprite=");
-            core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(world.debugStorageSize<SpriteComponent>()));
-            mTextBuffer.append(" spatialId=");
-            core::utils::format::appendU64(
-                mTextBuffer,
+            out.appendAtomic(" sprite=");
+            out.appendU64Atomic(
+                static_cast<std::uint64_t>(world.debugStorageSize<SpriteComponent>()));
+            out.appendAtomic(" spatialId=");
+            out.appendU64Atomic(
                 static_cast<std::uint64_t>(world.debugStorageSize<SpatialIdComponent>()));
-            mTextBuffer.append(" streamedOut=");
-            core::utils::format::appendU64(
-                mTextBuffer,
+            out.appendAtomic(" streamedOut=");
+            out.appendU64Atomic(
                 static_cast<std::uint64_t>(world.debugStorageSize<SpatialStreamedOutTag>()));
-            mTextBuffer.append(" dirty=");
-            core::utils::format::appendU64(
-                mTextBuffer, static_cast<std::uint64_t>(world.debugStorageSize<SpatialDirtyTag>()));
+            out.appendAtomic(" dirty=");
+            out.appendU64Atomic(
+                static_cast<std::uint64_t>(world.debugStorageSize<SpatialDirtyTag>()));
         }
 #endif // !defined(NDEBUG) || defined(SFML1_PROFILE)
 
         if (!mExtraTextBuffer.empty()) {
-            mTextBuffer.push_back('\n');
-            mTextBuffer.append(mExtraTextBuffer);
+            out.appendAtomic("\n");
+            // extra может быть большим: допускаем частичную допись.
+            out.appendClamped(mExtraTextBuffer);
+        }
+
+        if (mTextTruncated && !mTextTruncLogged) {
+            mTextTruncLogged = true;
+            LOG_WARN(core::log::cat::ECS,
+                     "DebugOverlay: text buffer truncated (cap={} bytes). "
+                     "Reduce overlay lines or increase kTextHardCapBytes.",
+                     kTextHardCapBytes);
         }
 
         mFpsText->setString(mTextBuffer);
@@ -338,35 +430,25 @@ namespace core::ecs {
 
     void DebugOverlaySystem::clearExtraText() noexcept {
         mExtraTextBuffer.clear();
+        mExtraTextTruncated = false;
     }
 
     void DebugOverlaySystem::appendExtraLine(const std::string_view line) {
-        if (line.empty()) {
+        if (line.empty() || mExtraTextTruncated) {
             return;
         }
 
-        // Hardening: никаких realloc/ассертов. Если не влезает — мягко обрезаем.
-        // Важно: std::string не обязан realloc'ать, пока finalSize <= capacity().
-        if (mExtraTextBuffer.size() >= mExtraTextBuffer.capacity()) {
-            return;
-        }
+        CappedAppender out{mExtraTextBuffer,
+                           kExtraTextHardCapBytes - kTruncMarker.size(),
+                           kTruncMarker,
+                           mExtraTextTruncated};
 
         if (!mExtraTextBuffer.empty()) {
-            if (mExtraTextBuffer.size() >= mExtraTextBuffer.capacity()) {
-                return;
-            }
-            mExtraTextBuffer.push_back('\n');
+            out.appendAtomic("\n");
         }
 
-        const std::size_t remaining = (mExtraTextBuffer.capacity() > mExtraTextBuffer.size())
-                                          ? (mExtraTextBuffer.capacity() - mExtraTextBuffer.size())
-                                          : 0u;
-        if (remaining == 0u) {
-            return;
-        }
-
-        const std::size_t toAppend = (line.size() <= remaining) ? line.size() : remaining;
-        mExtraTextBuffer.append(line.data(), toAppend);
+        // extra строки — могут быть длинными: дописываем частично.
+        out.appendClamped(line);
     }
 
     void DebugOverlaySystem::draw(sf::RenderWindow& window) const {

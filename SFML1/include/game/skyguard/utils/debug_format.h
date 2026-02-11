@@ -130,15 +130,16 @@ namespace game::skyguard::utils {
                                const sf::Vector2f& position) noexcept;
 
     // ВАЖНО:
-    // eligible != "реально отрисовано".
-    // eligible = "по известным нам условиям в UI-pass объект должен был попасть в render-pass".
+    // predictedVisible != "реально отрисовано".
+    // predictedVisible = "по известным нам условиям в UI-pass объект
+    // должен был попасть в render-pass".
     [[nodiscard]] std::size_t
     formatPlayerWatchVisibilityLine(char* buf, std::size_t cap,
                                     const core::spatial::Aabb2& lastAabb,
                                     const core::spatial::Aabb2& newAabb,
                                     bool fineCullPass,
                                     bool inQuery,
-                                    bool eligible) noexcept;
+                                    bool predictedVisible) noexcept;
 
     [[nodiscard]] std::size_t
     formatDensityLine(char* buf, std::size_t cap,

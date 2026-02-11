@@ -266,7 +266,7 @@ namespace game::skyguard::utils {
                                                 const core::spatial::Aabb2& newAabb,
                                                 const bool fineCullPass,
                                                 const bool inQuery,
-                                                const bool eligible) noexcept {
+                                                const bool predictedVisible) noexcept {
         if (cap == 0) {
             return 0;
         }
@@ -286,10 +286,10 @@ namespace game::skyguard::utils {
         if (!detail::appendNumber(it, end, static_cast<std::uint32_t>(inQuery))) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendLiteral(it, end, " eligible=")) {
+        if (!detail::appendLiteral(it, end, " predicted=")) {
             return static_cast<std::size_t>(it - buf);
         }
-        if (!detail::appendNumber(it, end, static_cast<std::uint32_t>(eligible))) {
+        if (!detail::appendNumber(it, end, static_cast<std::uint32_t>(predictedVisible))) {
             return static_cast<std::size_t>(it - buf);
         }
 

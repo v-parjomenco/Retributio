@@ -3010,9 +3010,41 @@ struct SpatialChunk final {
 
         for (std::size_t i = 0; i < mCellsPerChunk; ++i) {
             const Cell& cell = cells[i];
+
             std::uint32_t len = static_cast<std::uint32_t>(cell.count);
+
+            // Если inline уже > cap — мы даже не пытаемся искать dupApprox.
+            bool sampleEligible = (len <= kSampleCap);
+            std::uint32_t sampleCount = 0;
+
+            if (sampleEligible) {
+                for (std::uint8_t j = 0; j < cell.count; ++j) {
+                    sample[sampleCount++] = cell.entities[j];
+                }
+            }
+
             if (cell.overflowHandle != 0u) {
-                len += mOverflowPool.totalCount(cell.overflowHandle);
+                std::uint32_t overflowCount = 0;
+
+                (void) mOverflowPool.forEach(cell.overflowHandle, [&](const EntityId32 id) {
+                    ++overflowCount;
+
+                    // Сэмплим, пока итоговая длина не гарантированно > cap.
+                    if (sampleEligible) {
+                        if (sampleCount < kSampleCap) {
+                            sample[sampleCount++] = id;
+                        } else {
+                            // Вылезли за cap => dupApprox не считаем.
+                            sampleEligible = false;
+                        }
+                    }
+                    return true;
+                });
+
+                len += overflowCount;
+                if (len > kSampleCap) {
+                    sampleEligible = false;
+                }
             }
 
             out.sumCellLen += len;
@@ -3024,26 +3056,11 @@ struct SpatialChunk final {
                 continue;
             }
 
-            if (len <= kSampleCap) {
-                std::uint32_t sampleCount = 0;
-                for (std::uint8_t j = 0; j < cell.count; ++j) {
-                    sample[sampleCount++] = cell.entities[j];
-                }
-                if (cell.overflowHandle != 0u) {
-                    (void) mOverflowPool.forEach(cell.overflowHandle, [&](const EntityId32 id) {
-                        if (sampleCount < kSampleCap) {
-                            sample[sampleCount++] = id;
-                            return true;
-                        }
-                        return false;
-                    });
-                }
-
-                for (std::uint32_t a = 0; a < sampleCount; ++a) {
-                    for (std::uint32_t b = a + 1u; b < sampleCount; ++b) {
-                        if (sample[a] == sample[b]) {
-                            ++out.dupApprox;
-                        }
+            if (sampleEligible && sampleCount > 1u) {
+                std::sort(sample.begin(), sample.begin() + static_cast<std::ptrdiff_t>(sampleCount));
+                for (std::uint32_t k = 1; k < sampleCount; ++k) {
+                    if (sample[k - 1u] == sample[k]) {
+                        ++out.dupApprox;
                     }
                 }
             }
