@@ -1,10 +1,21 @@
 // ================================================================================================
 // File: core/log/logging.h
 // Purpose: Public API for the engine-wide logging subsystem (core::log).
-// Notes:
-//  - This header defines the configuration struct and high-level logging functions.
-//  - Implementation details (sinks, mutexes, file rotation) live in logging.cpp.
-//  - Formatting is provided via logf/detail::logf_impl and uses std::vformat (C++20).
+//
+// Architecture (ADR):
+//  - Synchronous logger, thread-safe via mutex. No async queue.
+//  - On enabled log:  1 string build (envelope + payload in one buffer), no intermediate
+//                      payload allocation. Scratch buffer reused across calls.
+//  - On disabled log: 0 formatting, 0 lock (atomic fast-gate in macro/wouldLog).
+//  - Format strings:  compile-time checked via std::format_string<Args...>.
+//                      Runtime format strings are NOT supported through the macro/template path.
+//                      Mods/scripts log via log() with a pre-formatted std::string_view message;
+//                      formatting is the caller's responsibility.
+//  - Layout:          Debug  — [timestamp] [LEVEL] [category] message (file:line)
+//                     Release — [timestamp] [LEVEL] [category] message
+//  - Flush policy:    console and file flush only on Error+ and PANIC.
+//  - Ordering:        global order guaranteed (single mutex).
+//  - Crash semantics: PANIC guarantees flush + close before process exit.
 // ================================================================================================
 #pragma once
 
@@ -13,90 +24,70 @@
 #include <format>
 #include <string>
 #include <string_view>
-#include <utility>
 
 #include "core/log/log_level.h"
 
-// -----------------------------------------------------------------------------------------------
-// Хелперы форматирования логов намеренно НЕ заинлайнены.
-// Они тяжелые (std::vformat + выделение памяти) и могут вызывать /Wall C4710 под /WX в Release.
-// ------------------------------------------------------------------------------------------------
-#if defined(_MSC_VER)
-    #define CORE_LOG_NOINLINE __declspec(noinline)
-#elif defined(__clang__) || defined(__GNUC__)
-    #define CORE_LOG_NOINLINE __attribute__((noinline))
-#else
-    #define CORE_LOG_NOINLINE
-#endif
-
 namespace core::log {
+
+    // --------------------------------------------------------------------------------------------
+    // Конфигурация
+    // --------------------------------------------------------------------------------------------
 
     /**
      * @brief Конфигурация логгера, задаваемая при инициализации.
      *
-     * Здесь нет тяжёлой логики — только набор флагов и параметров по умолчанию.
      * Значения для Debug/Release-сборок задаются в core/log/log_defaults.h.
      */
     struct Config {
         /// @brief Минимальный уровень, который будет записываться в лог.
-        Level       minLevel        = Level::Info;
+        Level       minLevel       = Level::Info;
         /// @brief Включён ли вывод в консоль (std::cout / debugger).
-        bool        consoleEnabled  = true;
+        bool        consoleEnabled = true;
         /// @brief Включён ли вывод в файл (logs/*.log).
-        bool        fileEnabled     = true;
+        bool        fileEnabled    = true;
         /// @brief Должен ли лог-файл сбрасывать буфер при Error+ (Error/Critical).
-        bool        flushOnError    = true;
+        bool        flushOnError   = true;
         /// @brief Каталог, куда складываются лог-файлы (например, "logs").
-        std::string logDirectory    = "logs";
+        std::string logDirectory   = "logs";
         /// @brief Максимальное количество лог-файлов, которые нужно хранить.
-        ///        При превышении старые файлы будут удаляться.
-        std::size_t maxFiles        = 10;
+        std::size_t maxFiles       = 10;
     };
 
     inline bool operator==(const Config& lhs, const Config& rhs) noexcept {
-        return lhs.minLevel == rhs.minLevel
+        return lhs.minLevel       == rhs.minLevel
             && lhs.consoleEnabled == rhs.consoleEnabled
-            && lhs.fileEnabled == rhs.fileEnabled
-            && lhs.flushOnError == rhs.flushOnError
-            && lhs.logDirectory == rhs.logDirectory
-            && lhs.maxFiles == rhs.maxFiles;
-    }
-
-    inline bool operator!=(const Config& lhs, const Config& rhs) noexcept {
-        return !(lhs == rhs);
+            && lhs.fileEnabled    == rhs.fileEnabled
+            && lhs.flushOnError   == rhs.flushOnError
+            && lhs.logDirectory   == rhs.logDirectory
+            && lhs.maxFiles       == rhs.maxFiles;
     }
 
     // --------------------------------------------------------------------------------------------
-    // Fast-path gating (macro-level): avoid std::vformat when message will be dropped anyway.
+    // Fast-path гейт (уровень макросов): не форматируем, если сообщение будет отброшено.
     // --------------------------------------------------------------------------------------------
 
-    // NB:
-    //  - g_fastGateReady false => "консервативный режим": 
-    //    возвращаем true, чтобы не потерять ранние логи до init()/ленивой инициализации.
-    //  - После инициализации (initLocked/ensureInitialized/setMinLevel)
-    //    g_fastGateReady становится true, и гейтимся по minLevel атомиком без mutex.
+    // g_fastGateReady == false => «консервативный режим»: возвращаем true,
+    //     чтобы не потерять ранние логи до init() / ленивой инициализации.
+    // После инициализации: g_fastGateReady == true, гейтимся по g_minLevelAtomic без mutex.
 
     inline std::atomic<Level> g_minLevelAtomic{Level::Info};
     inline std::atomic<bool>  g_fastGateReady{false};
 
     /**
-     * @brief Быстрая проверка "будет ли лог вообще записан" по текущему minLevel.
+     * @brief Быстрая проверка «будет ли лог записан» без захвата mutex.
      *
-     * Используется макросами, чтобы не делать форматирование (std::vformat) и не вычислять
-     * аргументы зря.
-     * Сейчас category не учитывается (у нас глобальный minLevel), но параметр оставлен на будущее.
+     * Используется макросами перед любым форматированием.
+     * category оставлен на будущее (per-category filtering); сейчас не учитывается.
      */
     [[nodiscard]] inline bool wouldLog(Level level, std::string_view /*category*/) noexcept {
         if (!g_fastGateReady.load(std::memory_order_acquire)) {
             return true;
         }
-
-        const Level minLevel = g_minLevelAtomic.load(std::memory_order_relaxed);
-        return level >= minLevel;
+        return level >= g_minLevelAtomic.load(std::memory_order_relaxed);
     }
 
     // --------------------------------------------------------------------------------------------
-    // Инициализация и завершение работы логгера
+    // Жизненный цикл
     // --------------------------------------------------------------------------------------------
 
     void init(const Config& config);
@@ -104,7 +95,8 @@ namespace core::log {
     void setMinLevel(Level level);
 
     // --------------------------------------------------------------------------------------------
-    // Базовая функция логирования (без форматирования)
+    // Путь с готовым сообщением (для модов/скриптов/прямого использования).
+    // Форматирование — ответственность вызывающей стороны.
     // --------------------------------------------------------------------------------------------
 
     void log(Level level,
@@ -113,151 +105,93 @@ namespace core::log {
              const char* file,
              int line);
 
-    // --------------------------------------------------------------------------------------------
-    // Форматируемые версии (логика реализована через std::vformat)
-    // --------------------------------------------------------------------------------------------
-
-    template <typename... Args>
-    void logf(Level level,
-              std::string_view category,
-              const char* formatString,
-              Args&&... args);
-
     [[noreturn]] void panic(std::string_view category,
                             std::string_view message,
                             const char* file,
                             int line);
 
-    template <typename... Args>
-    void panicf(std::string_view category,
-                const char* formatString,
-                Args&&... args);
-
     // --------------------------------------------------------------------------------------------
-    // Внутренние helper'ы для макросов (log_macros.h)
+    // Форматируемый путь — non-template sink'и (реализация в logging.cpp).
     // --------------------------------------------------------------------------------------------
 
     namespace detail {
 
-        #if defined(_MSC_VER)
-            #pragma warning(push)
-            // /Wall emits C4710/C4711 for heavy STL formatting code in headers,
-            // and /WX makes it fatal.
-            // This is noise (not a bug) and depends on MSVC inlining heuristics
-            // (Win32 triggers it more often).
-            #pragma warning(disable : 4710) // function not inlined
-            #pragma warning(disable : 4711) // selected for automatic inline expansion
-        #endif
+        void log_write(Level level,
+                       std::string_view category,
+                       const char* file,
+                       int line,
+                       std::string_view fmt,
+                       std::format_args args);
 
-        template <typename... Args>
-        CORE_LOG_NOINLINE void logf_impl(Level level,
-                                         std::string_view category,
-                                         const char* file,
-                                         int line,
-                                         const char* formatString,
-                                         Args&&... args);
-
-        template <typename... Args>
-        CORE_LOG_NOINLINE void panicf_impl(std::string_view category,
-                                           const char* file,
-                                           int line,
-                                           const char* formatString,
-                                           Args&&... args);
+        [[noreturn]] void panic_write(std::string_view category,
+                                      const char* file,
+                                      int line,
+                                      std::string_view fmt,
+                                      std::format_args args);
 
     } // namespace detail
 
     // --------------------------------------------------------------------------------------------
-    // Шаблонные реализации
+    // Форматируемый путь — тонкие шаблонные точки входа.
+    //
+    // Делают ровно две вещи:
+    //  1. Compile-time валидация формата (std::format_string<Args...>).
+    //  2. Type-erasure (std::make_format_args) + немедленный вызов non-template sink в .cpp.
+    //
+    // Никакого std::vformat, промежуточных строк или тяжёлой STL-работы в header.
     // --------------------------------------------------------------------------------------------
 
+    namespace detail {
+
+        /// Вызывается макросами LOG_* (с __FILE__/__LINE__).
+        template <typename... Args>
+        void logf_impl(Level level,
+                       std::string_view category,
+                       const char* file,
+                       int line,
+                       std::format_string<Args...> fmt,
+                       Args&&... args) {
+            log_write(level, category, file, line,
+                      fmt.get(), std::make_format_args(args...));
+        }
+
+        /// Вызывается макросом LOG_PANIC (с __FILE__/__LINE__). [[noreturn]].
+        template <typename... Args>
+        [[noreturn]] void panicf_impl(std::string_view category,
+                                      const char* file,
+                                      int line,
+                                      std::format_string<Args...> fmt,
+                                      Args&&... args) {
+            panic_write(category, file, line,
+                        fmt.get(), std::make_format_args(args...));
+        }
+
+    } // namespace detail
+
+    // --------------------------------------------------------------------------------------------
+    // Удобные функции (без file/line, для прямого использования вне макросов).
+    // --------------------------------------------------------------------------------------------
+
+    /// Форматированный лог — compile-time проверка. Source location помечен как неизвестный.
     template <typename... Args>
-    inline void logf(Level level,
-                     std::string_view category,
-                     const char* formatString,
-                     Args&&... args) {
-        // Fast-path: не форматируем вообще, если сообщение будет отброшено по minLevel.
+    void logf(Level level,
+              std::string_view category,
+              std::format_string<Args...> fmt,
+              Args&&... args) {
         if (!wouldLog(level, category)) {
             return;
         }
-
-        // Вариант без файла/строки: помечаем как неизвестный источник.
-        detail::logf_impl(level,
-                          category,
-                          /*file*/ "",
-                          /*line*/ 0,
-                          formatString,
-                          std::forward<Args>(args)...);
+        detail::log_write(level, category, "", 0,
+                          fmt.get(), std::make_format_args(args...));
     }
 
+    /// Форматированный panic — compile-time проверка. Source location помечен как неизвестный.
     template <typename... Args>
-    inline void panicf(std::string_view category,
-                       const char* formatString,
-                       Args&&... args) {
-        detail::panicf_impl(category,
-                            /*file*/ "",
-                            /*line*/ 0,
-                            formatString,
-                            std::forward<Args>(args)...);
+    [[noreturn]] void panicf(std::string_view category,
+                             std::format_string<Args...> fmt,
+                             Args&&... args) {
+        detail::panic_write(category, "", 0,
+                            fmt.get(), std::make_format_args(args...));
     }
-
-    namespace detail {
-
-        template <typename... Args>
-        CORE_LOG_NOINLINE void logf_impl(Level level,
-                                         std::string_view category,
-                                         const char* file,
-                                         int line,
-                                         const char* formatString,
-                                         Args&&... args) {
-            try {
-                // NB: make_format_args принимает const Args&..., поэтому forwarding не нужен.
-                auto fmtArgs = std::make_format_args(args...);
-
-                const std::string_view fmt =
-                    formatString ? std::string_view{formatString} : std::string_view{};
-                std::string formatted = std::vformat(fmt, fmtArgs);
-
-                log(level, category, formatted, file, line);
-            } catch (const std::format_error& e) {
-                std::string fallback = "[Log formatting error] ";
-                fallback += e.what();
-                fallback += " | formatStr: ";
-                fallback += formatString ? formatString : "<null>";
-
-                log(Level::Error, category, fallback, file, line);
-            }
-        }
-
-        template <typename... Args>
-        CORE_LOG_NOINLINE void panicf_impl(std::string_view category,
-                                           const char* file,
-                                           int line,
-                                           const char* formatString,
-                                           Args&&... args) {
-            try {
-                auto fmtArgs = std::make_format_args(args...);
-
-                const std::string_view fmt =
-                    formatString ? std::string_view{formatString} : std::string_view{};
-                std::string formatted = std::vformat(fmt, fmtArgs);
-
-                panic(category, formatted, file, line);
-            } catch (const std::format_error& e) {
-                std::string fallback = "[PANIC formatting error] ";
-                fallback += e.what();
-                fallback += " | formatStr: ";
-                fallback += formatString ? formatString : "<null>";
-
-                panic(category, fallback, file, line);
-            }
-        }
-
-        #if defined(_MSC_VER)
-            #pragma warning(pop)
-        #endif
-
-    } // namespace detail
 
 } // namespace core::log
-
-#undef CORE_LOG_NOINLINE

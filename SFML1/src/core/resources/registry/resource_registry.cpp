@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <format>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -16,7 +17,6 @@
 #include <vector>
 
 #if defined(SFML1_TESTS)
-    #include <format>
     #include <string>
 #endif
 
@@ -53,7 +53,8 @@ namespace core::resources {
         struct StringViewEqual {
             using is_transparent = void;
 
-            [[nodiscard]] bool operator()(std::string_view lhs, std::string_view rhs) const noexcept {
+            [[nodiscard]] bool operator()(
+                std::string_view lhs, std::string_view rhs) const noexcept {
                 return lhs == rhs;
             }
         };
@@ -72,11 +73,16 @@ namespace core::resources {
             return computeStableKey64(name);
         }
 
+        /// @brief Внутренний panic с compile-time проверкой формата.
+        ///
+        /// Все вызывающие передают строковые литералы — std::format_string
+        /// проверяет корректность формата на этапе компиляции.
+        /// В тестовой сборке перенаправляет на gPanicHandler (если задан).
         template <typename... Args>
-        [[noreturn]] void panic(const char* format, Args&&... args) {
+        [[noreturn]] void panic(std::format_string<Args...> format, Args&&... args) {
 #if defined(SFML1_TESTS)
             if (gPanicHandler != nullptr) {
-                std::string message = std::vformat(format, std::make_format_args(args...));
+                std::string message = std::vformat(format.get(), std::make_format_args(args...));
                 gPanicHandler(message);
                 std::abort(); // если handler не бросил исключение — считаем panic фатальным
             }
@@ -146,7 +152,9 @@ namespace core::resources {
                 return defaultValue;
             }
             if (!it->is_boolean()) {
-                panic("[ResourceRegistry] Field '{}' for '{}' must be boolean.", fieldName, entryName);
+                panic("[ResourceRegistry] Field '{}' for '{}' must be boolean.",
+                      fieldName,
+                      entryName);
             }
             return it->get<bool>();
         }
@@ -181,8 +189,9 @@ namespace core::resources {
             return *ptr;
         }
 
-        [[nodiscard]] std::optional<std::string_view> tryReadStringField(const Json& value,
-                                                                         std::string_view fieldName) {
+        [[nodiscard]] std::optional<std::string_view> tryReadStringField(
+            const Json& value,
+            std::string_view fieldName) {
             const auto it = value.find(fieldName);
             if (it == value.end()) {
                 return std::nullopt;
@@ -213,11 +222,13 @@ namespace core::resources {
                                                  StringViewHash,
                                                  StringViewEqual>;
 
-        void ensureUniqueInSource(std::unordered_set<std::string_view, StringViewHash, StringViewEqual>& sourceKeys,
+        void ensureUniqueInSource(std::unordered_set<
+                                   std::string_view, StringViewHash, StringViewEqual>& sourceKeys,
                                   std::string_view key) {
             const auto [_, inserted] = sourceKeys.emplace(key);
             if (!inserted) {
-                panic("[ResourceRegistry] Duplicate canonical key '{}' within a single source file.", key);
+                panic("[ResourceRegistry] Duplicate canonical key '{}' within a single source file.",
+                      key);
             }
         }
 
@@ -292,7 +303,8 @@ namespace core::resources {
         void parseTextureBlock(const Json& textures,
                                const ResourceSource& source,
                                registry::StringPool& strings,
-                               std::unordered_set<std::string_view, StringViewHash, StringViewEqual>& sourceKeys,
+                               std::unordered_set<
+                                std::string_view, StringViewHash, StringViewEqual>& sourceKeys,
                                DefinitionMap<config::TextureResourceConfig>& out) {
             for (auto it = textures.begin(); it != textures.end(); ++it) {
                 const std::string_view key = it.key();
@@ -332,7 +344,8 @@ namespace core::resources {
         void parseFontBlock(const Json& fonts,
                             const ResourceSource& source,
                             registry::StringPool& strings,
-                            std::unordered_set<std::string_view, StringViewHash, StringViewEqual>& sourceKeys,
+                            std::unordered_set<
+                             std::string_view, StringViewHash, StringViewEqual>& sourceKeys,
                             DefinitionMap<config::FontResourceConfig>& out) {
             for (auto it = fonts.begin(); it != fonts.end(); ++it) {
                 const std::string_view key = it.key();
@@ -368,7 +381,8 @@ namespace core::resources {
         void parseSoundBlock(const Json& sounds,
                              const ResourceSource& source,
                              registry::StringPool& strings,
-                             std::unordered_set<std::string_view, StringViewHash, StringViewEqual>& sourceKeys,
+                             std::unordered_set<
+                              std::string_view, StringViewHash, StringViewEqual>& sourceKeys,
                              DefinitionMap<config::SoundResourceConfig>& out) {
             for (auto it = sounds.begin(); it != sounds.end(); ++it) {
                 const std::string_view key = it.key();
@@ -418,7 +432,8 @@ namespace core::resources {
 
         template <typename Config>
         void computeStableKeysAndValidateCollisions(DefinitionMap<Config>& defs,
-                                                    std::unordered_map<std::uint64_t, std::string_view>& globalLookup) {
+                                                    std::unordered_map<std::uint64_t,
+                                                    std::string_view>& globalLookup) {
             for (auto& [_, def] : defs) {
                 def.stableKey = stableKeyFor(def.name);
 
@@ -475,7 +490,8 @@ namespace core::resources {
                 nameIndex.push_back(NameIndex{entries[i].name, static_cast<std::uint32_t>(i)});
             }
 
-            std::sort(nameIndex.begin(), nameIndex.end(), [](const NameIndex& lhs, const NameIndex& rhs) {
+            std::sort(nameIndex.begin(), nameIndex.end(), [](
+                const NameIndex& lhs, const NameIndex& rhs) {
                 return lhs.name < rhs.name;
             });
         }
@@ -529,7 +545,8 @@ namespace core::resources {
                 source.path,
                 kRegistryModule,
                 {JsonValidator::KeyRule{"version",
-                                        {Json::value_t::number_integer, Json::value_t::number_unsigned},
+                                        {Json::value_t::number_integer,
+                                         Json::value_t::number_unsigned},
                                         true},
                  JsonValidator::KeyRule{"textures", {Json::value_t::object}, true},
                  JsonValidator::KeyRule{"fonts", {Json::value_t::object}, true},
@@ -574,12 +591,14 @@ namespace core::resources {
 
         mMissingTexture = findTextureByName(kMissingTextureName);
         if (!mMissingTexture.valid()) {
-            panic("[ResourceRegistry] Missing required fallback texture '{}'.", kMissingTextureName);
+            panic("[ResourceRegistry] Missing required fallback texture '{}'.",
+                  kMissingTextureName);
         }
 
         mMissingFont = findFontByName(kMissingFontName);
         if (!mMissingFont.valid()) {
-            panic("[ResourceRegistry] Missing required fallback font '{}'.", kMissingFontName);
+            panic("[ResourceRegistry] Missing required fallback font '{}'.",
+                  kMissingFontName);
         }
 
         mStrings.clearLookup();
