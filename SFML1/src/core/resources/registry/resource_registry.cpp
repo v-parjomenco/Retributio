@@ -59,12 +59,17 @@ namespace core::resources {
             }
         };
 
+        using StableKey = std::uint64_t;
+        using StableKeyLookup = std::unordered_map<StableKey, std::string_view>;
+        using SourceKeySet =
+            std::unordered_set<std::string_view, StringViewHash, StringViewEqual>;
+
 #if defined(SFML1_TESTS)
         registry::test::StableKeyFn gStableKeyFn = computeStableKey64;
         registry::test::PanicHandler gPanicHandler = nullptr;
 #endif
 
-        [[nodiscard]] std::uint64_t stableKeyFor(std::string_view name) noexcept {
+        [[nodiscard]] StableKey stableKeyFor(std::string_view name) noexcept {
 #if defined(SFML1_TESTS)
             if (gStableKeyFn != nullptr) {
                 return gStableKeyFn(name);
@@ -210,7 +215,7 @@ namespace core::resources {
             std::string_view name{};       // interned canonical key
             std::string_view path{};       // interned path
             Config config{};               // type-specific config
-            std::uint64_t stableKey = 0u;  // StableKey64 (computed after overrides)
+            StableKey stableKey = 0u;      // StableKey64 (computed after overrides)
             int layerPriority = 0;
             int loadOrder = 0;
             std::string_view sourceName{}; // diagnostics only
@@ -222,9 +227,7 @@ namespace core::resources {
                                                  StringViewHash,
                                                  StringViewEqual>;
 
-        void ensureUniqueInSource(std::unordered_set<
-                                   std::string_view, StringViewHash, StringViewEqual>& sourceKeys,
-                                  std::string_view key) {
+        void ensureUniqueInSource(SourceKeySet& sourceKeys, std::string_view key) {
             const auto [_, inserted] = sourceKeys.emplace(key);
             if (!inserted) {
                 panic("[ResourceRegistry] Duplicate canonical key '{}' within a single source file.",
@@ -303,8 +306,7 @@ namespace core::resources {
         void parseTextureBlock(const Json& textures,
                                const ResourceSource& source,
                                registry::StringPool& strings,
-                               std::unordered_set<
-                                std::string_view, StringViewHash, StringViewEqual>& sourceKeys,
+                               SourceKeySet& sourceKeys,
                                DefinitionMap<config::TextureResourceConfig>& out) {
             for (auto it = textures.begin(); it != textures.end(); ++it) {
                 const std::string_view key = it.key();
@@ -344,8 +346,7 @@ namespace core::resources {
         void parseFontBlock(const Json& fonts,
                             const ResourceSource& source,
                             registry::StringPool& strings,
-                            std::unordered_set<
-                             std::string_view, StringViewHash, StringViewEqual>& sourceKeys,
+                            SourceKeySet& sourceKeys,
                             DefinitionMap<config::FontResourceConfig>& out) {
             for (auto it = fonts.begin(); it != fonts.end(); ++it) {
                 const std::string_view key = it.key();
@@ -381,8 +382,7 @@ namespace core::resources {
         void parseSoundBlock(const Json& sounds,
                              const ResourceSource& source,
                              registry::StringPool& strings,
-                             std::unordered_set<
-                              std::string_view, StringViewHash, StringViewEqual>& sourceKeys,
+                             SourceKeySet& sourceKeys,
                              DefinitionMap<config::SoundResourceConfig>& out) {
             for (auto it = sounds.begin(); it != sounds.end(); ++it) {
                 const std::string_view key = it.key();
@@ -432,8 +432,7 @@ namespace core::resources {
 
         template <typename Config>
         void computeStableKeysAndValidateCollisions(DefinitionMap<Config>& defs,
-                                                    std::unordered_map<std::uint64_t,
-                                                    std::string_view>& globalLookup) {
+                                                    StableKeyLookup& globalLookup) {
             for (auto& [_, def] : defs) {
                 def.stableKey = stableKeyFor(def.name);
 
@@ -558,7 +557,7 @@ namespace core::resources {
             const Json& fonts = requireObjectBlock(data, "fonts");
             const Json& sounds = requireObjectBlock(data, "sounds");
 
-            std::unordered_set<std::string_view, StringViewHash, StringViewEqual> sourceKeys;
+            SourceKeySet sourceKeys;
             sourceKeys.reserve(textures.size() + fonts.size() + sounds.size());
 
             parseTextureBlock(textures, source, mStrings, sourceKeys, textureDefinitions);
@@ -569,7 +568,7 @@ namespace core::resources {
         const std::size_t totalDefs =
             textureDefinitions.size() + fontDefinitions.size() + soundDefinitions.size();
 
-        std::unordered_map<std::uint64_t, std::string_view> stableKeyGlobal;
+        StableKeyLookup stableKeyGlobal;
         stableKeyGlobal.reserve(totalDefs);
 
         computeStableKeysAndValidateCollisions(textureDefinitions, stableKeyGlobal);
@@ -635,12 +634,12 @@ namespace core::resources {
         return findByNameIndex<TextureKey>(mTextureNameIndex, name, mTextures);
     }
 
-    TextureKey ResourceRegistry::findTextureByStableKey(std::uint64_t stableKey) const {
+    TextureKey ResourceRegistry::findTextureByStableKey(StableKey stableKey) const {
         const auto it = std::lower_bound(
             mTextures.begin(),
             mTextures.end(),
             stableKey,
-            [](const TextureEntry& entry, std::uint64_t value) { return entry.stableKey < value; });
+            [](const TextureEntry& entry, StableKey value) { return entry.stableKey < value; });
 
         if (it == mTextures.end() || it->stableKey != stableKey) {
             return TextureKey{};
