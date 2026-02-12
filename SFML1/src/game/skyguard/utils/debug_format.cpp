@@ -488,6 +488,69 @@ namespace game::skyguard::utils {
         }
     } // namespace
 
+    std::size_t formatStressStampLine(char* buf, std::size_t cap, const std::string_view mode,
+                                      const std::uint32_t seed, const std::size_t entitiesPerChunk,
+                                      const std::size_t texCount, const std::size_t zLayers,
+                                      const std::int32_t windowWidth,
+                                      const std::int32_t windowHeight) noexcept {
+        if (cap == 0) {
+            return 0;
+        }
+
+        char* it = buf;
+        char* end = buf + cap;
+
+        if (!detail::appendLiteral(it, end, "Stress: mode=")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendLiteral(it, end, mode)) {
+            return static_cast<std::size_t>(it - buf);
+        }
+
+        if (!detail::appendLiteral(it, end, " seed=")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, seed)) {
+            return static_cast<std::size_t>(it - buf);
+        }
+
+        if (!detail::appendLiteral(it, end, " entitiesPerChunk=")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, entitiesPerChunk)) {
+            return static_cast<std::size_t>(it - buf);
+        }
+
+        if (!detail::appendLiteral(it, end, " texCount=")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, texCount)) {
+            return static_cast<std::size_t>(it - buf);
+        }
+
+        if (!detail::appendLiteral(it, end, " zLayers=")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, static_cast<std::uint32_t>(zLayers))) {
+            return static_cast<std::size_t>(it - buf);
+        }
+
+        if (!detail::appendLiteral(it, end, " window=")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, windowWidth)) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendLiteral(it, end, "x")) {
+            return static_cast<std::size_t>(it - buf);
+        }
+        if (!detail::appendNumber(it, end, windowHeight)) {
+            return static_cast<std::size_t>(it - buf);
+        }
+
+        return static_cast<std::size_t>(it - buf);
+    }
+
     std::size_t formatResidencyLine(char* buf, std::size_t cap,
                                     const core::spatial::ChunkCoord& viewChunk,
                                     const core::spatial::ResidencyState viewState,

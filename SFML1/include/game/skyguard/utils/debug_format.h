@@ -170,6 +170,16 @@ namespace game::skyguard::utils {
                         std::uint32_t loadsThisFrame,
                         std::uint32_t unloadsThisFrame) noexcept;
 
+    [[nodiscard]] std::size_t
+    formatStressStampLine(char* buf, std::size_t cap,
+                          std::string_view mode,
+                          std::uint32_t seed,
+                          std::size_t entitiesPerChunk,
+                          std::size_t texCount,
+                          std::size_t zLayers,
+                          std::int32_t windowWidth,
+                          std::int32_t windowHeight) noexcept;
+
 #endif
 
     [[nodiscard]] inline std::size_t formatCameraStatsLine(char* buf, std::size_t cap,

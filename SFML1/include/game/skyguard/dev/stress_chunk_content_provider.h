@@ -32,6 +32,16 @@ namespace game::skyguard::dev {
 
         void onChunkUnloaded(core::spatial::ChunkCoord coord) noexcept override;
 
+        // ----------------------------------------------------------------------------------------
+        // Диагностические геттеры (stress runtime stamp, overlay).
+        // Post-clamp truth: значения после валидации/клампинга в конструкторе.
+        // ----------------------------------------------------------------------------------------
+        [[nodiscard]] std::uint32_t seed() const noexcept { return mSeed; }
+        [[nodiscard]] std::size_t textureCount() const noexcept { return mTextures.size(); }
+        [[nodiscard]] std::size_t zLayers() const noexcept { return mZLayers; }
+        [[nodiscard]] std::size_t entitiesPerChunk() const noexcept { return mEntitiesPerChunk; }
+        [[nodiscard]] bool isEnabled() const noexcept { return mEnabled; }
+
       private:
         std::int32_t mChunkSizeWorld = 0;
         std::size_t mEntitiesPerChunk = 0;

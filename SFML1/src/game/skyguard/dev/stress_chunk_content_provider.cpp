@@ -84,7 +84,7 @@ namespace {
         return s;
     }
 
-    // Visitor: bool(std::string_view token) -> continue?
+    // Visitor: bool(std::string_view token) → продолжить итерацию?
     template <typename Visitor>
     void parseCsvTokens(std::string_view csv, Visitor&& visitor) noexcept {
         while (!csv.empty()) {
@@ -141,7 +141,7 @@ namespace {
             return out;
         }
 
-        // 1) Optional explicit list (индексы, разделённые запятыми).
+        // 1) Явный список (опционально): индексы текстур через запятую.
         // Индексы соответствуют TextureKey.index() (RuntimeKey32 index) в текущем реестре.
         std::array<char, 1024> idsBuf{};
         const std::string_view ids = readEnvStringView("SKYGUARD_STRESS_TEXTURE_IDS", idsBuf);

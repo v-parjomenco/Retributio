@@ -24,6 +24,10 @@
 #include "game/skyguard/presentation/window_mode_manager.h"
 #include "game/skyguard/streaming/chunk_content_provider.h"
 
+#if defined(SFML1_PROFILE)
+    #include "game/skyguard/dev/stress_runtime_stamp.h"
+#endif
+
 namespace core::ecs {
     class DebugOverlaySystem;
     class RenderSystem;
@@ -103,6 +107,12 @@ namespace game::skyguard {
         game::skyguard::config::UserSettings mUserSettings{};
         std::filesystem::path mUserSettingsPath{};
         bool mUserSettingsSavingDisabled = false;
+#if defined(SFML1_PROFILE)
+        /// Snapshot параметров stress-прогона (заполняется один раз в initWorld,
+        /// читается per-frame в overlay). Все значения — post-clamp truth
+        /// из StressChunkContentProvider + SpatialIndexSystemConfig. Zero ENV reads.
+        dev::StressRuntimeStamp mStressStamp{};
+#endif
     };
 
 } // namespace game::skyguard

@@ -22,10 +22,6 @@ namespace core::utils::format {
         }
     }
 
-    inline void appendU32(std::string& out, std::uint32_t value) {
-        appendU64(out, static_cast<std::uint64_t>(value));
-    }
-
     inline void appendI32(std::string& out, std::int32_t value) {
         std::array<char, 32> buf{};
         auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + buf.size(), value);
@@ -36,8 +32,9 @@ namespace core::utils::format {
         }
     }
 
+    // Используется внутри appendAdaptiveTimingFromUs() для ms-диапазона.
     inline void appendMs1DecimalFromUs(std::string& out, std::uint64_t us) {
-        // Печатаем миллисекунды с 1 знаком после точки без float:
+        // Миллисекунды с 1 знаком после точки без float:
         // ms10 = (us / 100) == 0.1ms units (с округлением).
         const std::uint64_t ms10 = (us + 50) / 100;
 
@@ -47,6 +44,17 @@ namespace core::utils::format {
         appendU64(out, intPart);
         out.push_back('.');
         out.push_back(static_cast<char>('0' + static_cast<int>(frac)));
+    }
+
+    inline void appendAdaptiveTimingFromUs(std::string& out, std::uint64_t us) {
+        if (us < 1000u) {
+            appendU64(out, us);
+            out.append("us");
+            return;
+        }
+
+        appendMs1DecimalFromUs(out, us);
+        out.append("ms");
     }
 
 } // namespace core::utils::format

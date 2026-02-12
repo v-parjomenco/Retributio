@@ -102,12 +102,12 @@ namespace {
         }
 
 #if defined(SFML1_PROFILE)
-        void appendMs1DecimalFromUsAtomic(const std::uint64_t us) {
-            // Консервативно: "18446744073709551.6" + запас.
+        void appendAdaptiveTimingFromUsAtomic(const std::uint64_t us) {
+            // Консервативно: uint64 + suffix ("us"/"ms") + decimal part.
             if (!ensure(32u)) {
                 return;
             }
-            core::utils::format::appendMs1DecimalFromUs(dst, us);
+            core::utils::format::appendAdaptiveTimingFromUs(dst, us);
         }
 #endif
 
@@ -326,8 +326,8 @@ namespace core::ecs {
             // CPU: только totalMs (drawMs — в RenderCPU breakdown, без дублирования).
             mSmoothedCpuTotalUs = emaPow2(mSmoothedCpuTotalUs, stats.cpuTotalUs, mSmoothingShift);
 
-            out.appendAtomic("\nCPU: totalMs=");
-            out.appendMs1DecimalFromUsAtomic(mSmoothedCpuTotalUs);
+            out.appendAtomic("\nCPU: total=");
+            out.appendAdaptiveTimingFromUsAtomic(mSmoothedCpuTotalUs);
 
             // Разбивка RenderSystem (gather/sort/build/draw).
             mSmoothedRSGatherUs = emaPow2(mSmoothedRSGatherUs, stats.cpuGatherUs, mSmoothingShift);
@@ -335,14 +335,14 @@ namespace core::ecs {
             mSmoothedRSBuildUs = emaPow2(mSmoothedRSBuildUs, stats.cpuBuildUs, mSmoothingShift);
             mSmoothedRSDrawUs = emaPow2(mSmoothedRSDrawUs, stats.cpuDrawUs, mSmoothingShift);
 
-            out.appendAtomic("\nRenderCPU: gatherMs=");
-            out.appendMs1DecimalFromUsAtomic(mSmoothedRSGatherUs);
-            out.appendAtomic(" sortMs=");
-            out.appendMs1DecimalFromUsAtomic(mSmoothedRSSortUs);
-            out.appendAtomic(" buildMs=");
-            out.appendMs1DecimalFromUsAtomic(mSmoothedRSBuildUs);
-            out.appendAtomic(" drawMs=");
-            out.appendMs1DecimalFromUsAtomic(mSmoothedRSDrawUs);
+            out.appendAtomic("\nRenderCPU: gather=");
+            out.appendAdaptiveTimingFromUsAtomic(mSmoothedRSGatherUs);
+            out.appendAtomic(" sort=");
+            out.appendAdaptiveTimingFromUsAtomic(mSmoothedRSSortUs);
+            out.appendAtomic(" build=");
+            out.appendAdaptiveTimingFromUsAtomic(mSmoothedRSBuildUs);
+            out.appendAtomic(" draw=");
+            out.appendAdaptiveTimingFromUsAtomic(mSmoothedRSDrawUs);
 #endif
         }
 
@@ -373,7 +373,9 @@ namespace core::ecs {
             out.appendAtomic(" truncated=");
             out.appendU64Atomic(static_cast<std::uint64_t>(q.outTruncated));
 
-            out.appendAtomic("\nSpatialVisit: chunksLoaded=");
+            // chunksLoadedVisited - загруженные чанки, посещённые ПОСЛЕДНИМ query,
+            //                       не глобально загруженные чанки.
+            out.appendAtomic("\nSpatialVisit: chunksLoadedVisited=");
             out.appendU64Atomic(static_cast<std::uint64_t>(q.chunksLoadedVisited));
             out.appendAtomic(" chunks=");
             out.appendU64Atomic(static_cast<std::uint64_t>(q.chunksVisited));

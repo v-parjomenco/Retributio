@@ -2,10 +2,8 @@
 
 #include "game/skyguard/game.h"
 
-#include <algorithm>
 #include <array>
 #include <cassert>
-#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -21,22 +19,14 @@
 #include "core/config/loader/engine_settings_loader.h"
 #include "core/debug/debug_config.h"
 #include "core/ecs/entity.h"
-#include "core/ecs/components/sprite_component.h"
-#include "core/ecs/components/spatial_dirty_tag.h"
-#include "core/ecs/components/spatial_id_component.h"
-#include "core/ecs/components/spatial_streamed_out_tag.h"
 #include "core/ecs/components/transform_component.h"
-#include "core/ecs/render/sprite_bounds.h"
 #include "core/ecs/systems/debug_overlay_system.h"
 #include "core/ecs/systems/movement_system.h"
 #include "core/ecs/systems/render_system.h"
 #include "core/ecs/systems/spatial_index_system.h"
 #include "core/log/log_macros.h"
 #include "core/resources/registry/resource_registry.h"
-#include "core/spatial/aabb2.h"
-#include "core/spatial/chunk_coord.h"
 #include "core/time/time_config.h"
-#include "core/utils/math_constants.h"
 #include "game/skyguard/bootstrap/scene_bootstrap.h"
 #include "game/skyguard/config/config_paths.h"
 #include "game/skyguard/config/loader/app_config_loader.h"
@@ -51,14 +41,16 @@
 #include "game/skyguard/ecs/systems/player_bounds_system.h"
 #include "game/skyguard/ecs/systems/player_init_system.h"
 #include "game/skyguard/ecs/systems/spatial_streaming_system.h"
+#include "game/skyguard/ecs/queries/local_player_query.h"
 #include "game/skyguard/platform/user_paths.h"
 #include "game/skyguard/presentation/view_manager.h"
-#include "game/skyguard/utils/debug_format.h"
 
 #if defined(SFML1_PROFILE)
     #include "game/skyguard/dev/stress_chunk_content_provider.h"
+    #include "game/skyguard/dev/stress_runtime_stamp.h"
 #endif
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
+    #include "game/skyguard/dev/overlay_extras.h"
     #include "game/skyguard/dev/spatial_index_harness.h"
 #endif
 
@@ -74,33 +66,6 @@ namespace skycfg = ::game::skyguard::config;
 namespace skycfg_paths = ::game::skyguard::config::paths;
 // Платформенные утилиты SkyGuard (OS-стандартные пути записи/чтения и т.п.).
 namespace platform = ::game::skyguard::platform;
-
-namespace {
-
-    // O(1) поиск локального игрока: берём первую сущность из view и сразу возвращаем Transform.
-    // Без сравнений с NullEntity → не зависит от нюансов EnTT null-типа и не плодит operator!=.
-    [[nodiscard]] bool tryGetLocalPlayerTransform(
-        core::ecs::World& world,
-        core::ecs::Entity& outEntity,
-        const core::ecs::TransformComponent*& outTransform) noexcept {
-
-        auto view = world.view<game::skyguard::ecs::LocalPlayerTagComponent,
-                               core::ecs::TransformComponent>();
-
-        const auto it = view.begin();
-        if (it == view.end()) {
-            outEntity = core::ecs::NullEntity;
-            outTransform = nullptr;
-            return false;
-        }
-
-        const core::ecs::Entity e = *it;
-        outEntity = e;
-        outTransform = &view.get<core::ecs::TransformComponent>(e);
-        return true;
-    }
-
-} // namespace
 
 namespace game::skyguard {
 
@@ -286,8 +251,15 @@ namespace game::skyguard {
                       "Game::initWorld: stressPlayerKey must be resolved in PROFILE builds.");
         }
 
-        mChunkContentProvider = std::make_unique<game::skyguard::dev::StressChunkContentProvider>(
+        auto stressProvider = std::make_unique<dev::StressChunkContentProvider>(
             mResources, *boot.stressPlayerKey, spatialCfg.index.chunkSizeWorld);
+
+        // Stamp из фактических (post-clamp) данных provider + config.
+        // Zero ENV reads: единственный source of truth — runtime объекты.
+        mStressStamp = dev::buildStressRuntimeStamp(
+            *stressProvider, spatialCfg.storage.width, spatialCfg.storage.height);
+
+        mChunkContentProvider = std::move(stressProvider);
 #else
         // Debug/Release: no stress content (empty provider).
         mChunkContentProvider =
@@ -467,7 +439,7 @@ namespace game::skyguard {
                         core::ecs::Entity e{};
                         const core::ecs::TransformComponent* tr = nullptr;
 
-                        if (!tryGetLocalPlayerTransform(*mWorld, e, tr)) {
+                        if (!ecs::queries::tryGetLocalPlayerTransform(*mWorld, e, tr)) {
                             LOG_DEBUG(core::log::cat::Gameplay, "CamDebug: no local player");
                         } else {
                             const auto& vw = mViewManager.getWorldView();
@@ -559,7 +531,7 @@ namespace game::skyguard {
         core::ecs::Entity e{};
         const core::ecs::TransformComponent* tr = nullptr;
 
-        const bool foundPlayer = tryGetLocalPlayerTransform(*mWorld, e, tr);
+        const bool foundPlayer = ecs::queries::tryGetLocalPlayerTransform(*mWorld, e, tr);
         if (foundPlayer) {
             mViewManager.updateCamera(tr->position);
         }
@@ -596,147 +568,17 @@ namespace game::skyguard {
             return;
         }
 
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
-        // Важно для Profile: если overlay выключен — не тратим CPU на форматирование extra-строк.
+    #if !defined(NDEBUG) || defined(SFML1_PROFILE)
         if (mDebugOverlay->isEnabled()) {
-            mDebugOverlay->clearExtraText();
-
-            // Background line (Debug/Profile)
-            {
-                std::array<char, 256> extraBuffer{};
-                const std::size_t extraSize = utils::formatBackgroundStatsLine(
-                    extraBuffer.data(), extraBuffer.size(), mBackgroundRenderer);
-
-                // Если обрезали строку — увеличь буфер или сократи формат.
-                assert(extraSize < extraBuffer.size() &&
-                       "Game::renderUiPass: background debug line truncated. "
-                       "Increase extraBuffer.");
-
-                if (extraSize > 0) {
-                    mDebugOverlay->appendExtraLine(std::string_view(extraBuffer.data(), extraSize));
-                }
-            }
-
-#if !defined(NDEBUG)
-            // Camera line (Debug only)
-            {
-                core::ecs::Entity e{};
-                const core::ecs::TransformComponent* tr = nullptr;
-
-                if (tryGetLocalPlayerTransform(*mWorld, e, tr)) {
-                    std::array<char, 256> camBuf{};
-                    const auto& vw = mViewManager.getWorldView();
-                    const sf::Vector2f off = mViewManager.getCameraOffset();
-
-                    const std::size_t camSize = utils::formatCameraStatsLine(
-                        camBuf.data(), camBuf.size(), tr->position.y, vw.getCenter().y,
-                        vw.getSize().y, off.y, mViewManager.getCameraCenterYMax());
-
-                    if (camSize > 0) {
-                        mDebugOverlay->appendExtraLine(std::string_view(camBuf.data(), camSize));
-                    }
-                }
-            }
-#endif
-
-            if (mSpatialIndexSystem) {
-                std::array<char, 256> streamBuf{};
-                const auto& worldView = mViewManager.getWorldView();
-                const std::int32_t chunkSize = mSpatialIndexSystem->index().chunkSizeWorld();
-                const auto origin = mSpatialIndexSystem->index().windowOrigin();
-                const std::size_t streamSize = utils::formatStreamingStatsLine(
-                    streamBuf.data(), streamBuf.size(), worldView, origin, chunkSize);
-                if (streamSize > 0) {
-                    mDebugOverlay->appendExtraLine(std::string_view(streamBuf.data(), streamSize));
-                }
-
-                const sf::Vector2f viewCenter = worldView.getCenter();
-                const core::spatial::ChunkCoord viewChunk = core::spatial::worldToChunk(
-                    core::spatial::WorldPosf{viewCenter.x, viewCenter.y}, chunkSize);
-                const auto health = mSpatialIndexSystem->index().debugCellHealthForChunk(viewChunk);
-
-                std::array<char, 256> healthBuf{};
-                const std::size_t healthSize = utils::formatCellHealthLine(
-                    healthBuf.data(), healthBuf.size(), health.maxCellLen, health.sumCellLen,
-                    health.dupApprox, health.loaded);
-                if (healthSize > 0) {
-                    mDebugOverlay->appendExtraLine(std::string_view(healthBuf.data(), healthSize));
-                }
-            }
-
-            {
-                core::ecs::Entity e{};
-                const core::ecs::TransformComponent* tr = nullptr;
-
-                if (tryGetLocalPlayerTransform(*mWorld, e, tr)) {
-                    const sf::View& worldView = mViewManager.getWorldView();
-                    const sf::Vector2f viewSize = worldView.getSize();
-                    const sf::Vector2f viewCenter = worldView.getCenter();
-                    const sf::Vector2f topLeft{viewCenter.x - viewSize.x * 0.5f,
-                                               viewCenter.y - viewSize.y * 0.5f};
-                    core::spatial::Aabb2 viewAabb{};
-                    viewAabb.minX = topLeft.x;
-                    viewAabb.minY = topLeft.y;
-                    viewAabb.maxX = topLeft.x + viewSize.x;
-                    viewAabb.maxY = topLeft.y + viewSize.y;
-
-                    const auto* spatialId = mWorld->tryGetComponent<core::ecs::SpatialIdComponent>(e);
-                    const bool hasSpatialId = (spatialId != nullptr);
-                    const std::uint32_t spatialIdVal = hasSpatialId
-                        ? static_cast<std::uint32_t>(spatialId->id)
-                        : 0u;
-                    const bool hasDirty = mWorld->hasTag<core::ecs::SpatialDirtyTag>(e);
-                    const bool hasStreamedOut =
-                        mWorld->hasTag<core::ecs::SpatialStreamedOutTag>(e);
-                    const core::spatial::Aabb2 lastAabb =
-                        hasSpatialId ? spatialId->lastAabb : core::spatial::Aabb2{};
-                    const auto* sprite = mWorld->tryGetComponent<core::ecs::SpriteComponent>(e);
-                    core::spatial::Aabb2 newAabb = lastAabb;
-                    if (sprite != nullptr) {
-                        const float rotationDegrees = tr->rotationDegrees;
-                        if (rotationDegrees == 0.f) {
-                            newAabb = core::ecs::render::computeSpriteAabbNoRotation(
-                                tr->position, sprite->origin, sprite->scale, sprite->textureRect);
-                        } else {
-                            const float radians = rotationDegrees * core::utils::kDegToRad;
-                            const float cachedSin = std::sin(radians);
-                            const float cachedCos = std::cos(radians);
-                            newAabb = core::ecs::render::computeSpriteAabbRotated(
-                                tr->position, sprite->origin, sprite->scale, sprite->textureRect,
-                                cachedSin, cachedCos);
-                        }
-                    }
-                    const bool fineCullPass = hasSpatialId
-                        ? core::spatial::intersectsInclusive(lastAabb, viewAabb)
-                        : false;
-                    const bool inQuery = (hasSpatialId && mSpatialIndexSystem)
-                        ? mSpatialIndexSystem->index().debugWasInLastQuery(spatialId->id)
-                        : false;
-                    // predictedVisible != "реально отрисовано": прогноз по условиям UI-pass.
-                    const bool predictedVisible =
-                        (sprite != nullptr) && inQuery && fineCullPass && !hasStreamedOut;
-
-                    std::array<char, 256> watchStateBuf{};
-                    const std::size_t watchStateSize = utils::formatPlayerWatchStateLine(
-                        watchStateBuf.data(), watchStateBuf.size(), core::ecs::toUint(e),
-                        hasSpatialId, spatialIdVal, hasDirty, hasStreamedOut, tr->position);
-                    if (watchStateSize > 0) {
-                        mDebugOverlay->appendExtraLine(
-                            std::string_view(watchStateBuf.data(), watchStateSize));
-                    }
-
-                    std::array<char, 256> watchVisBuf{};
-                    const std::size_t watchVisSize = utils::formatPlayerWatchVisibilityLine(
-                        watchVisBuf.data(), watchVisBuf.size(), lastAabb, newAabb, fineCullPass,
-                        inQuery, predictedVisible);
-                    if (watchVisSize > 0) {
-                        mDebugOverlay->appendExtraLine(
-                            std::string_view(watchVisBuf.data(), watchVisSize));
-                    }
-                }
-            }
+            dev::populateDebugOverlayExtraLines(
+                *mDebugOverlay, *mWorld, mSpatialIndexSystem,
+                mBackgroundRenderer, mViewManager
+    #if defined(SFML1_PROFILE)
+                , &mStressStamp
+    #endif
+            );
         }
-#endif
+    #endif
 
         mDebugOverlay->prepareFrame(*mWorld);
         mDebugOverlay->draw(mWindow);
