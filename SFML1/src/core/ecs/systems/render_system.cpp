@@ -322,9 +322,6 @@ namespace core::ecs {
             mFrameId = 1;
         }
 
-        if (mSpatialIndex != nullptr && mSpatialIndex->marksClearRequired()) {
-            mSpatialIndex->clearMarksTable();
-        }
     }
 
     const sf::Texture* RenderSystem::getTextureCached(core::resources::TextureKey key,

@@ -50,6 +50,9 @@ namespace core::ecs {
             return mEntityBySpatialId;
         }
 
+        // Read phase hook: обслуживает marks/stamp до любых query из update.
+        void beginFrameRead() noexcept;
+
         void ensureDestroyConnection(World& world);
         void update(World& world, float dt) override;
         void render(World&, sf::RenderWindow&) override {}

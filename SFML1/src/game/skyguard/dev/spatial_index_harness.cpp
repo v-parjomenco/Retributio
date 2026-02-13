@@ -16,6 +16,8 @@
 #include <vector>
 
 #include "core/ecs/entity.h"
+#include "core/ecs/systems/spatial_index_system.h"
+#include "core/ecs/world.h"
 #include "core/log/log_macros.h"
 #include "core/spatial/spatial_index.h"
 #include "core/spatial/spatial_index_v2.h"
@@ -135,9 +137,72 @@ namespace {
         std::vector<std::uint32_t> overflowEntitiesVisited{};
     };
 
+    class QueryDuringUpdateSystem final : public core::ecs::ISystem {
+      public:
+        explicit QueryDuringUpdateSystem(core::ecs::SpatialIndexSystem* spatialIndexSystem) noexcept
+            : mSpatialIndexSystem(spatialIndexSystem) {
+        }
+
+        void update(core::ecs::World&, float) override {
+            std::array<core::spatial::EntityId32, 16> out{};
+            const core::spatial::Aabb2 area{
+                0.0f, 0.0f, static_cast<float>(mSpatialIndexSystem->index().chunkSizeWorld()),
+                static_cast<float>(mSpatialIndexSystem->index().chunkSizeWorld())};
+            (void) mSpatialIndexSystem->index().queryFast(
+                area, std::span<core::spatial::EntityId32>{out});
+            mQueryExecuted = true;
+        }
+
+        void render(core::ecs::World&, sf::RenderWindow&) override {
+        }
+
+        [[nodiscard]] bool queryExecuted() const noexcept {
+            return mQueryExecuted;
+        }
+
+      private:
+        core::ecs::SpatialIndexSystem* mSpatialIndexSystem{nullptr};
+        bool mQueryExecuted{false};
+    };
+
     [[nodiscard]] std::int64_t toI64(const std::size_t v) noexcept {
         // Для harness значения всегда малы и безопасно умещаются в int64.
         return static_cast<std::int64_t>(v);
+    }
+
+    void
+    runMarksMaintenanceBeforeUpdateScenario(const core::ecs::SpatialIndexSystemConfig& spatialCfg) {
+        core::ecs::World::CreateInfo worldInfo{};
+        worldInfo.reserveEntities = spatialCfg.maxEntityId;
+        core::ecs::World world{worldInfo};
+
+        auto& spatialSystem = world.addSystem<core::ecs::SpatialIndexSystem>(spatialCfg);
+
+        // Симулируем состояние "конец кадра": marks требуют обслуживания до следующего update.
+        spatialSystem.index().debugForceMarksMaintenanceRequired();
+        if (!spatialSystem.index().marksClearRequired()) {
+            LOG_PANIC(core::log::cat::ECS,
+                      "Spatial harness: failed to force marksClearRequired state");
+        }
+
+        auto& querySystem = world.addSystem<QueryDuringUpdateSystem>(&spatialSystem);
+
+        spatialSystem.beginFrameRead();
+        world.update(1.0f / 60.0f);
+
+        if (!querySystem.queryExecuted()) {
+            LOG_PANIC(
+                core::log::cat::ECS,
+                "Spatial harness: MarksMaintenanceBeforeUpdate failed (query system not executed)");
+        }
+
+        if (spatialSystem.index().marksClearRequired()) {
+            LOG_PANIC(core::log::cat::ECS, "Spatial harness: MarksMaintenanceBeforeUpdate failed "
+                                           "(maintenance still required)");
+        }
+
+        LOG_INFO(core::log::cat::Performance,
+                 "Spatial harness scenario passed: MarksMaintenanceBeforeUpdate");
     }
 
 } // namespace
@@ -417,6 +482,8 @@ namespace game::skyguard::dev {
                           "Spatial harness: deterministic query order mismatch");
             }
         }
+
+        runMarksMaintenanceBeforeUpdateScenario(spatialCfg);
 
         LOG_INFO(core::log::cat::Performance,
                  "Spatial harness complete. Env vars: {}=1, {} (entities), {} (queries), {} "

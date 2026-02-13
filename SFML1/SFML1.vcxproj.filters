@@ -325,6 +325,12 @@
     <Filter Include="src\game\skyguard\ecs\queries">
       <UniqueIdentifier>{e96a9871-51aa-478d-ae08-d8aa21065243}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\game\skyguard\orchestration">
+      <UniqueIdentifier>{7a434943-52cf-4871-90a1-9e6eeeef3460}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\game\skyguard\orchestration">
+      <UniqueIdentifier>{edceeeaf-fc77-4d13-807d-4bfaec3b098b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -470,6 +476,9 @@
     </ClCompile>
     <ClCompile Include="src\game\skyguard\dev\stress_runtime_stamp.cpp">
       <Filter>src\game\skyguard\dev</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\skyguard\orchestration\frame_orchestrator.cpp">
+      <Filter>src\game\skyguard\orchestration</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -832,6 +841,9 @@
     </ClInclude>
     <ClInclude Include="include\game\skyguard\dev\stress_runtime_stamp.h">
       <Filter>include\game\skyguard\dev</Filter>
+    </ClInclude>
+    <ClInclude Include="include\game\skyguard\orchestration\frame_orchestrator.h">
+      <Filter>include\game\skyguard\orchestration</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -39,6 +39,10 @@ namespace {
 
 namespace core::ecs {
 
+    void SpatialIndexSystem::beginFrameRead() noexcept {
+        mIndex.beginFrameRead();
+    }
+
     SpatialIndexSystem::SpatialIndexSystem(const SpatialIndexSystemConfig& config) noexcept
         : mIndex() {
         assert(config.maxEntityId > 0 && "SpatialIndexSystem: maxEntityId must be > 0");

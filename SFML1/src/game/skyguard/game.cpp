@@ -272,6 +272,7 @@ namespace game::skyguard {
 
         auto& spatialSystem = mWorld->addSystem<core::ecs::SpatialIndexSystem>(spatialCfg);
         mSpatialIndexSystem = &spatialSystem;
+        mFrameOrchestrator.bindSpatialIndexSystem(mSpatialIndexSystem);
 
         streamingSystem.bind(&spatialSystem, mChunkContentProvider.get());
 
@@ -522,6 +523,7 @@ namespace game::skyguard {
     void Game::update(const sf::Time& dt) {
         const float dtSeconds = dt.asSeconds();
         assert(dtSeconds > 0.0f); // фиксированный шаг должен быть положительным
+        mFrameOrchestrator.beginFrameRead();
         mWorld->update(dtSeconds); // обновляем все ECS-системы
         updateCamera();
         mWorld->flushDestroyed();

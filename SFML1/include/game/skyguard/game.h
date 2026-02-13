@@ -18,6 +18,7 @@
 #include "core/ecs/world.h"
 #include "core/resources/resource_manager.h"
 #include "core/time/time_service.h"
+#include "game/skyguard/orchestration/frame_orchestrator.h"
 #include "game/skyguard/config/loader/user_settings_loader.h"
 #include "game/skyguard/presentation/background_renderer.h"
 #include "game/skyguard/presentation/view_manager.h"
@@ -79,6 +80,7 @@ namespace game::skyguard {
         core::config::EngineSettings mEngineSettings;
 
         core::time::TimeService mTime; // сервис времени (вне ECS)
+        orchestration::FrameOrchestrator mFrameOrchestrator;
         std::unique_ptr<core::ecs::World> mWorld;
         presentation::ViewManager mViewManager;
         presentation::BackgroundRenderer mBackgroundRenderer;

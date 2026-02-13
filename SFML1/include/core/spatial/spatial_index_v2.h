@@ -552,7 +552,16 @@ struct SpatialChunk final {
             return mConfig.cellSizeWorld;
         }
 
-        // Marks wrap => maintenance required (call clearMarksTable before queries).
+        // Frame-level marks maintenance: single entry point for read-phase barrier.
+        // Call once before any queries in a given update step.
+        // Cheap no-op when no maintenance is required (single branch on bool flag).
+        void beginFrameRead() const noexcept {
+            if (mMarksClearRequired) {
+                clearMarksTable();
+            }
+        }
+
+        // Low-level marks API (prefer beginFrameRead() in normal usage).
         [[nodiscard]] bool marksClearRequired() const noexcept {
             return mMarksClearRequired;
         }
@@ -565,6 +574,10 @@ struct SpatialChunk final {
         void clearMarksTable() const noexcept;
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
+        void debugForceMarksMaintenanceRequired() noexcept {
+            mMarksClearRequired = true;
+        }
+
         struct DebugQueryStats final {
             std::uint32_t chunksVisited = 0;
             std::uint32_t chunksLoadedVisited = 0;
