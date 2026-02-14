@@ -701,6 +701,12 @@ struct SpatialChunk final {
         std::int32_t mCellsPerChunkX = 0;
         std::int32_t mCellsPerChunkY = 0;
         std::size_t mCellsPerChunk = 0;
+
+        // Number of entities accepted by registerEntity() and
+        // not yet removed by unregisterEntity().
+        // Invariant: incremented ONLY on successful register, decremented ONLY on successful
+        // unregister. updateEntity() does NOT touch this counter.
+        // NOTE: entity with empty bounds IS counted (registered but occupies zero cells).
         std::uint32_t mActiveEntityCount = 0;
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
@@ -2451,30 +2457,50 @@ struct SpatialChunk final {
         });
     }
 
-    template <typename Storage, typename BoundsT>
+template <typename Storage, typename BoundsT>
     inline void SpatialIndexV2<Storage, BoundsT>::removeFromCell(Cell& cell,
                                                                  const EntityId32 id) noexcept {
+        // Inline search.
         for (std::uint8_t i = 0; i < cell.count; ++i) {
             if (cell.entities[i] != id) {
                 continue;
             }
 
-        for (std::uint8_t j = static_cast<std::uint8_t>(i + 1u); j < cell.count; ++j) {
-            // static_cast: расширяем j до size_t ДО вычитания — silences lnt-arithmetic-overflow.
-            // Loop invariant: j >= 1 (начинается с i + 1, где i >= 0).
-            cell.entities[static_cast<std::size_t>(j) - 1u] = cell.entities[j];
-        }
+            for (std::uint8_t j = static_cast<std::uint8_t>(i + 1u); j < cell.count; ++j) {
+                // static_cast: расширяем j до size_t ДО вычитания —
+                // silences lnt-arithmetic-overflow.
+                // Loop invariant: j >= 1 (начинается с i + 1, где i >= 0).
+                cell.entities[static_cast<std::size_t>(j) - 1u] = cell.entities[j];
+            }
             --cell.count;
             return;
         }
 
+        // Overflow search.
         if (cell.overflowHandle != 0u) {
             const bool removed = mOverflowPool.remove(cell.overflowHandle, id);
+#if !defined(NDEBUG)
             assert(removed && "SpatialIndexV2: overflow remove failed");
+#else
             if (!removed) [[unlikely]] {
-                LOG_PANIC(core::log::cat::ECS, "SpatialIndexV2: overflow remove failed");
+                LOG_PANIC(core::log::cat::ECS, "SpatialIndexV2: overflow remove failed (id={})",
+                          id);
             }
+#endif
+            return;
         }
+
+        // Entity not found in inline nor overflow.
+        // Write-path invariant: every cell that was written to MUST contain the entity.
+        // Reaching here means data corruption (double-remove, cell stomp, etc.).
+#if !defined(NDEBUG)
+        assert(false &&
+               "SpatialIndexV2: removeFromCell entity not found "
+               "(write-path invariant violated)");
+#else
+        LOG_PANIC(core::log::cat::ECS,
+                  "SpatialIndexV2: removeFromCell entity not found (id={})", id);
+#endif
     }
 
     template <typename Storage, typename BoundsT>
