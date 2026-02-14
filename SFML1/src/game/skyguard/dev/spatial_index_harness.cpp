@@ -460,7 +460,8 @@ namespace game::skyguard::dev {
                  "  Worst cell density (max entities in cell)={}",
                  stats.worstCellDensity);
 
-        // Deterministic query order check (same state, same output order).
+        // Проверка детерминированного порядка query
+        // (одно и то же состояние => один и тот же порядок).
         {
             if (v2Index.marksClearRequired()) {
                 v2Index.clearMarksTable();

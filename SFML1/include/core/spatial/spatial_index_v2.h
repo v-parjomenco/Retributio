@@ -35,7 +35,7 @@ namespace core::spatial {
 
     namespace detail {
 
-        // Euclidean modulo: always returns [0..b-1] for b > 0.
+        // Евклидов модуль: всегда возвращает [0..b-1] при b > 0.
         // Используется для ring-buffer индексации SlidingWindowStorage.
         [[nodiscard]] inline std::int32_t euclideanMod(const std::int32_t a,
                                                        const std::int32_t b) noexcept {
@@ -47,16 +47,16 @@ namespace core::spatial {
 
     struct alignas(64) Cell final {
         static constexpr std::size_t kCacheLineBytes = 64;
-        static constexpr std::size_t kOverheadBytes = 1 + 3 + 4; // count + padding + handle
+        static constexpr std::size_t kOverheadBytes = 1 + 3 + 4; // счётчик + padding + дескриптор
         static constexpr std::uint8_t kInlineCapacity =
             static_cast<std::uint8_t>((kCacheLineBytes - kOverheadBytes) / sizeof(EntityId32));
 
-        std::array<EntityId32, kInlineCapacity> entities{}; // 56 bytes
+        std::array<EntityId32, kInlineCapacity> entities{}; // 56 байт
         std::uint8_t count = 0;
         std::uint8_t pad0 = 0;
         std::uint8_t pad1 = 0;
         std::uint8_t pad2 = 0;
-        std::uint32_t overflowHandle = 0; // 0 == none
+        std::uint32_t overflowHandle = 0; // 0 == нет overflow
     };
 
     static_assert(Cell::kInlineCapacity == 14,
@@ -65,7 +65,8 @@ namespace core::spatial {
     static_assert(alignof(Cell) == 64, "Cell must align to cache-line boundary.");
 
 struct SpatialChunk final {
-        std::uint32_t cellsBlockIndex = kInvalidCellsBlockIndex; // cell-offset in pool, or invalid
+        // Смещение блока ячеек в пуле, либо invalid
+        std::uint32_t cellsBlockIndex = kInvalidCellsBlockIndex;
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
          // Число зарегистрированных сущностей, чьи AABB пересекают этот chunk (coverage).
@@ -88,7 +89,8 @@ struct SpatialChunk final {
         // Legacy/alias (kept for compatibility). Stage 3/4 contract uses maxEntityId strictly.
         std::uint32_t marksCapacity = 0;
 
-        std::uint32_t maxEntityId = 0; // MUST be set (>0). Governs prewarm for marks/entities.
+        // ДОЛЖНО быть задано (>0). Управляет prewarm для marks/entities.
+        std::uint32_t maxEntityId = 0;
         OverflowConfig overflow{};
     };
 
@@ -101,8 +103,8 @@ struct SpatialChunk final {
         std::int32_t width = 0;
         std::int32_t height = 0;
 
-        // Stage 4: max simultaneously resident (Loaded) chunks.
-        // 0 => "no cap" (falls back to width*height; Stage 3 behavior).
+        // Stage 4: максимальное число одновременно резидентных (Loaded) чанков.
+        // 0 => "без лимита" (fallback на width*height; поведение Stage 3).
         std::uint32_t maxResidentChunks = 0;
     };
 
@@ -111,8 +113,8 @@ struct SpatialChunk final {
         std::int32_t width = 0;
         std::int32_t height = 0;
 
-        // Stage 4: max simultaneously resident (Loaded) chunks within the window.
-        // 0 => "no cap" (falls back to width*height).
+        // Stage 4: максимальное число одновременно резидентных (Loaded) чанков в окне.
+        // 0 => "без лимита" (fallback на width*height).
         std::uint32_t maxResidentChunks = 0;
     };
 
@@ -313,18 +315,20 @@ struct SpatialChunk final {
         std::int32_t mWidth = 0;
         std::int32_t mHeight = 0;
 
-        // Precomputed inclusive bounds (avoid signed overflow in hot-path clamps).
+         // Предварительно вычисленные включительные границы
+         // (избегаем signed overflow в hot-path clamp-ах).
         std::int32_t mMaxXInclusive = 0;
         std::int32_t mMaxYInclusive = 0;
 
-        // Cells per chunk (precomputed once; avoids divisions).
+        // Число ячеек в чанке (предвычисляется один раз; избегаем делений).
         std::size_t mCellsPerChunk = 0;
 
-        // Stage 4: residency-bounded cells pool (allocate on Loaded, free on leave Loaded).
+        // Stage 4: пул ячеек, ограниченный резидентностью
+        // (allocate при Loaded, free при выходе из Loaded).
         std::uint32_t mMaxBlocks = 0;
         std::uint32_t mNextUnusedBlock = 0;
         std::uint32_t mFreeBlockCount = 0;
-        std::vector<std::uint32_t> mFreeBlockStack{}; // stores cell-offsets
+        std::vector<std::uint32_t> mFreeBlockStack{}; //  хранит смещения блоков ячеек
 
         std::vector<SpatialChunk> mChunks{};
         std::vector<Cell> mCellsPool{};
@@ -341,9 +345,9 @@ struct SpatialChunk final {
         void init(const Config& config, const std::int32_t cellsPerChunkX,
                   const std::int32_t cellsPerChunkY);
 
-        // NOTE (Stage 3): non-const tryGetChunk has a side-effect by design:
-        // it may materialize (occupy) the slot for `coord` within the fixed window.
-        // Stage 4 will split API into pure tryGetChunk() vs getOrCreateChunk() when origin shifts.
+        // ПРИМЕЧАНИЕ (Stage 3): non-const tryGetChunk по дизайну имеет side-effect:
+        // может материализовать (занять) слот для `coord` внутри фиксированного окна.
+        // В Stage 4 API будет разделён: чистый tryGetChunk() и getOrCreateChunk() при сдвиге origin.
         [[nodiscard]] SpatialChunk* tryGetChunk(const ChunkCoord coord) noexcept;
         [[nodiscard]] const SpatialChunk* tryGetChunk(const ChunkCoord coord) const noexcept;
 
@@ -476,18 +480,19 @@ struct SpatialChunk final {
         std::int32_t mWidth = 0;
         std::int32_t mHeight = 0;
 
-        // Precomputed inclusive bounds (avoid signed overflow in hot-path clamps).
+        // Предварительно вычисленные включительные границы
+        // (избегаем signed overflow в hot-path clamp-ах).
         std::int32_t mMaxXInclusive = 0;
         std::int32_t mMaxYInclusive = 0;
 
-        // Cells per chunk (precomputed once; avoids divisions).
+        //  Число ячеек в чанке (предварительное вычисляется один раз; избегаем делений).
         std::size_t mCellsPerChunk = 0;
 
-        // Stage 4: residency-bounded cells pool.
+        // Stage 4: пул ячеек, ограниченный резидентностью.
         std::uint32_t mMaxBlocks = 0;
         std::uint32_t mNextUnusedBlock = 0;
         std::uint32_t mFreeBlockCount = 0;
-        std::vector<std::uint32_t> mFreeBlockStack{}; // stores cell-offsets
+        std::vector<std::uint32_t> mFreeBlockStack{}; // хранит смещения блоков ячеек
 
         std::vector<Slot> mSlots{};
         std::vector<Slot> mShiftScratch{};
@@ -552,21 +557,21 @@ struct SpatialChunk final {
             return mConfig.cellSizeWorld;
         }
 
-        // Frame-level marks maintenance: single entry point for read-phase barrier.
-        // Call once before any queries in a given update step.
-        // Cheap no-op when no maintenance is required (single branch on bool flag).
+        // Обслуживание marks на уровне кадра: единая точка входа для read-phase barrier.
+        // Вызывается один раз перед любыми query в конкретном update-шаге.
+        // Дешёвый no-op, когда обслуживание не требуется (одна ветка по bool-флагу).
         void beginFrameRead() const noexcept {
             if (mMarksClearRequired) {
                 clearMarksTable();
             }
         }
 
-        // Low-level marks API (prefer beginFrameRead() in normal usage).
+        // Низкоуровневый API marks (в обычном коде предпочитать beginFrameRead()).
         [[nodiscard]] bool marksClearRequired() const noexcept {
             return mMarksClearRequired;
         }
 
-        // Global count of registered entities (accepted in write-path).
+        // Глобальное число зарегистрированных сущностей (принятых в write-path).
         [[nodiscard]] std::uint32_t activeEntityCount() const noexcept {
             return mActiveEntityCount;
         }
@@ -702,11 +707,10 @@ struct SpatialChunk final {
         std::int32_t mCellsPerChunkY = 0;
         std::size_t mCellsPerChunk = 0;
 
-        // Number of entities accepted by registerEntity() and
-        // not yet removed by unregisterEntity().
-        // Invariant: incremented ONLY on successful register, decremented ONLY on successful
-        // unregister. updateEntity() does NOT touch this counter.
-        // NOTE: entity with empty bounds IS counted (registered but occupies zero cells).
+        // Число сущностей, принятых registerEntity() и ещё не удалённых через unregisterEntity().
+        // Инвариант: инкремент ТОЛЬКО при успешной регистрации, декремент ТОЛЬКО при успешном
+        // удалении. updateEntity() счётчик НЕ трогает.
+        // Сущность с пустыми bounds тоже учитывается (зарегистрирована, но занимает ноль ячеек).
         std::uint32_t mActiveEntityCount = 0;
 
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
@@ -720,7 +724,7 @@ struct SpatialChunk final {
     using SpatialIndexV2Sliding = SpatialIndexV2<SlidingWindowStorage, Aabb2>;
     using SpatialIndexV2Titan = SpatialIndexV2<FlatStorage, Aabb2i>;
 
-    // ---- Inline/template implementations ------------------------------------------------------
+    // ------------------------------ Шаблонные/Inline имплементации ------------------------------
 
     inline void OverflowPool::init(const OverflowConfig& cfg) {
         mNodeCapacity = cfg.nodeCapacity;
@@ -903,7 +907,7 @@ struct SpatialChunk final {
                     const std::uint32_t nextHandle = mNext[idx];
 
                     if (prevHandle == 0u) {
-                        // Removing head node.
+                        // Удаление головного узла.
                         const std::uint32_t oldHead = headHandle;
                         headHandle = nextHandle;
 
@@ -924,10 +928,10 @@ struct SpatialChunk final {
                         }
                         mTailByHead[oldHead] = 0u;
                     } else {
-                        // Removing non-head node: splice out.
+                        // Удаление не-головного node: вырезаем из цепочки.
                         mNext[nodeIndex(prevHandle)] = nextHandle;
 
-                        // If we removed the tail node, tail becomes prevHandle.
+                        // Если удалили tail-node, tail становится prevHandle.
                         if (handle == tailHandle) {
 #if !defined(NDEBUG)
                             assert(headHandle != 0u &&
@@ -1080,7 +1084,8 @@ struct SpatialChunk final {
         mWidth = config.width;
         mHeight = config.height;
 
-        // Precompute inclusive bounds using int64 to avoid signed overflow UB.
+        // Предварительно вычисляем включительные границы в int64,
+        // чтобы избежать UB от signed overflow.
         {
             const std::int64_t maxX64 = static_cast<std::int64_t>(mOrigin.x) + mWidth - 1;
             const std::int64_t maxY64 = static_cast<std::int64_t>(mOrigin.y) + mHeight - 1;
@@ -1177,7 +1182,7 @@ struct SpatialChunk final {
         }
 #endif
 
-        // Stage 4 pool: capacity == max resident chunks (not total chunks).
+        // Пул Stage 4: capacity == максимум резидентных чанков (а не общее число чанков).
         mCellsPool.assign(maxBlocksSz * cellsCount, Cell{});
 
         for (SpatialChunk& chunk : mChunks) {
@@ -1305,10 +1310,10 @@ struct SpatialChunk final {
             return true;
         }
 
-        // Strict model:
-        //  - Only Loaded chunks may hold cell data (and therefore must own an allocated block).
-        //  - Leaving Loaded => clear + free block immediately.
-        //  - Entering Loaded => allocate block (fail-fast if capacity exhausted).
+        // Строгая модель:
+        //  - Только Loaded-чанки могут хранить данные ячеек (и потому обязаны иметь allocated блок).
+        //  - Выход из Loaded => немедленно clear + free блока.
+        //  - Вход в Loaded => allocate блока (fail-fast при исчерпании capacity).
         if (prev == ResidencyState::Loaded && state != ResidencyState::Loaded) {
 #if !defined(NDEBUG)
             assert(detail::chunkOverlapCountIsZero(*chunk) &&
@@ -1356,7 +1361,7 @@ struct SpatialChunk final {
 #endif
             chunk->cellsBlockIndex = newBlock;
 
-            // Freshly loaded chunk starts empty.
+            // Только что загруженный чанк стартует пустым.
             clearChunkData(*chunk);
         }
 
@@ -1438,7 +1443,8 @@ struct SpatialChunk final {
         mWidth = config.width;
         mHeight = config.height;
 
-        // Precompute inclusive bounds using int64 to avoid signed overflow UB.
+        // Предварительно вычисляем включительные границы в int64,
+        // чтобы избежать UB от signed overflow.
         {
             const std::int64_t maxX64 = static_cast<std::int64_t>(mOrigin.x) + mWidth - 1;
             const std::int64_t maxY64 = static_cast<std::int64_t>(mOrigin.y) + mHeight - 1;
@@ -1648,7 +1654,7 @@ struct SpatialChunk final {
         Slot& slot = mSlots[slotIndex(coord)];
 
         if (slot.occupied && (slot.coord.x != coord.x || slot.coord.y != coord.y)) {
-            // With fixed origin (Stage 3), this is impossible-state.
+            // При фиксированном origin (Stage 3) это невозможное состояние.
 #if !defined(NDEBUG)
             assert(false && "SlidingWindowStorage: slot coord mismatch (internal error)");
 #else
@@ -1786,7 +1792,7 @@ struct SpatialChunk final {
         Slot& slot = mSlots[slotIndex(coord)];
 
         if (slot.occupied && (slot.coord.x != coord.x || slot.coord.y != coord.y)) {
-            // With fixed origin (Stage 3), this is impossible-state.
+            // При фиксированном origin (Stage 3) это невозможное состояние.
 #if !defined(NDEBUG)
             assert(false && "SlidingWindowStorage: slot coord mismatch (internal error)");
 #else
@@ -1808,8 +1814,8 @@ struct SpatialChunk final {
             return true;
         }
 
-        // Strict model:
-        //  - Only Loaded chunks may hold cell data (and therefore must own an allocated block).
+        // Строгая модель:
+        //  - Только Loaded-чанки могут хранить данные ячеек (потому обязаны иметь выделенный блок).
         if (prev == ResidencyState::Loaded && state != ResidencyState::Loaded) {
 #if !defined(NDEBUG)
             assert(detail::chunkOverlapCountIsZero(slot.chunk) &&
@@ -1860,14 +1866,14 @@ struct SpatialChunk final {
 #endif
             slot.chunk.cellsBlockIndex = newBlock;
 
-            // Freshly loaded chunk starts empty.
+            // Только что загруженный чанк стартует пустым.
             clearChunkDataInSlot(slot);
         }
 
         slot.chunk.state = state;
 
         if (state == ResidencyState::Unloaded) {
-            // Treat Unloaded as absent slot (chunkState()==Unloaded anyway).
+            // Считаем Unloaded отсутствующим слотом (chunkState()==Unloaded в любом случае).
             slot.occupied = false;
         }
 
@@ -1893,7 +1899,7 @@ struct SpatialChunk final {
                 return bounds.maxX < bounds.minX || bounds.maxY < bounds.minY;
             }
 
-            // Inclusive bounds: min==max is a point.
+            // Включительные границы: min==max — это точка.
 
             [[nodiscard]] static float maxInclusiveX(const Aabb2& bounds) noexcept {
                 return bounds.maxX;
@@ -2141,8 +2147,8 @@ struct SpatialChunk final {
                     writeToChunk(*chunk, {x, y}, cellRange, id);
 
                 if (chunkResult == WriteResult::Rejected) {
-                    // Rollback ONLY chunks we successfully wrote to (important: avoid removing
-                    // from unrelated overflow chains in a chunk we never touched).
+                    // Rollback ТОЛЬКО для чанков, в которые мы успешно записали
+                    // (важно: не трогать посторонние overflow-цепочки в нетронутых чанках).
                     if (lastWrittenY >= chunkRange.minY) {
                         for (std::int32_t ry = chunkRange.minY; ry <= lastWrittenY; ++ry) {
                             const std::int32_t maxX =
@@ -2197,7 +2203,7 @@ struct SpatialChunk final {
         const CellRange oldChunkRange = computeChunkRange(record.bounds);
         const CellRange newChunkRange = computeChunkRange(newBounds);
 
-        // Strict model: old coverage must be accessible to be removed/adjusted.
+        // Строгая модель: старое покрытие должно быть доступно для удаления/корректировки.
         if (!oldChunkRange.empty() && !canWriteRange(oldChunkRange)) {
             return WriteResult::Rejected;
         }
@@ -2237,8 +2243,8 @@ struct SpatialChunk final {
                     writeToChunk(*chunk, {x, y}, newCellRange, id);
 
                 if (addResult == WriteResult::Rejected) {
-                    // Rollback ONLY chunks we successfully added (avoid touching unrelated
-                    // overflow chains in chunks we never modified).
+                    // Rollback ТОЛЬКО для чанков, которые мы успешно добавили.
+                    // Не трогаем посторонние overflow-цепочки в чанках, которые не модифицировали.
                     if (lastAddedY >= newChunkRange.minY) {
                         for (std::int32_t ry = newChunkRange.minY; ry <= lastAddedY; ++ry) {
                             const std::int32_t maxX =
@@ -2315,7 +2321,7 @@ struct SpatialChunk final {
                 }
 #endif
 
-                // ADD first: newCells \ oldCells
+                // Сначала ADD: newCells \ oldCells
                 for (std::int32_t cy = newLocal.minY; cy <= newLocal.maxY; ++cy) {
                     const std::size_t rowOffset = static_cast<std::size_t>(cy) * mCellsPerChunkX;
                     for (std::int32_t cx = newLocal.minX; cx <= newLocal.maxX; ++cx) {
@@ -2328,7 +2334,7 @@ struct SpatialChunk final {
                     }
                 }
 
-                // REMOVE second: oldCells \ newCells
+                // Затем REMOVE: oldCells \ newCells
                 for (std::int32_t cy = oldLocal.minY; cy <= oldLocal.maxY; ++cy) {
                     const std::size_t rowOffset = static_cast<std::size_t>(cy) * mCellsPerChunkX;
                     for (std::int32_t cx = oldLocal.minX; cx <= oldLocal.maxX; ++cx) {
@@ -2434,7 +2440,7 @@ struct SpatialChunk final {
         }
 
         forEachCellInRange(chunk, coord, cellRange, [&](Cell& cell) {
-            appendToCell(cell, id); // void: either succeeds or PANICs
+            appendToCell(cell, id); // void: либо успех либо PANIC
             return true;
         });
 
@@ -2460,7 +2466,7 @@ struct SpatialChunk final {
 template <typename Storage, typename BoundsT>
     inline void SpatialIndexV2<Storage, BoundsT>::removeFromCell(Cell& cell,
                                                                  const EntityId32 id) noexcept {
-        // Inline search.
+        // Поиск в inline-части.
         for (std::uint8_t i = 0; i < cell.count; ++i) {
             if (cell.entities[i] != id) {
                 continue;
@@ -2468,15 +2474,15 @@ template <typename Storage, typename BoundsT>
 
             for (std::uint8_t j = static_cast<std::uint8_t>(i + 1u); j < cell.count; ++j) {
                 // static_cast: расширяем j до size_t ДО вычитания —
-                // silences lnt-arithmetic-overflow.
-                // Loop invariant: j >= 1 (начинается с i + 1, где i >= 0).
+                // подавляет lnt-arithmetic-overflow.
+                // Инвариант цикла: j >= 1 (начинается с i + 1, где i >= 0).
                 cell.entities[static_cast<std::size_t>(j) - 1u] = cell.entities[j];
             }
             --cell.count;
             return;
         }
 
-        // Overflow search.
+        // Поиск в overflow-части.
         if (cell.overflowHandle != 0u) {
             const bool removed = mOverflowPool.remove(cell.overflowHandle, id);
 #if !defined(NDEBUG)
@@ -2490,9 +2496,9 @@ template <typename Storage, typename BoundsT>
             return;
         }
 
-        // Entity not found in inline nor overflow.
-        // Write-path invariant: every cell that was written to MUST contain the entity.
-        // Reaching here means data corruption (double-remove, cell stomp, etc.).
+        // Entity не найден ни в inline, ни в overflow.
+        // Инвариант write-path: каждая ячейка, в которую записали entity, ОБЯЗАНА его содержать.
+        // Попадание сюда означает коррупцию данных (double-remove, затёртая ячейка и т.п.).
 #if !defined(NDEBUG)
         assert(false &&
                "SpatialIndexV2: removeFromCell entity not found "
@@ -2993,11 +2999,6 @@ template <typename Storage, typename BoundsT>
                             mDebugLastQueryStats.outTruncated = 1;
 #endif
                             handleOutputOverflow(); // [[noreturn]]
-#if !defined(NDEBUG)
-                            // Defensive (unreachable after PANIC)
-                            stop = true;
-                            return false;
-#endif
                         }
 #if !defined(NDEBUG)
                         assert(id < mMarks.size() && "SpatialIndexV2: marks table too small");
