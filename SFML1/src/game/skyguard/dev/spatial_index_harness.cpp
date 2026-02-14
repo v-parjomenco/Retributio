@@ -21,6 +21,7 @@
 #include "core/log/log_macros.h"
 #include "core/spatial/spatial_index.h"
 #include "core/spatial/spatial_index_v2.h"
+#include "game/skyguard/orchestration/frame_orchestrator.h"
 
 namespace {
 
@@ -187,7 +188,9 @@ namespace {
 
         auto& querySystem = world.addSystem<QueryDuringUpdateSystem>(&spatialSystem);
 
-        spatialSystem.beginFrameRead();
+        game::skyguard::orchestration::FrameOrchestrator orchestrator{};
+        orchestrator.bindSpatialIndexSystem(&spatialSystem);
+        orchestrator.beginFrameRead();
         world.update(1.0f / 60.0f);
 
         if (!querySystem.queryExecuted()) {
