@@ -14,6 +14,7 @@
 #include "core/ecs/components/sprite_component.h"
 #include "core/ecs/components/transform_component.h"
 #include "core/ecs/components/velocity_component.h"
+#include "core/ecs/validation/numeric_integrity.h"
 #include "core/ecs/world.h"
 #include "core/log/log_macros.h"
 
@@ -87,6 +88,10 @@ namespace game::skyguard::ecs {
             core::ecs::TransformComponent tr{};
             tr.position = cfg.startPosition;
             tr.rotationDegrees = cfg.aircraftControl.initialRotationDegrees;
+
+            // Validate-on-write: spawn boundary — данные из конфига/bootstrap.
+            core::ecs::validation::assertTransformFinite(tr, "PlayerInitSystem::spawn");
+            core::ecs::validation::assertSpriteFinite(spriteComp, "PlayerInitSystem::spawn");
 
             core::ecs::VelocityComponent vel{};
             vel.linear = {0.f, 0.f};

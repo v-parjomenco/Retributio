@@ -19,7 +19,12 @@ namespace core::ecs {
      *
      * Визуальные параметры (zOrder/rect/origin/visual scale) живут в SpriteComponent.
      *
-     * Компонента должна оставаться лёгкой и пригодной для массовых обновлений (100K+ сущностей).
+     * Numeric integrity (validate-on-write / trust-on-read):
+     *  - Все float-поля ДОЛЖНЫ быть конечны (не NaN, не Inf).
+     *  - Валидация выполняется ТОЛЬКО на границах записи (spawn/mutation) через
+     *    core/ecs/validation/numeric_integrity.h; чтение в hot-path доверяет данным.
+     *
+     * Компонента должна оставаться лёгкой и пригодной для массовых обновлений (1M+ сущностей).
      */
     struct TransformComponent {
         sf::Vector2f position{0.f, 0.f};

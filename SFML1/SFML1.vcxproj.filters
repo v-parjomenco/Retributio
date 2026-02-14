@@ -331,6 +331,12 @@
     <Filter Include="src\game\skyguard\orchestration">
       <UniqueIdentifier>{edceeeaf-fc77-4d13-807d-4bfaec3b098b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\ecs\validation">
+      <UniqueIdentifier>{c4145f6f-f716-4af8-a6a9-b5644e8f9a00}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\ecs\validation">
+      <UniqueIdentifier>{a4b97aff-9c96-470d-80a9-92a5524ce0b2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -844,6 +850,9 @@
     </ClInclude>
     <ClInclude Include="include\game\skyguard\orchestration\frame_orchestrator.h">
       <Filter>include\game\skyguard\orchestration</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\ecs\validation\numeric_integrity.h">
+      <Filter>include\core\ecs\validation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

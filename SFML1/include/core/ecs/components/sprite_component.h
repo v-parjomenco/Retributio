@@ -5,12 +5,16 @@
 // Related headers: transform_component.h, resource_key.h
 // ================================================================================================
 #pragma once
+
+#include <type_traits>
+
 #include <SFML/Graphics/Rect.hpp>
 #include <SFML/System/Vector2.hpp>
 
 #include "core/resources/keys/resource_key.h"
 
 namespace core::ecs {
+
     /**
      * @brief Sprite component (data-only, hot path).
      *
@@ -22,14 +26,19 @@ namespace core::ecs {
      *    (например, центр текстуры; anchor/layout — опционально, зависит от игры).
      *  - zOrder: ключ сортировки (детерминизм + batching).
      *
+     * Numeric integrity (validate-on-write / trust-on-read):
+     *  - Все float-поля (scale/origin/zOrder) ДОЛЖНЫ быть конечны (не NaN, не Inf).
+     *  - Валидация выполняется ТОЛЬКО на границах записи (spawn/mutation) через
+     *    core/ecs/validation/numeric_integrity.h; чтение в hot-path доверяет данным.
+     *
      * Инварианты:
      *  - Только POD-данные (без sf::Sprite / sf::Texture и без owning-ресурсов).
      *  - Компонент должен оставаться компактным (и попадать в 1 cache line).
-     * 
+     *
      * Примечание:
      *  - Если используется ScalingSystem, "baseScale" хранится в отдельном
      *    SpriteScalingDataComponent и scale пересчитывается при resize.
-     *  - Если ScalingSystem не используется (как в SkyGuard), 
+     *  - Если ScalingSystem не используется (как в SkyGuard),
      *    scale остаётся authoring/runtime значением; resize обрабатывается через View/viewport.
      */
     struct SpriteComponent {

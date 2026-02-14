@@ -559,6 +559,7 @@
     <ClInclude Include="include\core\ecs\systems\scaling_system.h" />
     <ClInclude Include="include\core\ecs\systems\spatial_index_system.h" />
     <ClInclude Include="include\core\ecs\system_manager.h" />
+    <ClInclude Include="include\core\ecs\validation\numeric_integrity.h" />
     <ClInclude Include="include\core\ecs\world.h" />
     <ClInclude Include="include\core\log\logging.h" />
     <ClInclude Include="include\core\log\log_categories.h" />

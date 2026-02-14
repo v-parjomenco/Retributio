@@ -1,7 +1,9 @@
 #include "pch.h"
+
 #include "core/ecs/systems/movement_system.h"
 
 #include "core/ecs/components/spatial_dirty_tag.h"
+#include "core/ecs/validation/numeric_integrity.h"
 #include "core/ecs/world.h"
 
 namespace core::ecs {
@@ -27,6 +29,11 @@ namespace core::ecs {
 
             transform.position += velocity.linear * dt;
             transform.rotationDegrees += velocity.angularDegreesPerSec * dt;
+
+            // Validate-on-write: арифметика (velocity * dt) — основной источник NaN/Inf
+            // в runtime mutation pipeline. Первичный барьер перед spatial index и render.
+            validation::assertTransformFinite(transform, "MovementSystem::update");
+
             world.markDirty<SpatialDirtyTag>(entity);
         });
     }
