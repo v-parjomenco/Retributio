@@ -70,11 +70,17 @@ namespace core::ecs {
         mDeterminismEnabled = config.determinismEnabled;
     }
 
+    // ============================================================================================
+    // update(): orchestrator only — registration of new entities + dispatch dirty path + tag clear.
+    // ============================================================================================
+
     void SpatialIndexSystem::update(World& world, float) {
 
         ensureDestroyConnection(world);
 
         auto& registry = world.registry();
+
+        // ----- Phase 1: register new entities (no SpatialIdComponent yet) -----------------------
 
         auto newView = registry.view<TransformComponent, SpriteComponent>(
                     entt::exclude<SpatialIdComponent, SpatialStreamedOutTag>);
@@ -96,7 +102,6 @@ namespace core::ecs {
                 LOG_PANIC(core::log::cat::ECS,
                           "SpatialIndexSystem: SpatialId32 pool exhausted (maxEntityId={})",
                           mEntityBySpatialId.size() - 1u);
-                // Unreachable: LOG_PANIC is [[noreturn]], но закрывающая скобка обязательна
             }
 
             // КРИТИЧЕСКИЙ КОНТРАКТ (state machine):
@@ -151,7 +156,6 @@ namespace core::ecs {
                           isFinite ? 1 : 0, minChunk.x, minChunk.y, maxChunk.x, maxChunk.y,
                           firstBad.x, firstBad.y, static_cast<int>(firstBadState), winOrigin.x,
                           winOrigin.y, mIndex.windowWidth(), mIndex.windowHeight());
-                // Unreachable: LOG_PANIC is [[noreturn]]
             }
 
             // entity гарантированно не имел SpatialIdComponent (exclude<>),
@@ -160,86 +164,11 @@ namespace core::ecs {
             registry.emplace<SpatialIdComponent>(entity, SpatialIdComponent{id, aabb});
         }
 
-        auto dirtyView = registry.view<SpatialIdComponent,
-                                       SpatialDirtyTag,
-                                       TransformComponent,
-                                       SpriteComponent>(
-                                       entt::exclude<SpatialStreamedOutTag>);
+        // ----- Phase 2: update dirty entities ---------------------------------------------------
 
-        bool hadDirty = false;
-
-        if (mDeterminismEnabled) {
-            auto& stableIds = world.stableIds();
-
-            const std::size_t dirtyHint = dirtyView.size_hint();
-            if (mDirtyStableScratch.capacity() < dirtyHint) {
-                mDirtyStableScratch.reserve(dirtyHint);
-            }
-            mDirtyStableScratch.clear();
-
-            for (const Entity e : dirtyView) {
-                const auto idOpt = stableIds.tryGet(e);
-                if (!idOpt.has_value()) {
-                    LOG_PANIC(core::log::cat::ECS,
-                              "SpatialIndexSystem: missing StableID in deterministic mode. "
-                              "Stable IDs must be assigned on entity creation.");
-                }
-                mDirtyStableScratch.emplace_back(*idOpt, e);
-            }
-
-            std::sort(mDirtyStableScratch.begin(), mDirtyStableScratch.end(),
-                      [](const auto& lhs, const auto& rhs) noexcept {
-                          if (lhs.first < rhs.first) {
-                              return true;
-                          }
-                          if (rhs.first < lhs.first) {
-                              return false;
-                          }
-                          // Теоретический tie-break (StableIdService обещает уникальность).
-                          return core::ecs::toUint(lhs.second) < core::ecs::toUint(rhs.second);
-                      });
-
-            for (const auto& entry : mDirtyStableScratch) {
-                const Entity e = entry.second;
-                auto& handleComp = registry.get<SpatialIdComponent>(e);
-                const auto& tr = registry.get<TransformComponent>(e);
-                const auto& sp = registry.get<SpriteComponent>(e);
-
-                hadDirty = true;
-
-                assert(core::ecs::render::hasExplicitRect(sp.textureRect) &&
-                       "SpatialIndexSystem: SpriteComponent.textureRect must be explicit");
-
-                const core::spatial::Aabb2 newAabb = computeEntityAabb(tr, sp);
-
-                const core::spatial::WriteResult updResult =
-                    mIndex.updateEntity(handleComp.id, newAabb);
-                if (updResult == core::spatial::WriteResult::Rejected) {
-                    LOG_PANIC(core::log::cat::ECS,
-                              "SpatialIndexSystem: updateEntity rejected (id={})", handleComp.id);
-                }
-                handleComp.lastAabb = newAabb;
-            }
-
-        } else {
-            for (auto [entity, handleComp, transform, sprite] : dirtyView.each()) {
-                (void) entity;
-                hadDirty = true;
-
-                assert(core::ecs::render::hasExplicitRect(sprite.textureRect) &&
-                       "SpatialIndexSystem: SpriteComponent.textureRect must be explicit");
-
-                const core::spatial::Aabb2 newAabb = computeEntityAabb(transform, sprite);
-
-                const core::spatial::WriteResult result =
-                    mIndex.updateEntity(handleComp.id, newAabb);
-                if (result == core::spatial::WriteResult::Rejected) {
-                    LOG_PANIC(core::log::cat::ECS,
-                              "SpatialIndexSystem: updateEntity rejected (id={})", handleComp.id);
-                }
-                handleComp.lastAabb = newAabb;
-            }
-        }
+        const bool hadDirty = mDeterminismEnabled
+                                  ? updateDirtyDeterministic(world, registry)
+                                  : updateDirtyFast(registry);
 
         // ВАЖНО: не удаляем SpatialDirtyTag внутри итерации view (риск инвалидации).
         // storage SpatialDirtyTag содержит только "грязные" сущности, поэтому clear() = O(dirty),
@@ -248,6 +177,113 @@ namespace core::ecs {
             registry.clear<SpatialDirtyTag>();
         }
     }
+
+    // ============================================================================================
+    // updateDirtyDeterministic: sorted by StableId for reproducible update order.
+    // Контракт: comparator работает по заранее заполненному scratch (не optional-lookup в sort).
+    // ============================================================================================
+
+    bool SpatialIndexSystem::updateDirtyDeterministic(World& world, entt::registry& registry) {
+        auto dirtyView = registry.view<SpatialIdComponent,
+                                       SpatialDirtyTag,
+                                       TransformComponent,
+                                       SpriteComponent>(
+                                       entt::exclude<SpatialStreamedOutTag>);
+
+        auto& stableIds = world.stableIds();
+
+        const std::size_t dirtyHint = dirtyView.size_hint();
+        if (mDirtyStableScratch.capacity() < dirtyHint) {
+            mDirtyStableScratch.reserve(dirtyHint);
+        }
+        mDirtyStableScratch.clear();
+
+        for (const Entity e : dirtyView) {
+            const auto idOpt = stableIds.tryGet(e);
+            if (!idOpt.has_value()) {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialIndexSystem: missing StableID in deterministic mode. "
+                          "Stable IDs must be assigned on entity creation.");
+            }
+            mDirtyStableScratch.emplace_back(*idOpt, e);
+        }
+
+        if (mDirtyStableScratch.empty()) {
+            return false;
+        }
+
+        std::sort(mDirtyStableScratch.begin(), mDirtyStableScratch.end(),
+                  [](const auto& lhs, const auto& rhs) noexcept {
+                      if (lhs.first < rhs.first) {
+                          return true;
+                      }
+                      if (rhs.first < lhs.first) {
+                          return false;
+                      }
+                      // Теоретический tie-break (StableIdService обещает уникальность).
+                      return core::ecs::toUint(lhs.second) < core::ecs::toUint(rhs.second);
+                  });
+
+        for (const auto& entry : mDirtyStableScratch) {
+            const Entity e = entry.second;
+            auto& handleComp = registry.get<SpatialIdComponent>(e);
+            const auto& tr = registry.get<TransformComponent>(e);
+            const auto& sp = registry.get<SpriteComponent>(e);
+
+            assert(core::ecs::render::hasExplicitRect(sp.textureRect) &&
+                   "SpatialIndexSystem: SpriteComponent.textureRect must be explicit");
+
+            const core::spatial::Aabb2 newAabb = computeEntityAabb(tr, sp);
+
+            const core::spatial::WriteResult updResult =
+                mIndex.updateEntity(handleComp.id, newAabb);
+            if (updResult == core::spatial::WriteResult::Rejected) {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialIndexSystem: updateEntity rejected (id={})", handleComp.id);
+            }
+            handleComp.lastAabb = newAabb;
+        }
+
+        return true;
+    }
+
+    // ============================================================================================
+    // updateDirtyFast: raw EnTT iteration order (non-deterministic, zero overhead).
+    // ============================================================================================
+
+    bool SpatialIndexSystem::updateDirtyFast(entt::registry& registry) {
+        auto dirtyView = registry.view<SpatialIdComponent,
+                                       SpatialDirtyTag,
+                                       TransformComponent,
+                                       SpriteComponent>(
+                                       entt::exclude<SpatialStreamedOutTag>);
+
+        bool hadDirty = false;
+
+        for (auto [entity, handleComp, transform, sprite] : dirtyView.each()) {
+            (void) entity;
+            hadDirty = true;
+
+            assert(core::ecs::render::hasExplicitRect(sprite.textureRect) &&
+                   "SpatialIndexSystem: SpriteComponent.textureRect must be explicit");
+
+            const core::spatial::Aabb2 newAabb = computeEntityAabb(transform, sprite);
+
+            const core::spatial::WriteResult result =
+                mIndex.updateEntity(handleComp.id, newAabb);
+            if (result == core::spatial::WriteResult::Rejected) {
+                LOG_PANIC(core::log::cat::ECS,
+                          "SpatialIndexSystem: updateEntity rejected (id={})", handleComp.id);
+            }
+            handleComp.lastAabb = newAabb;
+        }
+
+        return hadDirty;
+    }
+
+    // ============================================================================================
+    // Destroy callback + ID pool management (unchanged)
+    // ============================================================================================
 
     void SpatialIndexSystem::ensureDestroyConnection(World& world) {
         if (mConnected) {
