@@ -1,6 +1,6 @@
 // ================================================================================================
 // File: game/skyguard/orchestration/frame_orchestrator.h
-// Role: Game-layer frame phase orchestrator (Titan-first read barrier)
+// Role: Game-layer frame phase orchestrator
 // Notes:
 //  - Keeps Game as a pure conductor (no SpatialIndex marks business logic in game.cpp)
 //  - Centralizes per-frame read-phase orchestration entrypoint(s)

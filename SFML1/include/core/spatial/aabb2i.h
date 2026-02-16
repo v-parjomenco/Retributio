@@ -1,7 +1,7 @@
 // ================================================================================================
 // File: core/spatial/aabb2i.h
 // Purpose: Integer axis-aligned bounding box (2D, half-open)
-// Used by: SpatialIndex v2 (Titan), deterministic simulation
+// Used by: SpatialIndex v2, deterministic simulation
 // Related headers: (none)
 // Notes: Half-open bounds [min, max). min==max is empty.
 // ================================================================================================

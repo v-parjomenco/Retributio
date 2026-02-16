@@ -100,7 +100,7 @@ namespace core::ecs {
         /**
          * @brief Параметры создания World (capacity prewarm, feature toggles).
          *
-         * АРХИТЕКТУРНОЕ РЕШЕНИЕ (AAA/Titan-first):
+         * АРХИТЕКТУРНОЕ РЕШЕНИЕ:
          *  - World владеет registry → World отвечает за его capacity policy
          *  - Game остаётся дирижёром: передаёт expectedMaxEntities, не лезет в registry
          *  - Единая точка истины для capacity (одна write-boundary, детерминизм)
@@ -903,7 +903,7 @@ namespace core::ecs {
         /**
          * @brief Prewarm EnTT entity pool (избегает heap churn в hot-path).
          *
-         * АРХИТЕКТУРА (AAA/Titan-first):
+         * АРХИТЕКТУРА:
          *  - Единственная write-boundary для capacity policy
          *  - Вызывается в конструкторе World (cold-path, до любых entity operations)
          *  - Fail-fast при превышении EnTT limit или bad_alloc

@@ -249,7 +249,7 @@ namespace game::skyguard::config {
                 maxEntitiesPerChunkCeiling = static_cast<std::size_t>(perChunk);
 
                 // ENV-override: декаплинг размеров окна стриминга от viewport камеры.
-                // Titan-like сценарий: viewport маленький (1920×1080 → 3×3 chunks),
+                // Сценарий: viewport маленький (1920×1080 → 3×3 chunks),
                 // окно стриминга большое (16×16 = 256 chunks → 2M entities).
                 // queryFast обходит только viewport-чанки; остальные загружены, но не видимы.
                 const auto envW = readEnvU32("SKYGUARD_STRESS_WINDOW_WIDTH");

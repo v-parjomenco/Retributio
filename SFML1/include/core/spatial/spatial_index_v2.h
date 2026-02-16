@@ -722,7 +722,7 @@ struct SpatialChunk final {
 
     using SpatialIndexV2Flat = SpatialIndexV2<FlatStorage, Aabb2>;
     using SpatialIndexV2Sliding = SpatialIndexV2<SlidingWindowStorage, Aabb2>;
-    using SpatialIndexV2Titan = SpatialIndexV2<FlatStorage, Aabb2i>;
+    using SpatialIndexV2FlatInt = SpatialIndexV2<FlatStorage, Aabb2i>;
 
     // ------------------------------ Шаблонные/Inline имплементации ------------------------------
 

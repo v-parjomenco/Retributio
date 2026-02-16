@@ -27,7 +27,7 @@ namespace core::ecs {
         [[nodiscard]] bool isEnabled() const noexcept;
         void enable() noexcept;
 
-        // КОНТРАКТ НАЗНАЧЕНИЯ StableID (Titan-oriented):
+        // КОНТРАКТ НАЗНАЧЕНИЯ StableID:
         //
         // 1) ensureAssigned() — write-path:
         //    - вызывается ТОЛЬКО на write boundary (например, World::createEntity()).

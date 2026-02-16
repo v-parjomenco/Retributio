@@ -248,7 +248,7 @@ namespace game::skyguard::ecs {
             // kMaxInitEntitiesPerFrame = 50K — эмпирический ceiling:
             //   50K entities × ~100ns (createEntity + 2 addComponent) ≈ 5ms.
             //   При 60fps = ~30% frame budget. При 240fps = всё frame budget.
-            //   Для Titan-like stress test на init это приемлемо.
+            //   Для stress test на init это приемлемо.
             //
             // Chunk budget для Phase 2 = min(chunk_budget, 50K / density).
             // При density=64: 50000/64=781 → capped at mMaxLoadsPerFrame (255). No change.
