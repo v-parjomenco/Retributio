@@ -88,8 +88,10 @@ CMakeFiles/
 CMakeCache.txt
 
 # CMake builds
+out/
+out/**
 build/
-cmake-build-*/
+build/**
 
 # macOS
 .DS_Store
@@ -109,3 +111,7 @@ Thumbs.db
 .sfml/
 
 desktop.ini
+
+# vcpkg (manifest mode local installs)
+vcpkg_installed/
+vcpkg_installed/**

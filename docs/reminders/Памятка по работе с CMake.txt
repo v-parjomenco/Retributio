@@ -1,0 +1,30 @@
+# 1. Configure (один раз после замены CMakeLists.txt)
+cmake --preset win-msvc-ninja-mc
+
+{
+	В developer power shell for vs:
+	Remove-Item -Recurse -Force .\out\build\win-msvc-ninja-mc
+	
+	Cmd-аналог Remove-Item -Recurse -Force в x64 Native Tools Command Prompt for VS:
+	rmdir /s /q out\build\win-msvc-ninja-mc
+	
+	Когда использовать:
+
+	Configure упал с ошибкой → обязательно удалить перед повторной попыткой.
+	CMake кэширует частично сгенерированное состояние в CMakeCache.txt,
+	и повторный configure "поверх" сломанного может дать непредсказуемый результат.
+	
+	Build упал → не нужно. Инкрементальный build сам пересоберёт нужное.
+	
+	Изменил CMakeLists.txt → удалять не нужно, достаточно повторного cmake --preset.
+
+}
+
+# 2. Build нужного таргета в нужном конфиге
+cmake --build --preset win-debug   --target sfml1_game
+cmake --build --preset win-profile --target sfml1_game
+cmake --build --preset win-release --target sfml1_game
+
+# Или собрать всё сразу в одном конфиге:
+cmake --build --preset win-profile
+Короткое правило: поменял CMakeLists.txt → сначала configure, потом build. Поменял только .cpp/.h → сразу build, configure не нужен.

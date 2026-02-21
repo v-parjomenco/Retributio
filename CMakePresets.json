@@ -1,0 +1,46 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 24,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "win-msvc-ninja-mc",
+            "displayName": "Windows MSVC + Ninja Multi-Config (vcpkg, x64 only)",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake",
+
+                "CMAKE_C_COMPILER": "cl",
+                "CMAKE_CXX_COMPILER": "cl",
+
+                "VCPKG_TARGET_TRIPLET": "x64-windows-static-md",
+                "VCPKG_INSTALLED_DIR": "${sourceDir}/out/vcpkg_installed/${presetName}",
+                "CMAKE_CONFIGURATION_TYPES": "Debug;Profile;Release",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+
+                "CMAKE_MAP_IMPORTED_CONFIG_PROFILE": "Release;RelWithDebInfo;MinSizeRel"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "win-debug",
+            "configurePreset": "win-msvc-ninja-mc",
+            "configuration": "Debug"
+        },
+        {
+            "name": "win-profile",
+            "configurePreset": "win-msvc-ninja-mc",
+            "configuration": "Profile"
+        },
+        {
+            "name": "win-release",
+            "configurePreset": "win-msvc-ninja-mc",
+            "configuration": "Release"
+        }
+    ]
+}
