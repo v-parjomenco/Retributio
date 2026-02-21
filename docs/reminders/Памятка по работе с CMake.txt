@@ -1,30 +1,27 @@
 # 1. Configure (один раз после замены CMakeLists.txt)
 cmake --preset win-msvc-ninja-mc
 
-{
-	В developer power shell for vs:
-	Remove-Item -Recurse -Force .\out\build\win-msvc-ninja-mc
-	
-	Cmd-аналог Remove-Item -Recurse -Force в x64 Native Tools Command Prompt for VS:
-	rmdir /s /q out\build\win-msvc-ninja-mc
-	
-	Когда использовать:
+# Полная пересборка (только если configure упал):
+rmdir /s /q out\build\win-msvc-ninja-mc   # cmd
+Remove-Item -Recurse -Force .\out\build\win-msvc-ninja-mc  # powershell
 
-	Configure упал с ошибкой → обязательно удалить перед повторной попыткой.
-	CMake кэширует частично сгенерированное состояние в CMakeCache.txt,
-	и повторный configure "поверх" сломанного может дать непредсказуемый результат.
-	
-	Build упал → не нужно. Инкрементальный build сам пересоберёт нужное.
-	
-	Изменил CMakeLists.txt → удалять не нужно, достаточно повторного cmake --preset.
+# Когда удалять: configure упал → удалить обязательно.
+# Когда НЕ удалять: build упал / изменил .cpp/.h / изменил CMakeLists.txt.
+# Правило: поменял CMakeLists.txt → cmake --preset (без удаления). Поменял .cpp/.h → сразу build.
 
-}
+# 2. Игра
+cmake --build --preset win-debug   --target sfml1_game   # Debug: /Od, overlay, консоль
+cmake --build --preset win-profile --target sfml1_game   # Profile: /O2, overlay, без консоли
+cmake --build --preset win-release --target sfml1_game   # Release: /O2, без overlay, shipping
 
-# 2. Build нужного таргета в нужном конфиге
-cmake --build --preset win-debug   --target sfml1_game
-cmake --build --preset win-profile --target sfml1_game
-cmake --build --preset win-release --target sfml1_game
+# 3. Spatial harness (standalone, без GUI)
+cmake --build --preset win-profile --target sfml1_spatial_harness  # просто собрать EXE
 
-# Или собрать всё сразу в одном конфиге:
-cmake --build --preset win-profile
-Короткое правило: поменял CMakeLists.txt → сначала configure, потом build. Поменял только .cpp/.h → сразу build, configure не нужен.
+# Запуск с пресетами (тест + метрики):
+cmake --build --preset win-profile --target stress_small  # smoke: 4×4 chunks, ~198 entities
+cmake --build --preset win-profile --target stress_large  # soak: 128×128 chunks, ~25K entities
+
+# 4. Собрать всё в конфиге
+cmake --build --preset win-profile   # все таргеты Profile
+cmake --build --preset win-debug     # все таргеты Debug
+cmake --build --preset win-release   # все таргеты Release

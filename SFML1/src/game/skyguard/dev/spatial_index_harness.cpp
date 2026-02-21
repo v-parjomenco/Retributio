@@ -73,7 +73,8 @@ namespace {
         const std::string_view s = readEnvStringView(name, buf);
         std::uint32_t value = 0;
         if (!parseU32(s, value)) {
-            return defaultValue;
+            // maxValue применяется и к дефолту: контракт функции — возвращать значение в [0, maxValue].
+            return std::min(defaultValue, maxValue);
         }
         if (value > maxValue) {
             return maxValue;

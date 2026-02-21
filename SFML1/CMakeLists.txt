@@ -738,6 +738,44 @@ target_link_libraries(sfml1_game          PRIVATE SFML::Main)
 target_link_libraries(sfml1_render_stress PRIVATE SFML::Main)
 
 # ================================================================================================
+# Синхронизация assets — POST_BUILD для всех EXE-таргетов
+#
+# Проблема: все три EXE живут в out/build/.../SFML1/<Config>/, но assets/ лежат
+# в исходном дереве. fixWorkingDirectory() при запуске ищет assets/ вверх по дереву
+# и не находит их в output-директории → конфиги грузятся с дефолтами (WARNING в логе).
+#
+# Решение: copy_directory_if_different после каждой сборки.
+#   - Копирует только изменённые файлы (timestamp-based diff) — нет лишней работы.
+#   - Каждый EXE получает свою копию — независимые рабочие директории.
+#   - $<TARGET_FILE_DIR:target> раскрывается генератором корректно для
+#     Ninja Multi-Config: Debug/ Profile/ Release/ — каждый в своей папке.
+#
+# Путь к assets: ${CMAKE_CURRENT_SOURCE_DIR}/assets
+#   CMAKE_CURRENT_SOURCE_DIR = SFML1/ (директория этого CMakeLists.txt).
+#   Структура: SFML1/assets/game/..., SFML1/assets/core/...
+# ================================================================================================
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+    message(WARNING
+        "SFML1: директория assets не найдена: '${CMAKE_CURRENT_SOURCE_DIR}/assets'. "
+        "POST_BUILD-синхронизация пропущена. "
+        "EXE будут грузить дефолтные конфиги вместо JSON.")
+else()
+    set(_assets_src "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+
+    foreach(_exe IN ITEMS sfml1_game sfml1_spatial_harness sfml1_render_stress)
+        add_custom_command(TARGET ${_exe} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+                "${_assets_src}"
+                "$<TARGET_FILE_DIR:${_exe}>/assets"
+            COMMENT "Assets sync → ${_exe}: $<TARGET_FILE_DIR:${_exe}>/assets"
+        )
+    endforeach()
+
+    unset(_assets_src)
+    unset(_exe)
+endif()
+
+# ================================================================================================
 # Linker options (MSVC only)
 # Source of truth: vcxproj <Link> section per config.
 # ================================================================================================

@@ -51,7 +51,6 @@
 #endif
 #if !defined(NDEBUG) || defined(SFML1_PROFILE)
     #include "game/skyguard/dev/overlay_extras.h"
-    #include "game/skyguard/dev/spatial_index_harness.h"
 #endif
 
 // Движковые конфиги (Vsync, frame limit и т.п.).
@@ -285,10 +284,6 @@ namespace game::skyguard {
                        &mResources);
         // 3) Сохраняем указатель.
         mRenderSystem = &renderSys;
-
-#if !defined(NDEBUG) || defined(SFML1_PROFILE)
-        game::skyguard::dev::tryRunSpatialIndexHarnessFromEnv(spatialCfg);
-#endif
 
         // Эти системы требуют прямого доступа (onResize, onKeyEvent),
         // поэтому сохраняем указатели.
