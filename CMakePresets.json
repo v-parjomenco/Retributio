@@ -24,6 +24,15 @@
 
                 "CMAKE_MAP_IMPORTED_CONFIG_PROFILE": "Release;RelWithDebInfo;MinSizeRel"
             }
+        },
+        {
+            "name": "win-msvc-ninja-mc-ci",
+            "displayName": "Windows MSVC + Ninja Multi-Config (CI — vcpkg from VCPKG_ROOT env)",
+            "inherits": "win-msvc-ninja-mc",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_INSTALLED_DIR": "${sourceDir}/out/vcpkg_installed/win-msvc-ninja-mc-ci"
+            }
         }
     ],
     "buildPresets": [
@@ -41,6 +50,39 @@
             "name": "win-release",
             "configurePreset": "win-msvc-ninja-mc",
             "configuration": "Release"
+        },
+        {
+            "name": "ci-debug",
+            "configurePreset": "win-msvc-ninja-mc-ci",
+            "configuration": "Debug"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "win-debug",
+            "configurePreset": "win-msvc-ninja-mc",
+            "configuration": "Debug",
+            "output": {
+                "outputOnFailure": true,
+                "verbosity": "default"
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": false
+            }
+        },
+        {
+            "name": "ci-debug",
+            "configurePreset": "win-msvc-ninja-mc-ci",
+            "configuration": "Debug",
+            "output": {
+                "outputOnFailure": true,
+                "verbosity": "default"
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": false
+            }
         }
     ]
 }

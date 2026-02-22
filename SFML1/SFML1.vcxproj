@@ -1,10 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="DebugTests|x64">
-      <Configuration>DebugTests</Configuration>
-      <Platform>x64</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Profile|x64">
       <Configuration>Profile</Configuration>
       <Platform>x64</Platform>
@@ -27,12 +23,6 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
@@ -61,9 +51,6 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -75,11 +62,6 @@
     <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
     <ClangTidyChecks>
     </ClangTidyChecks>
-    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2-64\include;$(SolutionDir)third_party;</ExternalIncludePath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'">
-    <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
-    <ClangTidyChecks />
     <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\dev\SFML-3.0.2-64\include;$(SolutionDir)third_party;</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -96,33 +78,6 @@
       <WarningLevel>EnableAllWarnings</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>SFML_STATIC;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
-      <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
-      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
-      <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <TreatWarningAsError>true</TreatWarningAsError>
-      <DisableSpecificWarnings>4710;4711</DisableSpecificWarnings>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
-      <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
-    </ClCompile>
-    <Link>
-      <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\dev\SFML-3.0.2-64\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>sfml-main-d.lib;sfml-graphics-s-d.lib;freetype.lib;sfml-window-s-d.lib;opengl32.lib;winmm.lib;gdi32.lib;sfml-audio-s-d.lib;flac.lib;vorbisenc.lib;vorbisfile.lib;vorbis.lib;ogg.lib;sfml-network-s-d.lib;ws2_32.lib;sfml-system-s-d.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'">
-    <ClCompile>
-      <WarningLevel>EnableAllWarnings</WarningLevel>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>SFML_STATIC;_DEBUG;_CONSOLE;SFML1_TESTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -210,26 +165,20 @@
     <ClCompile Include="..\third_party\xxhash\upstream\xxhash.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">NotUsing</PrecompiledHeader>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir);$(SolutionDir)SFML1\include;$(SolutionDir)third_party</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'">$(SolutionDir);$(SolutionDir)SFML1\include;$(SolutionDir)third_party</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir);$(SolutionDir)SFML1\include;$(SolutionDir)third_party</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">$(SolutionDir);$(SolutionDir)SFML1\include;$(SolutionDir)third_party</AdditionalIncludeDirectories>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/wd5045 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'">/wd5045 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/wd5045 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">/wd5045 %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Level4</WarningLevel>
-      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'">Level4</WarningLevel>
       <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</TreatWarningAsError>
-      <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'">false</TreatWarningAsError>
       <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Level4</WarningLevel>
       <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</TreatWarningAsError>
       <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Level4</WarningLevel>
       <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">false</TreatWarningAsError>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4710;4711;4820;5045</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'">4710;4711;4820;5045</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4710;4711;4820;5045</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">4710;4711;4820;5045</DisableSpecificWarnings>
     </ClCompile>
@@ -243,15 +192,15 @@
     <ClCompile Include="src\core\ecs\systems\render_system.cpp" />
     <ClCompile Include="src\core\ecs\systems\spatial_index_system.cpp" />
     <ClCompile Include="src\core\ecs\world.cpp" />
+    <ClCompile Include="src\core\log\detail\utf8_to_wide.cpp" />
     <ClCompile Include="src\core\log\logging.cpp" />
     <ClCompile Include="src\core\log\log_level.cpp" />
+    <ClCompile Include="src\core\log\panic_sink_default.cpp" />
     <ClCompile Include="src\core\resources\keys\stable_key.cpp" />
+    <ClCompile Include="src\core\resources\keys\stable_key_impl_xxhash.cpp" />
     <ClCompile Include="src\core\resources\registry\resource_registry.cpp" />
-    <ClCompile Include="src\core\resources\registry\resource_registry_self_test.cpp" />
     <ClCompile Include="src\core\resources\registry\string_pool.cpp" />
-    <ClCompile Include="src\core\resources\registry\string_pool_self_test.cpp" />
     <ClCompile Include="src\core\resources\resource_manager.cpp" />
-    <ClCompile Include="src\core\resources\resource_manager_self_test.cpp" />
     <ClCompile Include="src\core\spatial\spatial_index.cpp" />
     <ClCompile Include="src\core\spatial\spatial_index_v2.cpp" />
     <ClCompile Include="src\core\time\time_service.cpp" />
@@ -275,16 +224,13 @@
     <ClCompile Include="src\game\skyguard\game.cpp" />
     <ClCompile Include="src\game\skyguard\orchestration\frame_orchestrator.cpp" />
     <ClCompile Include="src\game\skyguard\platform\user_paths.cpp" />
-    <ClCompile Include="src\game\skyguard\presentation\background_math_self_test.cpp" />
     <ClCompile Include="src\game\skyguard\presentation\background_renderer.cpp" />
     <ClCompile Include="src\game\skyguard\presentation\view_manager.cpp" />
     <ClCompile Include="src\game\skyguard\presentation\window_mode_manager.cpp" />
     <ClCompile Include="src\game\skyguard\utils\debug_format.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'">Create</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='DebugTests|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Create</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">pch.h</PrecompiledHeaderFile>
@@ -339,6 +285,7 @@
     <ClInclude Include="include\core\ecs\system_manager.h" />
     <ClInclude Include="include\core\ecs\validation\numeric_integrity.h" />
     <ClInclude Include="include\core\ecs\world.h" />
+    <ClInclude Include="include\core\log\detail\utf8_to_wide.h" />
     <ClInclude Include="include\core\log\logging.h" />
     <ClInclude Include="include\core\log\log_categories.h" />
     <ClInclude Include="include\core\log\log_defaults.h" />

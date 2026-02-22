@@ -337,6 +337,12 @@
     <Filter Include="src\core\ecs\validation">
       <UniqueIdentifier>{a4b97aff-9c96-470d-80a9-92a5524ce0b2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\log\detail">
+      <UniqueIdentifier>{e262e62e-027f-4dac-b0f7-adb4725e8b21}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\log\detail">
+      <UniqueIdentifier>{2d1cf540-bf01-4215-82d1-3ab1ad63731b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -429,29 +435,17 @@
     <ClCompile Include="src\core\resources\registry\string_pool.cpp">
       <Filter>src\core\resources\registry</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\resources\registry\string_pool_self_test.cpp">
-      <Filter>src\core\resources\registry</Filter>
-    </ClCompile>
     <ClCompile Include="src\core\resources\keys\stable_key.cpp">
       <Filter>src\core\resources\keys</Filter>
     </ClCompile>
     <ClCompile Include="src\core\resources\registry\resource_registry.cpp">
       <Filter>src\core\resources\registry</Filter>
     </ClCompile>
-    <ClCompile Include="src\core\resources\registry\resource_registry_self_test.cpp">
-      <Filter>src\core\resources\registry</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core\resources\resource_manager_self_test.cpp">
-      <Filter>src\core\resources</Filter>
-    </ClCompile>
     <ClCompile Include="..\third_party\xxhash\upstream\xxhash.c">
       <Filter>third_party\xxhash\upstream</Filter>
     </ClCompile>
     <ClCompile Include="src\game\skyguard\ecs\systems\player_init_system.cpp">
       <Filter>src\game\skyguard\ecs\systems</Filter>
-    </ClCompile>
-    <ClCompile Include="src\game\skyguard\presentation\background_math_self_test.cpp">
-      <Filter>src\game\skyguard\presentation</Filter>
     </ClCompile>
     <ClCompile Include="src\game\skyguard\utils\debug_format.cpp">
       <Filter>src\game\skyguard\utils</Filter>
@@ -485,6 +479,15 @@
     </ClCompile>
     <ClCompile Include="src\game\skyguard\orchestration\frame_orchestrator.cpp">
       <Filter>src\game\skyguard\orchestration</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\log\panic_sink_default.cpp">
+      <Filter>src\core\log</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\log\detail\utf8_to_wide.cpp">
+      <Filter>src\core\log\detail</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\resources\keys\stable_key_impl_xxhash.cpp">
+      <Filter>src\core\resources\keys</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -853,6 +856,9 @@
     </ClInclude>
     <ClInclude Include="include\core\ecs\validation\numeric_integrity.h">
       <Filter>include\core\ecs\validation</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\log\detail\utf8_to_wide.h">
+      <Filter>include\core\log\detail</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

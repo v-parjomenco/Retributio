@@ -1,0 +1,87 @@
+# ================================================================================================
+# File: .github/workflows/ci.yml
+# Purpose: Build (Debug) and run Google Tests on every push / pull_request.
+#
+# Workflow:
+#   1. Checkout with submodules
+#   2. Set up MSVC x64 environment (cl.exe in PATH)
+#   3. Bootstrap vcpkg (sets VCPKG_ROOT env var)
+#   4. Configure with win-msvc-ninja-mc-ci preset (uses $env{VCPKG_ROOT} for toolchain)
+#   5. Build Debug config — also installs vcpkg packages on first run
+#   6. Run tests via ctest --preset ci-debug
+#
+# Presets used:
+#   Configure : win-msvc-ninja-mc-ci  (inherits win-msvc-ninja-mc, overrides toolchain path)
+#   Build     : ci-debug              (configurePreset: win-msvc-ninja-mc-ci, config: Debug)
+#   Test      : ci-debug              (configurePreset: win-msvc-ninja-mc-ci, config: Debug)
+# ================================================================================================
+
+name: Build and Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build-and-test:
+    name: MSVC / x64 / Debug
+    runs-on: windows-latest
+
+    steps:
+      # ──────────────────────────────────────────────────────────────
+      # 1. Checkout
+      # ──────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ──────────────────────────────────────────────────────────────
+      # 2. MSVC environment
+      #
+      # Adds cl.exe, link.exe, and the Windows SDK to PATH.
+      # Required because windows-latest ships with VS installed but
+      # does NOT add compiler tools to PATH by default.
+      # ──────────────────────────────────────────────────────────────
+      - name: Set up MSVC x64 environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # ──────────────────────────────────────────────────────────────
+      # 3. vcpkg — bootstrap + cache
+      #
+      # lukka/run-vcpkg bootstraps vcpkg and exports VCPKG_ROOT.
+      # The vcpkg binary cache is keyed by vcpkg.json hash so
+      # packages are only rebuilt when dependencies change.
+      # vcpkgGitCommitId must match builtin-baseline in vcpkg.json.
+      # ──────────────────────────────────────────────────────────────
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 'e5a1490e1409d175932ef6014519e9ae149ddb7c'
+
+      # ──────────────────────────────────────────────────────────────
+      # 4. Configure
+      #
+      # Uses the ci-specific preset which reads VCPKG_ROOT from env
+      # instead of the hardcoded local path in win-msvc-ninja-mc.
+      # vcpkg packages are installed automatically by the toolchain
+      # file during this step.
+      # ──────────────────────────────────────────────────────────────
+      - name: Configure (CMake)
+        run: cmake --preset win-msvc-ninja-mc-ci
+
+      # ──────────────────────────────────────────────────────────────
+      # 5. Build (Debug)
+      # ──────────────────────────────────────────────────────────────
+      - name: Build
+        run: cmake --build --preset ci-debug
+
+      # ──────────────────────────────────────────────────────────────
+      # 6. Test
+      # ──────────────────────────────────────────────────────────────
+      - name: Test
+        run: ctest --preset ci-debug

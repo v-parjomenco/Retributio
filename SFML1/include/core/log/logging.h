@@ -129,6 +129,14 @@ namespace core::log {
                                       std::string_view fmt,
                                       std::format_args args);
 
+        /// Финальный обработчик паники — определяется вне sfml1_core линкером.
+        /// production : sfml1_panic_sink_default -> MessageBox + std::exit.
+        /// тесты      : sfml1_core_test_support  -> throw PanicException.
+        [[noreturn]] void panic_sink(std::string_view category,
+                                      std::string_view message,
+                                      const char* file,
+                                      int line);
+
     } // namespace detail
 
     // --------------------------------------------------------------------------------------------

@@ -11,14 +11,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <span>
 #include <string_view>
 #include <vector>
-
-#if defined(SFML1_TESTS)
-    #include <filesystem>
-#endif
 
 #include "core/resources/keys/resource_key.h"
 #include "core/resources/registry/resource_registry.h"
@@ -36,6 +33,36 @@ namespace core::resources {
      */
     class ResourceManager {
       public:
+        // ----------------------------------------------------------------------------------------
+        // I/O seam — инъекция загрузчиков для initialize().
+        //
+        // Контракт:
+        //  - Поля по умолчанию пусты ({}), тогда используется продакшн-загрузка с диска.
+        //  - Продакшн callsite ничего не передаёт (Loaders{} по умолчанию).
+        //  - Тесты передают стабы напрямую; глобального mutable state нет; SFML1_TESTS нет.
+        //
+        // Важно:
+        //  - В публичном заголовке НЕ используем std::filesystem::path, чтобы не тащить
+        //    <filesystem> как обязательную зависимость продукта (compile-time/границы).
+        //  - Путь передаётся как std::string_view; .cpp конвертирует в filesystem::path
+        //    только в продакшн-default пути.
+        //
+        // Loaders хранится в members, потому что lazy-load возможен после initialize().
+        // ----------------------------------------------------------------------------------------
+        struct Loaders {
+            using TextureFn = std::function<bool(types::TextureResource&,
+                                                 std::string_view path,
+                                                 bool sRgb)>;
+            using FontFn    = std::function<bool(types::FontResource&,
+                                                 std::string_view path)>;
+            using SoundFn   = std::function<bool(types::SoundBufferResource&,
+                                                 std::string_view path)>;
+
+            TextureFn texture{}; // empty → default file-based loader
+            FontFn    font{};    // empty → default file-based loader
+            SoundFn   sound{};   // empty → default file-based loader
+        };
+
         ResourceManager() = default;
         ~ResourceManager() = default;
 
@@ -51,26 +78,23 @@ namespace core::resources {
         /**
          * @brief Инициализация key-world реестра и кэшей.
          *
+         * @param sources  Список JSON-файлов реестра (см. ResourceRegistry::loadFromSources).
+         * @param loaders  Опциональные перегрузки загрузчиков. Продакшн-код не передаёт их
+         *                 (умолчание Loaders{} → файловые загрузчики).
+         *
          * Контракт:
-         *  - вызывается ровно один раз на старте (до любых getTexture/getFont/tryGetSound
-         *    по ключам);
+         *  - вызывается ровно один раз на старте (до любых getTexture/getFont/tryGetSound);
          *  - повторный вызов = programmer error (LOG_PANIC).
          */
-        void initialize(std::span<const ResourceSource> sources);
+        void initialize(std::span<const ResourceSource> sources, Loaders loaders = {});
 
         /**
          * @brief Запретить lazy-load после фазы инициализации/прелоада.
-         *
-         * Контракт:
-         *  - Должно быть включено после того, как сцена/ресурсный набор подготовлены.
-         *  - Любая попытка загрузить ресурс через loading API после этого — programmer error.
          */
         void setIoForbidden(bool enabled) noexcept;
 
         /**
          * @brief Поколение кэша ресурсов (для инвалидирования внешних pointer-кэшей).
-         *
-         * Инкрементируется при initialize()/clearAll() и будущих reload/eviction действиях.
          */
         [[nodiscard]] std::uint32_t cacheGeneration() const noexcept;
 
@@ -78,69 +102,21 @@ namespace core::resources {
         // Key-based API (RuntimeKey32) — целевой путь
         // ----------------------------------------------------------------------------------------
 
-        /**
-         * @brief Получить текстуру по RuntimeKey32.
-         *
-         * Контракт:
-         *  - invalid ключ или index вне диапазона => fallback (missingTextureKey());
-         *  - любая ошибка загрузки (I/O/декодирование) => LOG_PANIC (Type A).
-         *  - загрузка выполняется один раз, далее O(1) через индекс.
-         */
         [[nodiscard]] const types::TextureResource& getTexture(TextureKey key);
-
-        /**
-         * @brief Получить шрифт по RuntimeKey32.
-         *
-         * Контракт:
-         *  - invalid ключ или index вне диапазона => fallback (missingFontKey());
-         *  - любая ошибка загрузки => LOG_PANIC (Type A).
-         *  - загрузка выполняется один раз, далее O(1) через индекс.
-         */
         [[nodiscard]] const types::FontResource& getFont(FontKey key);
-
-        /**
-         * @brief Получить звуковой буфер по RuntimeKey32.
-         *
-         * Контракт:
-         *  - invalid ключ или index вне диапазона => nullptr;
-         *  - ошибка загрузки => soft-fail (LOG_WARN один раз + skip); повторно не пробуем.
-         *  - загрузка выполняется один раз, далее O(1) через индекс.
-         */
         [[nodiscard]] const types::SoundBufferResource* tryGetSound(SoundKey key);
 
         // ----------------------------------------------------------------------------------------
         // Resident-only API (NO I/O, NO decoding, NO allocations)
         // ----------------------------------------------------------------------------------------
 
-        /**
-         * @brief Получить resident текстуру. НИКОГДА не делает I/O.
-         *
-         * Контракт:
-         *  - invalid/out-of-range => missingTextureKey (missing гарантированно resident).
-         *  - если ресурс не resident => LOG_PANIC (programmer error: забыли preload).
-         */
         [[nodiscard]] const types::TextureResource& expectTextureResident(TextureKey key) const;
-
-        /**
-         * @brief Получить resident шрифт. НИКОГДА не делает I/O.
-         *
-         * Контракт:
-         *  - invalid/out-of-range => missingFontKey (missing гарантированно resident).
-         *  - если ресурс не resident => LOG_PANIC (programmer error: забыли preload).
-         */
         [[nodiscard]] const types::FontResource& expectFontResident(FontKey key) const;
-
-        /**
-         * @brief Получить resident звук, если он есть. НИКОГДА не делает I/O.
-         *
-         * Политика: sounds soft-fail (nullptr означает "нет звука/не загружен/сломался").
-         */
-        [[nodiscard]] const types::SoundBufferResource* 
-            tryGetSoundResident(SoundKey key) const noexcept;
+        [[nodiscard]] const types::SoundBufferResource*
+        tryGetSoundResident(SoundKey key) const noexcept;
 
         /// Найти ключ текстуры по каноническому имени (O(log N), для тулов/конфигов).
         [[nodiscard]] TextureKey findTexture(std::string_view canonicalName) const;
-
         /// Найти ключ шрифта по каноническому имени (O(log N), для тулов/конфигов).
         [[nodiscard]] FontKey findFont(std::string_view canonicalName) const;
 
@@ -155,7 +131,6 @@ namespace core::resources {
         // Метрики
         // ----------------------------------------------------------------------------------------
 
-        /// Статистика по загруженным ресурсам key-world.
         struct ResourceMetrics {
             std::size_t textureCount = 0;
             std::size_t fontCount = 0;
@@ -164,14 +139,13 @@ namespace core::resources {
 
         [[nodiscard]] ResourceMetrics getMetrics() const noexcept;
 
+        // ----------------------------------------------------------------------------------------
         // Batch preload (scene-level)
+        // ----------------------------------------------------------------------------------------
+
         void preloadTextures(std::span<const TextureKey> keys);
         void preloadFonts(std::span<const FontKey> keys);
         void preloadSounds(std::span<const SoundKey> keys);
-
-        // ----------------------------------------------------------------------------------------
-        // Preload API (key-world, deterministic by index)
-        // ----------------------------------------------------------------------------------------
 
         void preloadTexture(TextureKey key);
         void preloadFont(FontKey key);
@@ -188,35 +162,21 @@ namespace core::resources {
         void clearAll() noexcept;
 
       private:
-
-        enum class ResourceState : std::uint8_t {
-            NotLoaded = 0,
-            Resident  = 1,
-            Failed    = 2
-            // NOTE: extend with Loading/Unloaded when async loading / eviction lands.
-        };
+        enum class ResourceState : std::uint8_t { NotLoaded = 0, Resident = 1, Failed = 2 };
 
         void bumpCacheGeneration() noexcept;
 
-        // ----------------------------------------------------------------------------------------
-        // Key-world registry + O(1) vector caches (PR3)
-        // ----------------------------------------------------------------------------------------
-
+        // Key-world registry + O(1) vector caches
         ResourceRegistry mRegistry;
+        Loaders mLoaders; // инъекция initialize(), используется в lazy-load
         bool mInitialized = false;
         bool mIoForbidden = false;
         std::uint32_t mCacheGeneration = 0;
 
-        // Примечание:
-        //  - Кэши хранят ptr для ленивой загрузки и будущего streaming/eviction.
-        //  - Если позже появится churn/фрагментация — переоценить layout (slot/pool/in-place).
         std::vector<std::unique_ptr<types::TextureResource>> mTextureCache;
         std::vector<std::unique_ptr<types::FontResource>> mFontCache;
         std::vector<std::unique_ptr<types::SoundBufferResource>> mSoundCache;
 
-        // Состояния загрузки (single-threaded for now):
-        //  - Texture/Font: NotLoaded -> Resident (Type A => ошибка загрузки = PANIC).
-        //  - Sound:        NotLoaded -> Resident | Failed (soft-fail, stop retries).
         std::vector<ResourceState> mTextureState;
         std::vector<ResourceState> mFontState;
         std::vector<ResourceState> mSoundState;
@@ -224,22 +184,5 @@ namespace core::resources {
         TextureKey mMissingTextureKey{};
         FontKey mMissingFontKey{};
     };
-
-#if defined(SFML1_TESTS)
-    namespace resource_manager::test {
-        // Важно: без имён параметров — меньше шанс словить макро/парсинг-коллизии.
-        using TextureLoadFn = bool (*)(types::TextureResource&, const std::filesystem::path&,
-                                       bool sRgb);
-        using FontLoadFn = bool (*)(types::FontResource&, const std::filesystem::path&);
-        using SoundLoadFn = bool (*)(types::SoundBufferResource&, const std::filesystem::path&);
-
-        void setTextureLoadFn(TextureLoadFn fn) noexcept;
-        void resetTextureLoadFn() noexcept;
-        void setFontLoadFn(FontLoadFn fn) noexcept;
-        void resetFontLoadFn() noexcept;
-        void setSoundLoadFn(SoundLoadFn fn) noexcept;
-        void resetSoundLoadFn() noexcept;
-    } // namespace resource_manager::test
-#endif // defined(SFML1_TESTS)
 
 } // namespace core::resources

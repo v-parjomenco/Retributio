@@ -2,7 +2,7 @@
 # File: SFML1/CMakeLists.txt
 #
 # Authoritative source for all build flags and project structure.
-# Ground truth: SFML1.vcxproj (Debug / DebugTests / Profile / Release configurations).
+# Ground truth: SFML1.vcxproj (Debug / Profile / Release configurations).
 #
 # Requires CMake 4.2.3+. No backwards-compatibility shims — this project targets
 # the latest toolchain exclusively.
@@ -10,10 +10,6 @@
 # Configurations:
 #   Debug       - /Od /ZI /RTC1 /JMC, /MDd, Console subsystem
 #                 Defines: SFML_STATIC _DEBUG _CONSOLE _UNICODE UNICODE
-#   DebugTests  - [Future CMake config] Same as Debug + SFML1_TESTS.
-#                 sfml1_core_tests carries SFML1_TESTS unconditionally; adding the
-#                 DebugTests CMake config later requires only CMakePresets.json update
-#                 and adding $<CONFIG:DebugTests> to the relevant generator expressions here.
 #   Profile     - /O2 /Ob2 /Ot /GL + /LTCG, /MD, Windows subsystem
 #                 Defines: SFML_STATIC NDEBUG SFML1_PROFILE _UNICODE UNICODE
 #                 INVARIANT: must NOT define _DEBUG.
@@ -23,51 +19,40 @@
 #   Release     - /O2 /GL + /LTCG, /MD, Windows subsystem
 #                 Defines: SFML_STATIC NDEBUG _UNICODE UNICODE
 #
-# Dev library policy:
-#   sfml1_skyguard_dev is a dev OVERLAY library — NOT a debug-only library.
-#   It provides runtime visibility (stats, spatial metrics, debug overlays) in:
-#     Debug   — correctness + visibility, no optimization
-#     Profile — full optimization, visibility preserved for profiling sessions
-#     Release — completely absent (empty TUs, excluded via generator expression)
-#   The overlay guards itself: #if !defined(NDEBUG) || defined(SFML1_PROFILE)
-#   Profile is a RELEASE-LIKE build: /O2 /Ob2 /Ot /GL, /MD, NDEBUG defined, no RTC.
-#   sfml1_skyguard_dev does NOT alter Profile's optimization profile in any way.
+# Target graph (dependency direction: A -> B means A depends on B):
 #
-#   sfml1_core_tests — linked in Debug only (correctness assertions, not perf)
-#   sfml1_spatial_harness executable — built in Debug + Profile
-#   sfml1_render_stress executable   — built in Debug + Profile
+#   sfml1_core                — engine artifact: ECS, spatial, resources, logging.
+#                               Declares core::log::detail::panic_sink but does NOT define it.
+#   sfml1_panic_sink_default  — STATIC; defines panic_sink → MessageBox + std::exit.
+#   sfml1_runtime             — INTERFACE; composes sfml1_core + sfml1_panic_sink_default.
+#                               All game targets link sfml1_runtime, not sfml1_core directly.
+#                               Tests link sfml1_core + sfml1_core_test_support instead.
+#   sfml1_skyguard            -> sfml1_runtime, SFML::*
+#   sfml1_stress_common       -> sfml1_runtime  (no sfml1_skyguard dep — avoids cycle)
+#   sfml1_skyguard_dev        -> sfml1_skyguard, sfml1_stress_common(PRIVATE)
+#   sfml1_spatial_harness_lib -> sfml1_runtime, sfml1_skyguard, sfml1_stress_common(PRIVATE)
+#   sfml1_render_stress_lib   -> sfml1_skyguard  (INTERFACE stub)
+#   sfml1_game                -> sfml1_skyguard, sfml1_skyguard_dev(Debug+Profile),
+#                                sfml1_stress_common(Debug+Profile)
+#   sfml1_spatial_harness     -> sfml1_spatial_harness_lib
+#   sfml1_render_stress       -> sfml1_render_stress_lib
 #
-# Phase 1 changes (see ROADMAP.md § Phase 1):
-#   + sfml1_stress_common: new STATIC target, owns stress_runtime_stamp.cpp +
-#     stress_chunk_content_provider.cpp (physically in src/game/skyguard/dev/).
-#     Breaks the LNK2001 time bomb:
+# Dev overlay policy (sfml1_skyguard_dev):
+#   Active in Debug (no optimization) and Profile (full /O2 optimization).
+#   Absent in Release: excluded by generator expression.
+#   Source guard: #if !defined(NDEBUG) || defined(SFML1_PROFILE)
 #
-#     BEFORE (broken):
-#       sfml1_skyguard_dev ──uses──► StressRuntimeStamp
-#                                            ↑
-#       sfml1_spatial_harness_lib ──owns─────┘
-#                 └──► sfml1_skyguard (FrameOrchestrator)
-#       sfml1_game (Profile) linked sfml1_skyguard_dev but NOT sfml1_spatial_harness_lib
-#       → LNK2001 the moment main_skyguard.cpp gets real code
+# sfml1_stress_common ownership:
+#   Owns stress_runtime_stamp.cpp + stress_chunk_content_provider.cpp.
+#   Consumed PRIVATELY by sfml1_skyguard_dev and sfml1_spatial_harness_lib.
+#   Must not depend on sfml1_skyguard: both consumers already depend on it,
+#   adding sfml1_skyguard here would create a dependency cycle.
+#   Physical file location (src/game/skyguard/dev/) is a historical artifact;
+#   CMake target membership defines ownership, not filesystem path.
 #
-#     AFTER (correct, acyclic):
-#       sfml1_stress_common → sfml1_core only (no skyguard/dev deps)
-#       sfml1_skyguard_dev  → sfml1_stress_common (PRIVATE — impl detail, not public API)
-#       sfml1_spatial_harness_lib → sfml1_stress_common (PRIVATE)
-#       sfml1_game → sfml1_stress_common (explicit, same genex as sfml1_skyguard_dev)
-#
-#     Why sfml1_game needs explicit sfml1_stress_common:
-#       STATIC lib PRIVATE deps are NOT propagated to consumers — by CMake design.
-#       Linker resolves symbols only when building the final EXE/DLL.
-#       sfml1_game (EXE) must declare every lib it needs at link time.
-#       Making sfml1_stress_common PUBLIC in sfml1_skyguard_dev would be wrong:
-#       it would leak stress headers into every consumer's include path.
-#
-#   + sfml1_skyguard_dev: links sfml1_stress_common PRIVATE
-#   + sfml1_spatial_harness_lib: source list trimmed, links sfml1_stress_common PRIVATE
-#   + sfml1_game: links sfml1_stress_common in Debug+DebugTests+Profile
-#   + stress_small / stress_large custom targets — one-click from MSVC or CLI
-#   + COMPILE_WARNING_AS_ERROR target property (CMake 4.x) used where applicable
+#   Why sfml1_game links sfml1_stress_common explicitly:
+#     STATIC lib PRIVATE deps are NOT propagated to EXE consumers by CMake design.
+#     sfml1_game (EXE) must name every lib it needs at link time.
 # ================================================================================================
 
 # ------------------------------------------------------------------------------------------------
@@ -85,7 +70,7 @@ set(CMAKE_C_EXTENSIONS          OFF)
 
 # ------------------------------------------------------------------------------------------------
 # MSVC Runtime Library
-# Debug / DebugTests : /MDd  (MultiThreadedDebugDLL)
+# Debug   : /MDd  (MultiThreadedDebugDLL)
 # Release / Profile  : /MD   (MultiThreadedDLL)
 #
 # SFML is linked statically (SFML_STATIC), so no SFML .dll is needed at runtime.
@@ -95,17 +80,14 @@ set(CMAKE_C_EXTENSIONS          OFF)
 # ------------------------------------------------------------------------------------------------
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY
-        "MultiThreaded$<$<OR:$<CONFIG:Debug>,$<CONFIG:DebugTests>>:Debug>DLL")
+        "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 endif()
 
 # ------------------------------------------------------------------------------------------------
 # Profile configuration: CMake has no built-in knowledge of this custom config name.
 # All CMAKE-injected default flag variables must be cleared; flags are controlled
 # exclusively via sfml1_build_options INTERFACE target below.
-#
-# Without this reset, CMake silently injects Release defaults (/O2 /Ob2 /DNDEBUG)
-# into Profile at configure time, duplicating our explicit flags and being invisible
-# to the developer unless they grep the generated .rsp files.
+# Without this reset CMake silently duplicates Release defaults into Profile.
 # ------------------------------------------------------------------------------------------------
 if(MSVC)
     foreach(_v IN ITEMS
@@ -121,42 +103,24 @@ endif()
 # ------------------------------------------------------------------------------------------------
 # MSVC debug information format (CMake 3.25+ / CMake 4.x)
 #
-# CMake injects /Zi into CMAKE_CXX_FLAGS_DEBUG by default. Our targets need /ZI
-# (Edit-and-Continue) for Debug, and /Zi (ProgramDatabase) for Release/Profile.
-# Having both on the command line causes D9025 "overriding /Zi with /ZI" on every TU.
+# Setting CMAKE_MSVC_DEBUG_INFORMATION_FORMAT before any target is created causes CMake
+# to stop injecting /Zi into CMAKE_CXX_FLAGS_* and instead use the target property
+# mechanism, eliminating D9025 "overriding /Zi with /ZI" on every TU.
 #
-# The correct solution (CMake 3.25+) is CMAKE_MSVC_DEBUG_INFORMATION_FORMAT.
-# When this variable is set BEFORE any target is created, CMake:
-#   1. Completely stops injecting debug-info flags into CMAKE_CXX_FLAGS_* / CMAKE_C_FLAGS_*
-#   2. Injects the correct per-config flag via the target property mechanism instead
-#
-# Values: EditAndContinue → /ZI   ProgramDatabase → /Zi   (empty) → no flag
-#
-# This replaces the previous regex-strip hack on CMAKE_CXX_FLAGS_DEBUG, which was
-# fragile and broke on cache invalidation. The property mechanism is authoritative.
-#
-# Must be set before add_library / add_executable — CMake reads it at target creation time.
+# Values: EditAndContinue -> /ZI   ProgramDatabase -> /Zi
 # ------------------------------------------------------------------------------------------------
 if(MSVC)
     set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
-        "$<$<OR:$<CONFIG:Debug>,$<CONFIG:DebugTests>>:EditAndContinue>$<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:ProgramDatabase>"
+        "$<$<CONFIG:Debug>:EditAndContinue>$<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:ProgramDatabase>"
     )
 endif()
 
 # ------------------------------------------------------------------------------------------------
 # Dependencies
 # ------------------------------------------------------------------------------------------------
-# IMPORTANT: CMAKE_MAP_IMPORTED_CONFIG_<CONFIG> must be set as a regular (non-cache)
-# variable in the calling scope BEFORE find_package. CMake reads this variable at the
-# moment it creates each imported target and uses it to initialize the per-target
-# MAP_IMPORTED_CONFIG_<CONFIG> property. A cache-only value (from CMakePresets.json)
-# does NOT trigger this initialization — only a regular variable in scope does.
-#
-# Setting it here covers all find_package calls below, including the transitive ones
-# invoked by SFMLConfig.cmake (FindVorbis, FindFLAC, etc.). Those modules ship only
-# DEBUG and RELEASE variants; "Profile" is unknown to them. Without this mapping,
-# CMake's Ninja Multi-Config generator fails at generate time with:
-#   "IMPORTED_LOCATION not set for imported target Vorbis::vorbis configuration Profile"
+# CMAKE_MAP_IMPORTED_CONFIG_<CONFIG> must be a regular (non-cache) variable set BEFORE
+# find_package so CMake initialises the per-target property at imported-target creation time.
+# Profile is unknown to SFML/Vorbis/FLAC modules which ship only DEBUG/RELEASE variants.
 set(CMAKE_MAP_IMPORTED_CONFIG_PROFILE "Release")
 
 message(STATUS "SFML1: CMAKE_MAP_IMPORTED_CONFIG_PROFILE = ${CMAKE_MAP_IMPORTED_CONFIG_PROFILE}")
@@ -164,19 +128,13 @@ message(STATUS "SFML1: CMAKE_MAP_IMPORTED_CONFIG_PROFILE = ${CMAKE_MAP_IMPORTED_
 find_package(SFML CONFIG REQUIRED COMPONENTS Network Graphics Window Audio System Main)
 
 # ------------------------------------------------------------------------------------------------
-# Profile configuration fix for config-less transitive targets (Vorbis, FLAC).
+# Config-less imported targets fix (Vorbis, FLAC)
 #
-# These targets are created by vcpkg's FindVorbis / FindFLAC modules as config-less
-# imported targets: no IMPORTED_CONFIGURATIONS, a single IMPORTED_LOCATION (no suffix).
-# CMake's Ninja Multi-Config generator validates per-config locations for every config
-# listed in CMAKE_CONFIGURATION_TYPES. It requires IMPORTED_LOCATION_<CONFIG> to exist
-# for each config. IMPORTED_LOCATION (no suffix) does NOT satisfy this check for "Profile".
-# MAP_IMPORTED_CONFIG_PROFILE is used at link time but is NOT consulted during generator
-# validation — that check is purely suffix-based.
-#
-# Fix: copy IMPORTED_LOCATION → IMPORTED_LOCATION_PROFILE on each affected target.
-# Diagnostic confirmed: IMPORTED_LOCATION = .../debug/lib/vorbis.lib (config-less).
-# MAP_IMPORTED_CONFIG_PROFILE = Release is already set, so link time uses the Release lib.
+# vcpkg's FindVorbis/FindFLAC create targets with IMPORTED_LOCATION (no config suffix)
+# instead of per-config IMPORTED_LOCATION_<CONFIG>. Ninja Multi-Config validates
+# per-config locations for every config in CMAKE_CONFIGURATION_TYPES and rejects
+# config-less targets for Profile. MAP_IMPORTED_CONFIG_PROFILE handles link time but
+# NOT generator validation. Fix: promote each target to config-aware mode explicitly.
 # ------------------------------------------------------------------------------------------------
 foreach(_t IN ITEMS Ogg::ogg Vorbis::vorbis Vorbis::vorbisfile Vorbis::vorbisenc FLAC::FLAC)
     if(NOT TARGET ${_t})
@@ -188,8 +146,7 @@ foreach(_t IN ITEMS Ogg::ogg Vorbis::vorbis Vorbis::vorbisfile Vorbis::vorbisenc
         continue()
     endif()
 
-    # vcpkg layout: debug libs live under   .../debug/lib/<n>.lib
-    #               release libs live under  .../lib/<n>.lib
+    # vcpkg layout: debug libs under .../debug/lib/, release libs under .../lib/
     string(REPLACE "/debug/lib/" "/lib/" _loc_release "${_loc_debug}")
     if(NOT EXISTS "${_loc_release}")
         message(WARNING
@@ -198,11 +155,6 @@ foreach(_t IN ITEMS Ogg::ogg Vorbis::vorbis Vorbis::vorbisfile Vorbis::vorbisenc
         set(_loc_release "${_loc_debug}")
     endif()
 
-    # Transition the target from config-less to config-aware mode.
-    # Config-less imported targets use a single IMPORTED_LOCATION for ALL configs,
-    # but the Ninja Multi-Config generator validates each config independently.
-    # Setting IMPORTED_CONFIGURATIONS explicitly makes IMPORTED_LOCATION_<CONFIG>
-    # the authoritative per-config property, which the generator accepts.
     set_target_properties(${_t} PROPERTIES
         IMPORTED_CONFIGURATIONS   "DEBUG;RELEASE;PROFILE"
         IMPORTED_LOCATION_DEBUG   "${_loc_debug}"
@@ -238,23 +190,19 @@ target_compile_features(sfml1_build_options INTERFACE cxx_std_20)
 # ----------------------------------------------------------------
 target_compile_definitions(sfml1_build_options INTERFACE
 
-    # ── All configurations ───────────────────────────────────────
+    # All configurations
     SFML_STATIC        # SFML linked as static library (no .dll dependency)
     _UNICODE           # Windows: use Unicode API (wchar_t)
     UNICODE            # Windows: use Unicode API (C++ side)
 
-    # ── Debug / DebugTests ───────────────────────────────────────
-    $<$<OR:$<CONFIG:Debug>,$<CONFIG:DebugTests>>:_DEBUG>
-    $<$<OR:$<CONFIG:Debug>,$<CONFIG:DebugTests>>:_CONSOLE>
+    # Debug
+    $<$<CONFIG:Debug>:_DEBUG>
+    $<$<CONFIG:Debug>:_CONSOLE>
 
-    # ── Release / Profile  (no _DEBUG, no _CONSOLE) ──────────────
-    # NOTE: CMake also injects NDEBUG for Release via CMAKE_CXX_FLAGS_RELEASE.
-    # We define it here explicitly so Profile gets it through the same path.
+    # Release / Profile — defined here so Profile gets NDEBUG through the same path as Release.
     $<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:NDEBUG>
 
-    # ── Profile only ─────────────────────────────────────────────
-    # SFML1_PROFILE activates dev overlay at compile time.
-    # Profile remains release-optimized: /O2 /Ob2 /Ot /GL, NDEBUG, no RTC.
+    # Profile only — activates dev overlay; does not affect optimization profile.
     $<$<CONFIG:Profile>:SFML1_PROFILE>
 )
 
@@ -264,73 +212,54 @@ if(MSVC)
     # Each flag maps to an explicit vcxproj ClCompile setting.
     # ----------------------------------------------------------------
     target_compile_options(sfml1_build_options INTERFACE
-        /utf-8               # Source and execution charset: UTF-8 (AdditionalOptions)
-        /permissive-         # Strict conformance (ConformanceMode=true)
-        /wd4710              # Disable: 'function' not inlined (DisableSpecificWarnings)
+        /utf-8               # Source and execution charset: UTF-8
+        /permissive-         # Strict conformance
+        /wd4710              # Disable: 'function' not inlined
         /wd4711              # Disable: function selected for inline expansion
-        /sdl                 # SDL security checks (SDLCheck=true); superset of /GS
-        /GS                  # Buffer security checks (default, explicit for clarity)
-        /fp:precise          # Precise floating-point (FloatingPointModel=Precise)
-        /FC                  # Full path in diagnostics (UseFullPaths=true)
-        /diagnostics:column  # Report column numbers (DiagnosticsFormat=Column)
+        /sdl                 # SDL security checks (superset of /GS)
+        /GS                  # Buffer security checks
+        /fp:precise          # Precise floating-point
+        /FC                  # Full path in diagnostics
+        /diagnostics:column  # Report column numbers
         /Zc:wchar_t          # wchar_t as native type
         /Zc:inline           # Remove unreferenced COMDAT
-        # External-header warning suppression.
-        # CRITICAL: without these, /Wall + /WX causes thousands of errors in
-        # SFML / EnTT / nlohmann / STL headers, making the project unbuildable.
+        # Without these, /Wall + /WX produces thousands of errors in external headers.
         /external:anglebrackets  # Mark <angle-bracket> includes as external
         /external:W0             # Zero warnings from external headers
         /analyze:external-       # No code analysis on external headers
     )
 
-    # ── C++-only flags (all configs) ────────────────────────────
+    # C++-only flags (all configs)
     target_compile_options(sfml1_build_options INTERFACE
         $<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>   # Correct __cplusplus macro value
         $<$<COMPILE_LANGUAGE:CXX>:/Zc:preprocessor>  # Conformant preprocessor
         $<$<COMPILE_LANGUAGE:CXX>:/EHsc>             # C++ exception handling model
-        $<$<COMPILE_LANGUAGE:CXX>:/Wall>             # Enable all warnings
+        $<$<COMPILE_LANGUAGE:CXX>:/Wall>             # All warnings
     )
 
-    # ── C-only flags (all configs) ──────────────────────────────
+    # C-only flags (all configs)
     target_compile_options(sfml1_build_options INTERFACE
         $<$<COMPILE_LANGUAGE:C>:/Wall>
     )
 
-    # ----------------------------------------------------------------
-    # Debug / DebugTests — no optimization, edit-and-continue, runtime checks
-    # Source: vcxproj Debug|x64 ClCompile
-    # ----------------------------------------------------------------
+    # Debug
     target_compile_options(sfml1_build_options INTERFACE
-        $<$<OR:$<CONFIG:Debug>,$<CONFIG:DebugTests>>:/Od>    # Disable optimization
-        # /ZI (EditAndContinue PDB) is injected by CMake via CMAKE_MSVC_DEBUG_INFORMATION_FORMAT.
-        # Do NOT duplicate it here — that causes D9025 "overriding /Zi with /ZI" on every TU.
-        $<$<OR:$<CONFIG:Debug>,$<CONFIG:DebugTests>>:/RTC1>  # Runtime checks (stack, uninit)
-        $<$<OR:$<CONFIG:Debug>,$<CONFIG:DebugTests>>:/JMC>   # Just My Code debugging
+        $<$<CONFIG:Debug>:/Od>    # Disable optimization
+        # /ZI injected via CMAKE_MSVC_DEBUG_INFORMATION_FORMAT — do not duplicate here.
+        $<$<CONFIG:Debug>:/RTC1>  # Runtime checks (stack, uninit)
+        $<$<CONFIG:Debug>:/JMC>   # Just My Code debugging
     )
 
-    # ----------------------------------------------------------------
     # Release / Profile — shared optimization baseline
-    # Source: vcxproj Release|x64 and Profile|x64 ClCompile
-    #
-    # Profile is NOT a copy of Release — it is a separate explicit config.
-    # Both have identical optimization flags; Profile additionally defines
-    # SFML1_PROFILE which enables the dev overlay at compile time.
-    # ----------------------------------------------------------------
     target_compile_options(sfml1_build_options INTERFACE
         $<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:/O2>  # Maximize speed
-        # /Zi (ProgramDatabase) is injected by CMake via CMAKE_MSVC_DEBUG_INFORMATION_FORMAT.
-        # Do NOT duplicate it here — that causes D9025.
+        # /Zi injected via CMAKE_MSVC_DEBUG_INFORMATION_FORMAT — do not duplicate here.
         $<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:/GL>  # Whole-program optimization
         $<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:/Gy>  # Function-level linking
         $<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:/Oi>  # Enable intrinsic functions
     )
 
-    # ----------------------------------------------------------------
     # Profile only — additional speed flags beyond Release baseline
-    # Source: vcxproj Profile|x64 ClCompile
-    #   /Ob2 → InlineFunctionExpansion=AnySuitable
-    #   /Ot  → FavorSizeOrSpeed=Speed
-    # ----------------------------------------------------------------
     target_compile_options(sfml1_build_options INTERFACE
         $<$<CONFIG:Profile>:/Ob2>   # Inline: any suitable function
         $<$<CONFIG:Profile>:/Ot>    # Favor fast code over small code
@@ -338,12 +267,8 @@ if(MSVC)
 
 endif() # MSVC
 
-# ------------------------------------------------------------------------------------------------
-# COMPILE_WARNING_AS_ERROR — CMake 4.x target property.
-# Replaces manual /WX flag injection. Applied to sfml1_build_options so every
-# consumer inherits it. xxhash source file overrides this via per-source COMPILE_OPTIONS
-# (/WX-) which takes precedence over the target-level property on MSVC.
-# ------------------------------------------------------------------------------------------------
+# COMPILE_WARNING_AS_ERROR (CMake 4.x) — inherited by all consumers via sfml1_build_options.
+# xxhash overrides this per-source with /WX- (see per-source block below).
 set_target_properties(sfml1_build_options PROPERTIES
     COMPILE_WARNING_AS_ERROR ON
 )
@@ -355,26 +280,20 @@ set_target_properties(sfml1_build_options PROPERTIES
 set(_pch_cpp  "${CMAKE_CURRENT_SOURCE_DIR}/src/pch.cpp")
 set(_xxhash_c "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xxhash/upstream/xxhash.c")
 
-# pch.cpp: CMake manages PCH via target_precompile_headers; pch.cpp is kept in
-# sources for IDE file-tree visibility but must NOT participate in CMake's PCH
-# mechanism (otherwise CMake tries to apply /Yu to a file compiled with /Yc).
+# pch.cpp: kept in sources for IDE visibility only; must not participate in CMake's
+# PCH mechanism (applying /Yu to a /Yc file causes a build error).
 set_source_files_properties("${_pch_cpp}" PROPERTIES
     SKIP_PRECOMPILE_HEADERS ON
 )
 
-# xxhash.c: C source from third-party. Must not use PCH (C vs C++ PCH incompatibility).
-# Per-source settings mirror vcxproj <ClCompile Include="...xxhash.c"> item overrides:
-#   PrecompiledHeader       = NotUsing  → SKIP_PRECOMPILE_HEADERS ON
-#   WarningLevel            = Level4   → /W4  (overrides /Wall from build_options)
-#   TreatWarningAsError     = false    → /WX- (overrides COMPILE_WARNING_AS_ERROR ON)
-#   DisableSpecificWarnings = 4710;4711;4820;5045
-#     4820 — padding bytes added after struct member (common in C)
-#     5045 — Spectre mitigation informational (not actionable in third-party code)
+# xxhash.c: third-party C source; incompatible with the C++ PCH.
+# /W4 /WX- override the project-wide /Wall + COMPILE_WARNING_AS_ERROR.
+# /wd4820 (struct padding) and /wd5045 (Spectre) are expected in C third-party code.
 set_source_files_properties("${_xxhash_c}" PROPERTIES
     SKIP_PRECOMPILE_HEADERS ON
 )
 if(MSVC)
-    # APPEND so these come after sfml1_build_options flags on the command line.
+    # APPEND: these flags follow sfml1_build_options flags on the command line.
     # MSVC applies the last /Wn and last /WX[+/-] seen, so ordering matters.
     set_property(SOURCE "${_xxhash_c}" APPEND PROPERTY COMPILE_OPTIONS
         /W4 /WX- /wd4710 /wd4711 /wd4820 /wd5045
@@ -383,6 +302,11 @@ endif()
 
 # ================================================================================================
 # sfml1_core  —  Engine-layer static library (ECS, spatial, resources, logging, UI utils)
+#
+# core::log::detail::panic_sink is declared in logging.h but NOT defined in this target.
+# The definition is provided at link time by sfml1_panic_sink_default (production) or
+# sfml1_core_test_support (tests). sfml1_runtime below is the canonical production
+# composition that satisfies this requirement for all game targets.
 # ================================================================================================
 add_library(sfml1_core STATIC)
 
@@ -417,6 +341,7 @@ target_sources(sfml1_core PRIVATE
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/log/logging.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/log/log_level.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/core/log/detail/utf8_to_wide.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/resources/keys/stable_key.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/resources/registry/resource_registry.cpp
@@ -436,53 +361,60 @@ target_sources(sfml1_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/utils/json/json_parsers.cpp
 )
 
-# PCH: each target compiles its own PCH from include/pch.h.
-# REUSE_FROM is fundamentally incompatible with Ninja Multi-Config + MSVC:
-# it requires all consumers to use the identical /Fd path, but CMake generates
-# per-target /Fd paths, causing C2859. Per-target PCH is the correct solution —
-# pch.h rarely changes, the extra compilation cost is negligible.
+# Per-target PCH: REUSE_FROM is incompatible with Ninja Multi-Config + MSVC (/Fd path conflict).
 target_precompile_headers(sfml1_core PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
 )
 
 # ================================================================================================
-# sfml1_core_tests  —  Engine self-tests
+# sfml1_panic_sink_default — production panic policy (MessageBox + std::exit)
 #
-# Linked in Debug (and future DebugTests config) only — not in Profile or Release.
-# SFML1_TESTS is defined unconditionally on this target because sfml1_core_tests
-# is exclusively a test artifact. When DebugTests CMake config is added, extend
-# the generator expression in sfml1_game's target_link_libraries accordingly.
+# Provides the definition of core::log::detail::panic_sink required by sfml1_core.
+# Linked PRIVATE to sfml1_core to access logging internals and utf8ToWide without
+# leaking those as additional PUBLIC dependencies of this target.
+# Win32: explicit user32 dependency for MessageBoxW.
 # ================================================================================================
-add_library(sfml1_core_tests STATIC)
+add_library(sfml1_panic_sink_default STATIC)
 
-target_link_libraries(sfml1_core_tests
+target_link_libraries(sfml1_panic_sink_default
     PUBLIC
         sfml1::build_options
+    PRIVATE
         sfml1_core
 )
 
-# SFML1_TESTS enables self-test code paths in the source files of this target.
-# Matches vcxproj DebugTests|x64 <PreprocessorDefinitions> which adds SFML1_TESTS.
-target_compile_definitions(sfml1_core_tests PRIVATE SFML1_TESTS)
+if(WIN32)
+    target_link_libraries(sfml1_panic_sink_default PRIVATE user32)
+endif()
 
-target_sources(sfml1_core_tests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/resources/registry/resource_registry_self_test.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/resources/registry/string_pool_self_test.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/resources/resource_manager_self_test.cpp
+target_include_directories(sfml1_panic_sink_default
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_precompile_headers(sfml1_core_tests PRIVATE
+target_sources(sfml1_panic_sink_default PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/log/panic_sink_default.cpp
+)
+
+target_precompile_headers(sfml1_panic_sink_default PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
 )
 
-# C4189: local variable initialized but not referenced.
-# Test files capture intermediate results for debugger inspection even when
-# assert() expands to nothing under NDEBUG. Intentional test idiom — the variable
-# exists to be breakpoint-inspectable, not to produce side effects.
-# Suppressed per-target to avoid polluting other targets.
-if(MSVC)
-    target_compile_options(sfml1_core_tests PRIVATE /wd4189)
-endif()
+# ================================================================================================
+# sfml1_runtime — production runtime: engine + panic policy
+#
+# INTERFACE composition point for all game targets. Links sfml1_core and
+# sfml1_panic_sink_default so consumers get a complete, linkable product.
+# Test targets link sfml1_core + sfml1_core_test_support directly,
+# bypassing sfml1_panic_sink_default entirely.
+# ================================================================================================
+add_library(sfml1_runtime INTERFACE)
+
+target_link_libraries(sfml1_runtime
+    INTERFACE
+        sfml1_core
+        sfml1_panic_sink_default
+)
 
 # ================================================================================================
 # sfml1_skyguard  —  SkyGuard game runtime (pure game layer, no dev tooling)
@@ -492,7 +424,7 @@ add_library(sfml1_skyguard STATIC)
 target_link_libraries(sfml1_skyguard
     PUBLIC
         sfml1::build_options
-        sfml1_core
+        sfml1_runtime
         SFML::Graphics
         SFML::Window
         SFML::Audio
@@ -532,32 +464,24 @@ target_precompile_headers(sfml1_skyguard PRIVATE
 )
 
 # ================================================================================================
-# [PHASE 1] sfml1_stress_common  —  Shared stress infrastructure
+# sfml1_stress_common  —  Shared stress test infrastructure
 #
-# Owns the two stress source files previously embedded in sfml1_spatial_harness_lib.
-# Extracting them breaks the LNK2001 time bomb described in the file header.
-#
-# Dependency contract (enforced by PRIVATE linkage everywhere):
-#   sfml1_stress_common → sfml1_core
-#   sfml1_stress_common → NOTHING from sfml1_skyguard or sfml1_skyguard_dev
-#
-# Rationale: stress_common is consumed by BOTH sfml1_skyguard_dev (game tool layer)
-# and sfml1_spatial_harness_lib (standalone tool) — it must not depend on either.
-# Depending on sfml1_skyguard here would create a cycle:
-#   sfml1_skyguard_dev → sfml1_stress_common → sfml1_skyguard → sfml1_skyguard_dev  [CYCLE]
-#
-# Physical file locations are UNCHANGED — CMake ownership is what defines the boundary.
+# Owns stress_runtime_stamp.cpp and stress_chunk_content_provider.cpp.
+# Consumed PRIVATELY by sfml1_skyguard_dev and sfml1_spatial_harness_lib.
+# Depends only on sfml1_runtime; must not depend on sfml1_skyguard to avoid a cycle
+# (both consumers already depend on sfml1_skyguard).
+# Physical files are located in src/game/skyguard/dev/; CMake target membership
+# defines ownership independently of filesystem location.
 # ================================================================================================
 add_library(sfml1_stress_common STATIC)
 
 target_link_libraries(sfml1_stress_common
     PUBLIC
         sfml1::build_options
-        sfml1_core
+        sfml1_runtime
 )
 
 target_sources(sfml1_stress_common PRIVATE
-    # Files are physically in src/game/skyguard/dev/ — location is historical artifact.
     ${CMAKE_CURRENT_SOURCE_DIR}/src/game/skyguard/dev/stress_runtime_stamp.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/game/skyguard/dev/stress_chunk_content_provider.cpp
 )
@@ -569,26 +493,14 @@ target_precompile_headers(sfml1_stress_common PRIVATE
 # ================================================================================================
 # sfml1_skyguard_dev  —  Developer overlay (active in Debug AND Profile)
 #
-# This is NOT a "debug-only" library. It is a DEVELOPER VISIBILITY library that
-# provides runtime statistics, spatial metrics, and debug overlays in two configs:
+# Provides runtime statistics, spatial metrics, and debug overlays.
+# Active in Debug (no optimization) and Profile (full /O2 optimization).
+# Absent in Release: excluded by generator expression at sfml1_game link step.
+# Source guard: #if !defined(NDEBUG) || defined(SFML1_PROFILE)
 #
-#   Debug   — no optimization (/Od), full runtime checks (/RTC1), overlay visible
-#   Profile — full optimization (/O2 /Ob2 /Ot /GL), NO runtime checks, overlay visible
-#             Profile is release-like in every performance-relevant way. The overlay
-#             exists here to provide profiling data during performance sessions.
-#   Release — overlay completely absent (empty TUs after preprocessor; excluded by genex)
-#
-# Source guard in overlay_extras.cpp and background_math_self_test.cpp:
-#   #if !defined(NDEBUG) || defined(SFML1_PROFILE)
-#   Debug  : NDEBUG not defined → compiles
-#   Profile: NDEBUG defined BUT SFML1_PROFILE defined → compiles
-#   Release: NDEBUG defined, SFML1_PROFILE not defined → empty TU
-#
-# [PHASE 1] sfml1_stress_common linked PRIVATE:
-#   PRIVATE because stress types (StressRuntimeStamp etc.) are implementation details
-#   of overlay_extras.cpp — they do NOT appear in sfml1_skyguard_dev's public headers.
-#   Consumers of sfml1_skyguard_dev must NOT see or link sfml1_stress_common implicitly.
-#   sfml1_game therefore links sfml1_stress_common explicitly (see sfml1_game below).
+# sfml1_stress_common is a PRIVATE dependency: its types are implementation details
+# of overlay_extras.cpp and do not appear in this target's public interface.
+# sfml1_game must therefore name sfml1_stress_common explicitly at its own link step.
 # ================================================================================================
 add_library(sfml1_skyguard_dev STATIC)
 
@@ -597,12 +509,11 @@ target_link_libraries(sfml1_skyguard_dev
         sfml1::build_options
         sfml1_skyguard
     PRIVATE
-        sfml1_stress_common  # [PHASE 1] impl detail: StressRuntimeStamp, StressChunkContentProvider
+        sfml1_stress_common
 )
 
 target_sources(sfml1_skyguard_dev PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/game/skyguard/dev/overlay_extras.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/game/skyguard/presentation/background_math_self_test.cpp
 )
 
 target_precompile_headers(sfml1_skyguard_dev PRIVATE
@@ -612,31 +523,24 @@ target_precompile_headers(sfml1_skyguard_dev PRIVATE
 # ================================================================================================
 # sfml1_spatial_harness_lib  —  Spatial index correctness + timing harness
 #
-# spatial_index_harness.cpp guards: #if !defined(NDEBUG) || defined(SFML1_PROFILE)
-# Debug:   correctness tests (V1 vs V2 result matching, determinism checks)
-# Profile: performance benchmarks (query/update timing, p95/p99 latencies)
-#
-# Requires sfml1_skyguard because spatial_index_harness.cpp uses FrameOrchestrator
-# (implementation in frame_orchestrator.cpp, owned by sfml1_skyguard).
-#
-# [PHASE 1] stress_runtime_stamp.cpp and stress_chunk_content_provider.cpp removed
-# from this target — ownership transferred to sfml1_stress_common.
-# sfml1_stress_common is linked PRIVATE: its types are implementation details of
-# spatial_index_harness.cpp and do not appear in sfml1_spatial_harness_lib headers.
+# Debug:   V1 vs V2 result matching, determinism checks.
+# Profile: query/update timing, p95/p99 latency benchmarks.
+# Requires sfml1_skyguard for FrameOrchestrator.
+# sfml1_stress_common is a PRIVATE dependency: implementation detail of
+# spatial_index_harness.cpp; does not appear in this target's public interface.
 # ================================================================================================
 add_library(sfml1_spatial_harness_lib STATIC)
 
 target_link_libraries(sfml1_spatial_harness_lib
     PUBLIC
         sfml1::build_options
-        sfml1_core
+        sfml1_runtime
         sfml1_skyguard
     PRIVATE
-        sfml1_stress_common  # [PHASE 1] ownership transferred from here to sfml1_stress_common
+        sfml1_stress_common
 )
 
 target_sources(sfml1_spatial_harness_lib PRIVATE
-    # [PHASE 1] stress_runtime_stamp.cpp + stress_chunk_content_provider.cpp removed.
     ${CMAKE_CURRENT_SOURCE_DIR}/src/game/skyguard/dev/spatial_index_harness.cpp
 )
 
@@ -645,7 +549,7 @@ target_precompile_headers(sfml1_spatial_harness_lib PRIVATE
 )
 
 # ================================================================================================
-# sfml1_render_stress_lib  —  Render stress test (INTERFACE; entry point stub only for now)
+# sfml1_render_stress_lib  —  Render stress test (INTERFACE stub; no sources yet)
 # ================================================================================================
 add_library(sfml1_render_stress_lib INTERFACE)
 
@@ -666,27 +570,16 @@ add_executable(sfml1_game
     ${CMAKE_CURRENT_SOURCE_DIR}/src/game/skyguard/entry/main_skyguard.cpp
 )
 
-# WIN32_EXECUTABLE: tells CMake this is a Windows-subsystem app.
-# Without this, CMake unconditionally injects /subsystem:console, conflicting with
-# our per-config /SUBSYSTEM:CONSOLE|WINDOWS below. We own the subsystem flag entirely.
+# WIN32_EXECUTABLE disables CMake's unconditional /subsystem:console injection;
+# subsystem is controlled per-config in target_link_options below.
 set_target_properties(sfml1_game PROPERTIES WIN32_EXECUTABLE TRUE)
 
 target_link_libraries(sfml1_game PRIVATE
     sfml1_skyguard
-
-    # Dev overlay: Debug + Profile only. Release: excluded (empty TUs, saves link time).
-    $<$<OR:$<CONFIG:Debug>,$<CONFIG:DebugTests>,$<CONFIG:Profile>>:sfml1_skyguard_dev>
-
-    # [PHASE 1] sfml1_stress_common: must be listed explicitly here.
-    # sfml1_skyguard_dev links sfml1_stress_common PRIVATE — PRIVATE deps of a STATIC
-    # lib are NOT propagated to consumers (STATIC libs do not link; only EXE/DLL do).
-    # sfml1_game (EXE) is where actual linking happens, so it must name every lib
-    # whose symbols it needs. Same activation set as sfml1_skyguard_dev: no stress
-    # code reaches Release binary.
-    $<$<OR:$<CONFIG:Debug>,$<CONFIG:DebugTests>,$<CONFIG:Profile>>:sfml1_stress_common>
-
-    # Self-tests: Debug + DebugTests only (correctness, not perf measurement)
-    $<$<OR:$<CONFIG:Debug>,$<CONFIG:DebugTests>>:sfml1_core_tests>
+    $<$<OR:$<CONFIG:Debug>,$<CONFIG:Profile>>:sfml1_skyguard_dev>
+    # sfml1_stress_common is a PRIVATE dep of sfml1_skyguard_dev; STATIC lib PRIVATE deps
+    # are not propagated to EXE consumers — the EXE must name them at its own link step.
+    $<$<OR:$<CONFIG:Debug>,$<CONFIG:Profile>>:sfml1_stress_common>
 )
 
 target_precompile_headers(sfml1_game PRIVATE
@@ -694,8 +587,7 @@ target_precompile_headers(sfml1_game PRIVATE
 )
 
 # ------------------------------------------------------------------------------------------------
-# sfml1_spatial_harness  —  Standalone spatial index benchmark / correctness harness
-# Console tool: reads config from env vars, prints timing to stdout, exits.
+# sfml1_spatial_harness  —  Spatial index benchmark / correctness harness (console tool)
 # ------------------------------------------------------------------------------------------------
 add_executable(sfml1_spatial_harness
     ${CMAKE_CURRENT_SOURCE_DIR}/src/game/skyguard/entry/main_spatial_harness.cpp
@@ -719,7 +611,7 @@ set_target_properties(sfml1_render_stress PROPERTIES WIN32_EXECUTABLE TRUE)
 
 target_link_libraries(sfml1_render_stress PRIVATE
     sfml1_render_stress_lib
-    $<$<OR:$<CONFIG:Debug>,$<CONFIG:DebugTests>,$<CONFIG:Profile>>:sfml1_skyguard_dev>
+    $<$<OR:$<CONFIG:Debug>,$<CONFIG:Profile>>:sfml1_skyguard_dev>
 )
 
 target_precompile_headers(sfml1_render_stress PRIVATE
@@ -729,36 +621,25 @@ target_precompile_headers(sfml1_render_stress PRIVATE
 # ================================================================================================
 # SFML::Main — Windows entry point wrapper
 #
-# Provides WinMain → delegates to int main(). Required for /SUBSYSTEM:WINDOWS builds
-# (Release + Profile) where the OS calls WinMain, not main() directly.
-# Linked in all configs per vcxproj (sfml-main[-d].lib in all <AdditionalDependencies>).
-# sfml1_spatial_harness excluded: pure console tool, no windowed entry point needed.
+# Required for /SUBSYSTEM:WINDOWS (Release + Profile): OS calls WinMain, not main().
+# Linked in all configs to match vcxproj (sfml-main[-d].lib in all configurations).
+# sfml1_spatial_harness excluded: pure console tool, no WinMain needed.
 # ================================================================================================
 target_link_libraries(sfml1_game          PRIVATE SFML::Main)
 target_link_libraries(sfml1_render_stress PRIVATE SFML::Main)
 
 # ================================================================================================
-# Синхронизация assets — POST_BUILD для всех EXE-таргетов
+# Assets sync — POST_BUILD copy for all EXE targets
 #
-# Проблема: все три EXE живут в out/build/.../SFML1/<Config>/, но assets/ лежат
-# в исходном дереве. fixWorkingDirectory() при запуске ищет assets/ вверх по дереву
-# и не находит их в output-директории → конфиги грузятся с дефолтами (WARNING в логе).
-#
-# Решение: copy_directory_if_different после каждой сборки.
-#   - Копирует только изменённые файлы (timestamp-based diff) — нет лишней работы.
-#   - Каждый EXE получает свою копию — независимые рабочие директории.
-#   - $<TARGET_FILE_DIR:target> раскрывается генератором корректно для
-#     Ninja Multi-Config: Debug/ Profile/ Release/ — каждый в своей папке.
-#
-# Путь к assets: ${CMAKE_CURRENT_SOURCE_DIR}/assets
-#   CMAKE_CURRENT_SOURCE_DIR = SFML1/ (директория этого CMakeLists.txt).
-#   Структура: SFML1/assets/game/..., SFML1/assets/core/...
+# EXE output directories do not contain assets by default. fixWorkingDirectory()
+# searches upward from the EXE for assets/ and fails when running from the output
+# directory directly. copy_directory_if_different is timestamp-based: only changed
+# files are copied, so incremental builds pay negligible cost.
 # ================================================================================================
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets")
     message(WARNING
-        "SFML1: директория assets не найдена: '${CMAKE_CURRENT_SOURCE_DIR}/assets'. "
-        "POST_BUILD-синхронизация пропущена. "
-        "EXE будут грузить дефолтные конфиги вместо JSON.")
+        "SFML1: assets directory not found: '${CMAKE_CURRENT_SOURCE_DIR}/assets'. "
+        "POST_BUILD sync skipped. EXE targets will load default configs.")
 else()
     set(_assets_src "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 
@@ -767,7 +648,7 @@ else()
             COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
                 "${_assets_src}"
                 "$<TARGET_FILE_DIR:${_exe}>/assets"
-            COMMENT "Assets sync → ${_exe}: $<TARGET_FILE_DIR:${_exe}>/assets"
+            COMMENT "Assets sync -> ${_exe}: $<TARGET_FILE_DIR:${_exe}>/assets"
         )
     endforeach()
 
@@ -781,33 +662,21 @@ endif()
 # ================================================================================================
 if(MSVC)
 
-    # ----------------------------------------------------------------
-    # sfml1_game
-    # Debug/DebugTests : /SUBSYSTEM:CONSOLE  (vcxproj <SubSystem>Console)
-    # Release/Profile  : /SUBSYSTEM:WINDOWS  (vcxproj <SubSystem>Windows)
-    # Release/Profile  : /LTCG               (vcxproj <LinkTimeCodeGeneration>)
-    # Profile          : /INCREMENTAL:NO     (vcxproj <LinkIncremental>false; implied by /LTCG)
-    # ----------------------------------------------------------------
     target_link_options(sfml1_game PRIVATE
-        $<$<OR:$<CONFIG:Debug>,$<CONFIG:DebugTests>>:/SUBSYSTEM:CONSOLE>
+        $<$<CONFIG:Debug>:/SUBSYSTEM:CONSOLE>
         $<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:/SUBSYSTEM:WINDOWS>
         $<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:/LTCG>
         $<$<CONFIG:Profile>:/INCREMENTAL:NO>
     )
 
-    # ----------------------------------------------------------------
-    # sfml1_render_stress — same subsystem logic as sfml1_game (has a render window)
-    # ----------------------------------------------------------------
     target_link_options(sfml1_render_stress PRIVATE
-        $<$<OR:$<CONFIG:Debug>,$<CONFIG:DebugTests>>:/SUBSYSTEM:CONSOLE>
+        $<$<CONFIG:Debug>:/SUBSYSTEM:CONSOLE>
         $<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:/SUBSYSTEM:WINDOWS>
         $<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:/LTCG>
         $<$<CONFIG:Profile>:/INCREMENTAL:NO>
     )
 
-    # ----------------------------------------------------------------
-    # sfml1_spatial_harness — always Console (CLI benchmark, no GUI window)
-    # ----------------------------------------------------------------
+    # sfml1_spatial_harness: always console, no render window.
     target_link_options(sfml1_spatial_harness PRIVATE
         /SUBSYSTEM:CONSOLE
         $<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:/LTCG>
@@ -817,30 +686,15 @@ if(MSVC)
 endif() # MSVC
 
 # ================================================================================================
-# [PHASE 1] Stress preset custom targets
+# Stress preset custom targets
 #
-# One-click stress runs from MSVC Solution Explorer (right-click target → Build)
-# or from the command line:
+# One-click stress runs from MSVC Solution Explorer or CLI:
 #   cmake --build --preset win-profile --target stress_small
 #   cmake --build --preset win-profile --target stress_large
 #
-# Architecture:
-#   .env files (tools/presets/) — source of truth for stress configuration (12-factor)
-#   cmake/run_with_env.cmake    — portable env-file runner (no shell required)
-#   add_custom_target           — convenience wrapper for MSVC and CLI; thin layer only
-#
-# DEPENDS ensures sfml1_spatial_harness is built before the custom target runs.
-# USES_TERMINAL routes child process stdout/stderr directly to MSVC Output window.
-#
-# Preset path: CMAKE_SOURCE_DIR is the Solution root (parent of SFML1/).
-# Directory layout assumed:
-#   <SolutionDir>/
-#   ├── SFML1/          ← CMAKE_CURRENT_SOURCE_DIR (this file)
-#   ├── tools/
-#   │   └── presets/
-#   │       ├── active_small.env
-#   │       └── active_large.env
-#   └── CMakeLists.txt  ← CMAKE_SOURCE_DIR
+# Configuration is read from .env files (12-factor). cmake/run_with_env.cmake provides
+# a portable env-file runner without shell dependency. USES_TERMINAL routes output
+# directly to the MSVC Output window.
 # ================================================================================================
 set(_stress_presets_dir  "${CMAKE_SOURCE_DIR}/tools/presets")
 set(_run_with_env_script "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_with_env.cmake")

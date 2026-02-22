@@ -39,25 +39,47 @@ namespace core::resources {
         ResourceRegistry(ResourceRegistry&&) noexcept = default;
         ResourceRegistry& operator=(ResourceRegistry&&) noexcept = default;
 
+        // ----------------------------------------------------------------------------------------
         // Load-time API
+        // ----------------------------------------------------------------------------------------
+
+        /// Разобрать и зафиксировать определения ресурсов из sources.
+        ///
+        /// Контракт:
+        ///  - validate-on-write: любые ошибки структуры/значений → LOG_PANIC;
+        ///  - детерминизм: RuntimeKey32 назначается в порядке StableKey64 (возрастающе);
+        ///  - переопределения: layerPriority выше → побеждает; при равенстве loadOrder выше →
+        ///    побеждает; полное равенство политики → LOG_PANIC (ошибка авторинга).
         void loadFromSources(std::span<const ResourceSource> sources);
 
-        // Runtime API (O(1))
+        // ----------------------------------------------------------------------------------------
+        // Runtime API — O(1) по индексу
+        // ----------------------------------------------------------------------------------------
+
         [[nodiscard]] const TextureEntry& getTexture(TextureKey key) const noexcept;
         [[nodiscard]] const FontEntry& getFont(FontKey key) const noexcept;
         [[nodiscard]] const SoundEntry* tryGetSound(SoundKey key) const noexcept;
 
-        // Debug/Tooling API (O(log N))
+        // ----------------------------------------------------------------------------------------
+        // Debug / Tooling API — O(log N)
+        // ----------------------------------------------------------------------------------------
+
         [[nodiscard]] TextureKey findTextureByName(std::string_view name) const;
         [[nodiscard]] TextureKey findTextureByStableKey(std::uint64_t stableKey) const;
         [[nodiscard]] FontKey findFontByName(std::string_view name) const;
         [[nodiscard]] SoundKey findSoundByName(std::string_view name) const;
 
-        // Fallback keys
+        // ----------------------------------------------------------------------------------------
+        // Fallback keys (валидны после loadFromSources)
+        // ----------------------------------------------------------------------------------------
+
         [[nodiscard]] TextureKey missingTextureKey() const noexcept;
         [[nodiscard]] FontKey missingFontKey() const noexcept;
 
+        // ----------------------------------------------------------------------------------------
         // Metrics
+        // ----------------------------------------------------------------------------------------
+
         [[nodiscard]] std::size_t textureCount() const noexcept;
         [[nodiscard]] std::size_t fontCount() const noexcept;
         [[nodiscard]] std::size_t soundCount() const noexcept;
@@ -76,17 +98,5 @@ namespace core::resources {
         TextureKey mMissingTexture{};
         FontKey mMissingFont{};
     };
-
-#if defined(SFML1_TESTS)
-    namespace registry::test {
-        using StableKeyFn = std::uint64_t (*)(std::string_view) noexcept;
-        using PanicHandler = void (*)(std::string_view message);
-
-        void setStableKeyFn(StableKeyFn fn) noexcept;
-        void resetStableKeyFn() noexcept;
-        void setPanicHandler(PanicHandler handler) noexcept;
-        void resetPanicHandler() noexcept;
-    } // namespace registry::test
-#endif // defined(SFML1_TESTS)
 
 } // namespace core::resources

@@ -3,6 +3,7 @@
 #include "core/log/logging.h"
 #include "core/log/log_defaults.h"
 #include "core/log/log_categories.h"
+#include "core/log/detail/utf8_to_wide.h"
 
 #include <algorithm>
 #include <charconv>
@@ -33,7 +34,8 @@ namespace {
         bool          initialized = false;
         Config        config{};
         std::ofstream file;
-        std::string   scratch;            ///< Переиспользуемый буфер строки; reserve один раз, clear на каждую запись.
+        /// Переиспользуемый буфер строки; reserve один раз, clear на каждую запись.
+        std::string   scratch;
 
         LoggerState() { scratch.reserve(1024); }
 
@@ -69,7 +71,8 @@ namespace {
     #endif
 
         // "2025-06-15 14:30:45" = 19 символов
-        const std::size_t written = std::strftime(buf, bufSize, "%Y-%m-%d %H:%M:%S", &localTime);
+        const std::size_t written =
+            std::strftime(buf, bufSize, "%Y-%m-%d %H:%M:%S", &localTime);
 
         // strftime возвращает 0 при ошибке — содержимое буфера indeterminate (стандарт C).
         // В этом случае не дописываем миллисекунды и возвращаем пустой view.
@@ -138,37 +141,6 @@ namespace {
 
 #ifdef _WIN32
 
-    std::wstring utf8ToWide(std::string_view text) {
-        if (text.empty()) {
-            return {};
-        }
-
-        const int required = MultiByteToWideChar(
-            CP_UTF8, 0,
-            text.data(), static_cast<int>(text.size()),
-            nullptr, 0
-        );
-
-        if (required <= 0) {
-            return L"<UTF-8 to UTF-16 conversion failed>";
-        }
-
-        std::wstring result;
-        result.resize(static_cast<std::size_t>(required));
-
-        const int converted = MultiByteToWideChar(
-            CP_UTF8, 0,
-            text.data(), static_cast<int>(text.size()),
-            result.data(), required
-        );
-
-        if (converted <= 0) {
-            return L"<UTF-8 to UTF-16 conversion failed>";
-        }
-
-        return result;
-    }
-
     void configureConsoleUtf8Once() {
         static std::once_flag once;
         std::call_once(once, []() {
@@ -220,8 +192,8 @@ namespace {
         std::cout << message << '\n';
         SetConsoleTextAttribute(hOut, oldInfo.wAttributes);
 
-        // Дублируем в OutputDebugString, чтобы было видно в Visual Studio.
-        const std::wstring wide = utf8ToWide(message);
+        // Дублируем в OutputDebugString — видно в Visual Studio.
+        const std::wstring wide = detail::utf8ToWide(message);
         OutputDebugStringW(wide.c_str());
         OutputDebugStringW(L"\n");
     }
@@ -368,8 +340,8 @@ namespace {
         }
 
         struct LogFileInfo {
-            fs::path             path;
-            fs::file_time_type   time;
+            fs::path           path;
+            fs::file_time_type time;
         };
 
         std::vector<LogFileInfo> files;
@@ -538,7 +510,7 @@ namespace {
         // Пишем в лог как CRITICAL.
         log(Level::Critical, category, message, file, line);
 
-        // Сбрасываем и закрываем файл.
+        // Сбрасываем и закрываем файл перед передачей в sink.
         auto& state = getState();
         {
             std::lock_guard lock(state.mutex);
@@ -550,31 +522,10 @@ namespace {
             g_fastGateReady.store(false, std::memory_order_release);
         }
 
-        // Собираем текст для пользователя.
-        const std::string userMessage = std::format(
-            "Категория: {}\n\n{}\n\nФайл: {}\nСтрока: {}",
-            category,
-            message,
-            file ? file : "",
-            line
-        );
-
-    #ifdef _WIN32
-        const std::wstring wide = utf8ToWide(userMessage);
-        MessageBoxW(
-            nullptr,
-            wide.c_str(),
-            L"Критическая ошибка",
-            MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST
-        );
-    #else
-        std::cerr << "\n========================================\n"
-                  << "КРИТИЧЕСКАЯ ОШИБКА\n\n"
-                  << userMessage << '\n'
-                  << "========================================\n\n";
-    #endif
-
-        std::exit(EXIT_FAILURE);
+        // Финальный kill switch — runtime policy (UI/exit или throw в тестах).
+        // Символ предоставляется извне: sfml1_panic_sink_default (production)
+        // или sfml1_core_test_support (тесты). sfml1_core не содержит определения.
+        detail::panic_sink(category, message, file, line);
     }
 
     // --------------------------------------------------------------------------------------------
@@ -635,8 +586,8 @@ namespace {
                                       int line,
                                       std::string_view fmt,
                                       std::format_args args) {
-            // Форматируем payload, затем делегируем в panic(), который логирует и завершает процесс.
-            // Это crash-path — одна лишняя строка допустима.
+            // Форматируем payload, затем делегируем в panic().
+            // Crash-path — одна лишняя аллокация строки допустима.
             std::string message;
         #ifdef _DEBUG
             try {
