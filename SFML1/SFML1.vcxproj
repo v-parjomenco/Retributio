@@ -81,7 +81,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)include_private;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
@@ -110,7 +110,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)include_private;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
@@ -139,7 +139,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)include_private;$(SolutionDir)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions> /utf-8 /Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <ExternalTemplatesDiagnostics>true</ExternalTemplatesDiagnostics>
@@ -183,6 +183,8 @@
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">4710;4711;4820;5045</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="main_skyguard.cpp" />
+    <ClCompile Include="src\core\backends\sfml_audio\sfml_audio_loader.cpp" />
+    <ClCompile Include="src\core\backends\sfml_audio\sfml_sound_resource.cpp" />
     <ClCompile Include="src\core\config\loader\debug_overlay_loader.cpp" />
     <ClCompile Include="src\core\config\loader\detail\non_critical_config_report.cpp" />
     <ClCompile Include="src\core\config\loader\engine_settings_loader.cpp" />
@@ -244,6 +246,7 @@
     <ClInclude Include="include\adapters\json\json_fwd.hpp" />
     <ClInclude Include="include\adapters\json\json_silent.hpp" />
     <ClInclude Include="include\adapters\xxhash\xxhash.h" />
+    <ClInclude Include="include\core\backends\sfml_audio\sfml_audio_loader.h" />
     <ClInclude Include="include\core\compiler\platform\windows.h" />
     <ClInclude Include="include\core\compiler\warnings.h" />
     <ClInclude Include="include\core\config\blueprints\debug_overlay_blueprint.h" />
@@ -294,6 +297,7 @@
     <ClInclude Include="include\core\resources\config\font_resource_config.h" />
     <ClInclude Include="include\core\resources\config\sound_resource_config.h" />
     <ClInclude Include="include\core\resources\config\texture_resource_config.h" />
+    <ClInclude Include="include\core\resources\handles\sound_handle.h" />
     <ClInclude Include="include\core\resources\keys\resource_key.h" />
     <ClInclude Include="include\core\resources\keys\stable_key.h" />
     <ClInclude Include="include\core\resources\registry\resource_entry.h" />
@@ -301,7 +305,7 @@
     <ClInclude Include="include\core\resources\registry\string_pool.h" />
     <ClInclude Include="include\core\resources\resource_manager.h" />
     <ClInclude Include="include\core\resources\types\font_resource.h" />
-    <ClInclude Include="include\core\resources\types\soundbuffer_resource.h" />
+    <ClInclude Include="include\core\resources\types\i_sound_resource.h" />
     <ClInclude Include="include\core\resources\types\texture_resource.h" />
     <ClInclude Include="include\core\spatial\aabb2.h" />
     <ClInclude Include="include\core\spatial\aabb2i.h" />
@@ -361,6 +365,7 @@
     <ClInclude Include="include\game\skyguard\streaming\chunk_content_provider.h" />
     <ClInclude Include="include\game\skyguard\utils\debug_format.h" />
     <ClInclude Include="include\pch.h" />
+    <ClInclude Include="include_private\core\backends\sfml_audio\sfml_sound_resource.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="assets\core\config\debug_overlay.json" />

@@ -225,28 +225,44 @@ protected:
         bool hasSecondaryFont = false;
     };
 
+    class TestSoundResource final : public core::resources::ISoundResource {
+      public:
+        explicit TestSoundResource(ResourceManagerTest& owner)
+            : mOwner(owner) {
+        }
+
+        [[nodiscard]] bool loadFromFile(std::string_view path) override {
+            ++mOwner.soundLoads;
+            return !(mOwner.failSound && path.ends_with("fail.wav"));
+        }
+
+      private:
+        ResourceManagerTest& mOwner;
+    };
+
+    bool onLoadTexture(core::resources::types::TextureResource& /* out */,
+                       std::string_view /* path */,
+                       bool /* sRgb */) {
+        ++textureLoads;
+        return true;
+    }
+
+    bool onLoadFont(core::resources::types::FontResource& /* out */,
+                    std::string_view /* path */) {
+        ++fontLoads;
+        return true;
+    }
+
+    std::unique_ptr<core::resources::ISoundResource> onCreateSound() {
+        return std::make_unique<TestSoundResource>(*this);
+    }
+
     [[nodiscard]] core::resources::ResourceManager::Loaders makeLoaders() {
         core::resources::ResourceManager::Loaders l{};
 
-        l.texture = [this](core::resources::types::TextureResource&,
-                            std::string_view,
-                            bool /* sRgb */) -> bool {
-            ++textureLoads;
-            return true;
-        };
-
-        l.font = [this](core::resources::types::FontResource&,
-                         std::string_view) -> bool {
-            ++fontLoads;
-            return true;
-        };
-
-        l.sound = [this](core::resources::types::SoundBufferResource&,
-                          std::string_view path) -> bool {
-            ++soundLoads;
-            // Тестовая семантика: fail.wav должен "проваливаться".
-            return !(failSound && path.ends_with("fail.wav"));
-        };
+        l.bindTexture<ResourceManagerTest, &ResourceManagerTest::onLoadTexture>(*this);
+        l.bindFont<ResourceManagerTest, &ResourceManagerTest::onLoadFont>(*this);
+        l.bindSoundFactory<ResourceManagerTest, &ResourceManagerTest::onCreateSound>(*this);
 
         return l;
     }
@@ -400,7 +416,8 @@ TEST_F(ResourceManagerTest, GetFont_LoadOnceAndFallback_NoExtraLoads) {
 
 // ------------------------------------------------------------------------------------------------
 // findTexture(): возвращает key; secondary грузится по требованию ровно один раз.
-// Дополнительно: cacheGeneration НЕ должен меняться из-за lazy-load (меняется только init/clearAll).
+// Дополнительно: cacheGeneration НЕ должен меняться из-за lazy-load.
+// Меняется только init/clearAll.
 // ------------------------------------------------------------------------------------------------
 TEST_F(ResourceManagerTest, FindTexture_LoadsSecondaryExactlyOnce_NoGenerationBump) {
     const auto env = makeEnv(false);
@@ -450,7 +467,8 @@ TEST_F(ResourceManagerTest, FindFont_LoadsSecondaryExactlyOnce) {
 // ------------------------------------------------------------------------------------------------
 // Контракт звуков:
 //  - invalid key -> nullptr
-//  - soft-fail: одна попытка, затем Failed, retry запрещён даже если загрузчик позже бы "починился".
+//  - soft-fail: одна попытка, затем Failed; retry запрещён, даже если
+//    загрузчик позже бы "починился".
 // ------------------------------------------------------------------------------------------------
 TEST_F(ResourceManagerTest, TryGetSound_InvalidKeyNullptr_SoftFailNoRetry) {
     const auto env = makeEnv(false);
@@ -458,28 +476,28 @@ TEST_F(ResourceManagerTest, TryGetSound_InvalidKeyNullptr_SoftFailNoRetry) {
     core::resources::ResourceManager manager;
     initialize(manager, env);
 
-    EXPECT_EQ(manager.tryGetSound(core::resources::SoundKey{}), nullptr);
+    EXPECT_FALSE(manager.tryGetSound(core::resources::SoundKey{}).valid());
 
-    const auto failKey = manager.registry().findSoundByName("core.sound.fail");
+    const auto failKey = manager.findSound("core.sound.fail");
     ASSERT_TRUE(failKey.valid());
 
     soundLoads = 0;
     failSound = true;
 
-    const auto* s1 = manager.tryGetSound(failKey);
-    const auto* s2 = manager.tryGetSound(failKey);
+    const auto s1 = manager.tryGetSound(failKey);
+    const auto s2 = manager.tryGetSound(failKey);
 
-    EXPECT_EQ(s1, nullptr);
-    EXPECT_EQ(s2, nullptr);
+    EXPECT_FALSE(s1.valid());
+    EXPECT_FALSE(s2.valid());
     EXPECT_EQ(soundLoads, 1);
 
     // Даже если бы загрузчик теперь "починился", retry запрещён контрактом Failed-state.
     failSound = false;
 
     const int before = soundLoads;
-    const auto* s3 = manager.tryGetSound(failKey);
+    const auto s3 = manager.tryGetSound(failKey);
 
-    EXPECT_EQ(s3, nullptr);
+    EXPECT_FALSE(s3.valid());
     EXPECT_EQ(soundLoads, before);
 }
 
@@ -511,7 +529,55 @@ TEST_F(ResourceManagerTest, ResidentOnlyApi_InvalidMapsToMissing_NoIo) {
     EXPECT_EQ(fontLoads, fontBefore);
     EXPECT_EQ(soundLoads, soundBefore);
 
-    EXPECT_EQ(manager.tryGetSoundResident(core::resources::SoundKey{}), nullptr);
+    EXPECT_FALSE(manager.tryGetSoundResident(core::resources::SoundKey{}).valid());
+}
+
+// ------------------------------------------------------------------------------------------------
+// tryGetSoundResource(SoundHandle):
+//  - invalid handle (SoundHandle{}) → nullptr
+//  - valid index but NotLoaded → nullptr
+//  - valid index but Failed (after failed load) → nullptr
+//  - valid resident handle → non-null pointer, stable across repeated calls
+// ------------------------------------------------------------------------------------------------
+TEST_F(ResourceManagerTest, TryGetSoundResource_AllStateTransitions) {
+    const auto env = makeEnv(false);
+
+    core::resources::ResourceManager manager;
+    initialize(manager, env);
+
+    // Case 1: invalid handle → nullptr.
+    EXPECT_EQ(manager.tryGetSoundResource(core::resources::SoundHandle{}), nullptr);
+
+    // Case 2: valid cache index but NotLoaded → nullptr.
+    // After init all sounds are NotLoaded. Fabricate a handle with a valid index.
+    const auto clickKey = manager.findSound("core.sound.click");
+    ASSERT_TRUE(clickKey.valid());
+    EXPECT_EQ(manager.tryGetSoundResource(core::resources::SoundHandle{clickKey.index()}),
+              nullptr);
+
+    // Case 3: valid cache index but Failed → nullptr.
+    const auto failKey = manager.findSound("core.sound.fail");
+    ASSERT_TRUE(failKey.valid());
+
+    failSound = true;
+    const auto failResult = manager.tryGetSound(failKey);
+    EXPECT_FALSE(failResult.valid()); // tryGetSound returns invalid on failure
+
+    // The sound at failKey.index() is now in Failed state.
+    EXPECT_EQ(manager.tryGetSoundResource(core::resources::SoundHandle{failKey.index()}),
+              nullptr);
+
+    // Case 4: resident handle → non-null, stable pointer.
+    failSound = false;
+    const auto okHandle = manager.tryGetSound(clickKey);
+    ASSERT_TRUE(okHandle.valid());
+
+    const auto* resource = manager.tryGetSoundResource(okHandle);
+    EXPECT_NE(resource, nullptr);
+
+    // Pointer stability: repeated calls return the same address.
+    const auto* resource2 = manager.tryGetSoundResource(okHandle);
+    EXPECT_EQ(resource, resource2);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -546,7 +612,7 @@ TEST_F(ResourceManagerTest, PreloadAndMetrics_AreConsistent) {
         EXPECT_EQ(m.soundCount, 0u);
     }
 
-    const auto okSound = manager.registry().findSoundByName("core.sound.click");
+    const auto okSound = manager.findSound("core.sound.click");
     ASSERT_TRUE(okSound.valid());
 
     manager.preloadSound(okSound);
@@ -558,18 +624,18 @@ TEST_F(ResourceManagerTest, PreloadAndMetrics_AreConsistent) {
         EXPECT_EQ(m.soundCount, 1u);
     }
 
-    const auto* residentOk = manager.tryGetSoundResident(okSound);
-    ASSERT_NE(residentOk, nullptr);
+    const auto residentOk = manager.tryGetSoundResident(okSound);
+    ASSERT_TRUE(residentOk.valid());
 
     const int before = soundLoads;
 
     // Resident-путь не должен пытаться грузить заново.
-    const auto* s2 = manager.tryGetSound(okSound);
-    ASSERT_NE(s2, nullptr);
+    const auto s2 = manager.tryGetSound(okSound);
+    ASSERT_TRUE(s2.valid());
     EXPECT_EQ(s2, residentOk);
     EXPECT_EQ(soundLoads, before);
 
-    const auto failSoundKey = manager.registry().findSoundByName("core.sound.fail");
+    const auto failSoundKey = manager.findSound("core.sound.fail");
     ASSERT_TRUE(failSoundKey.valid());
 
     failSound = true;
@@ -607,13 +673,13 @@ TEST_F(ResourceManagerTest, PreloadAllByRegistry_RespectsContracts) {
     manager.preloadAllSoundsByRegistry();
     EXPECT_EQ(soundLoads, 2);
 
-    const auto okSound = manager.registry().findSoundByName("core.sound.click");
+    const auto okSound = manager.findSound("core.sound.click");
     ASSERT_TRUE(okSound.valid());
-    EXPECT_NE(manager.tryGetSoundResident(okSound), nullptr);
+    EXPECT_TRUE(manager.tryGetSoundResident(okSound).valid());
 
-    const auto failKey = manager.registry().findSoundByName("core.sound.fail");
+    const auto failKey = manager.findSound("core.sound.fail");
     ASSERT_TRUE(failKey.valid());
-    EXPECT_EQ(manager.tryGetSoundResident(failKey), nullptr);
+    EXPECT_FALSE(manager.tryGetSoundResident(failKey).valid());
 
     // Повторный preloadAllSoundsByRegistry не должен делать retry на Failed.
     failSound = false;
@@ -638,7 +704,7 @@ TEST_F(ResourceManagerTest, IoForbidden_DisallowsLazyLoadButAllowsResident) {
     const auto secondaryTex = manager.findTexture("core.texture.secondary");
     ASSERT_TRUE(secondaryTex.valid());
 
-    const auto okSound = manager.registry().findSoundByName("core.sound.click");
+    const auto okSound = manager.findSound("core.sound.click");
     ASSERT_TRUE(okSound.valid());
 
     manager.setIoForbidden(true);
@@ -690,7 +756,7 @@ TEST_F(ResourceManagerTest, ClearAll_ResetsCaches_KeepsFallback_BumpsGeneration)
     const auto secondaryFont = manager.findFont("core.font.secondary");
     ASSERT_TRUE(secondaryFont.valid());
 
-    const auto okSound = manager.registry().findSoundByName("core.sound.click");
+    const auto okSound = manager.findSound("core.sound.click");
     ASSERT_TRUE(okSound.valid());
 
     manager.preloadTexture(secondaryTex);

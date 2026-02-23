@@ -23,11 +23,23 @@
 #
 #   sfml1_core                — engine artifact: ECS, spatial, resources, logging.
 #                               Declares core::log::detail::panic_sink but does NOT define it.
+#                               Declares core::resources::detail::hashCanonicalKey but does NOT
+#                               define it (StableKey seam).
+#   sfml1_stable_key_xxhash   — STATIC; defines StableKey seam:
+#                               core::resources::detail::hashCanonicalKey via xxHash3_64.
+#                               Linked by sfml1_runtime (production).
+#                               Tests provide their own seam TU and must NOT link this target.
+#   sfml1_sfml_audio          — STATIC; SFML audio backend for ISoundResource.
+#                               Links SFML::Audio PUBLIC (self-sufficient).
+#                               Private headers isolated in include_private/.
 #   sfml1_panic_sink_default  — STATIC; defines panic_sink → MessageBox + std::exit.
-#   sfml1_runtime             — INTERFACE; composes sfml1_core + sfml1_panic_sink_default.
+#   sfml1_runtime             — INTERFACE; composes sfml1_core + sfml1_panic_sink_default
+#                               + sfml1_stable_key_xxhash (production seam set).
 #                               All game targets link sfml1_runtime, not sfml1_core directly.
-#                               Tests link sfml1_core + sfml1_core_test_support instead.
-#   sfml1_skyguard            -> sfml1_runtime, SFML::*
+#                               Tests link sfml1_core + sfml1_core_test_support instead and
+#                               provide StableKey seam TU explicitly.
+#   sfml1_skyguard            -> sfml1_runtime, sfml1_sfml_audio(SFML1_ENABLE_AUDIO),
+#                                SFML::Graphics, SFML::Window, SFML::Network
 #   sfml1_stress_common       -> sfml1_runtime  (no sfml1_skyguard dep — avoids cycle)
 #   sfml1_skyguard_dev        -> sfml1_skyguard, sfml1_stress_common(PRIVATE)
 #   sfml1_spatial_harness_lib -> sfml1_runtime, sfml1_skyguard, sfml1_stress_common(PRIVATE)
@@ -67,6 +79,8 @@ set(CMAKE_CXX_EXTENSIONS        OFF)
 set(CMAKE_C_STANDARD            17)
 set(CMAKE_C_STANDARD_REQUIRED   ON)
 set(CMAKE_C_EXTENSIONS          OFF)
+
+option(SFML1_ENABLE_AUDIO "Enable SFML audio module" ON)
 
 # ------------------------------------------------------------------------------------------------
 # MSVC Runtime Library
@@ -110,6 +124,8 @@ endif()
 # Values: EditAndContinue -> /ZI   ProgramDatabase -> /Zi
 # ------------------------------------------------------------------------------------------------
 if(MSVC)
+    # Single string — NOT two separate set() arguments. Two args would produce a CMake
+    # list ("EditAndContinue;") because set() joins with ';'. CMake 4.2+ rejects trailing ';'.
     set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
         "$<$<CONFIG:Debug>:EditAndContinue>$<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:ProgramDatabase>"
     )
@@ -125,7 +141,13 @@ set(CMAKE_MAP_IMPORTED_CONFIG_PROFILE "Release")
 
 message(STATUS "SFML1: CMAKE_MAP_IMPORTED_CONFIG_PROFILE = ${CMAKE_MAP_IMPORTED_CONFIG_PROFILE}")
 
-find_package(SFML CONFIG REQUIRED COMPONENTS Network Graphics Window Audio System Main)
+if(SFML1_ENABLE_AUDIO)
+    find_package(SFML CONFIG REQUIRED COMPONENTS
+        Network Graphics Window Audio System Main)
+else()
+    find_package(SFML CONFIG REQUIRED COMPONENTS
+        Network Graphics Window System Main)
+endif()
 
 # ------------------------------------------------------------------------------------------------
 # Config-less imported targets fix (Vorbis, FLAC)
@@ -307,6 +329,11 @@ endif()
 # The definition is provided at link time by sfml1_panic_sink_default (production) or
 # sfml1_core_test_support (tests). sfml1_runtime below is the canonical production
 # composition that satisfies this requirement for all game targets.
+#
+# StableKey seam:
+# core::resources::detail::hashCanonicalKey is declared in stable_key.h but NOT defined here.
+# The production definition is provided by sfml1_stable_key_xxhash (linked by sfml1_runtime).
+# Tests provide their own seam TU and must NOT link sfml1_stable_key_xxhash.
 # ================================================================================================
 add_library(sfml1_core STATIC)
 
@@ -341,7 +368,7 @@ target_sources(sfml1_core PRIVATE
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/log/logging.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/log/log_level.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/core/log/detail/utf8_to_wide.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/log/detail/utf8_to_wide.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/resources/keys/stable_key.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/resources/registry/resource_registry.cpp
@@ -365,6 +392,79 @@ target_sources(sfml1_core PRIVATE
 target_precompile_headers(sfml1_core PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
 )
+
+# ================================================================================================
+# sfml1_stable_key_xxhash — production link-time seam for StableKey64
+#
+# Defines core::resources::detail::hashCanonicalKey via xxHash3_64.
+# The xxHash implementation is provided by third_party/xxhash/upstream/xxhash.c
+# which is compiled into sfml1_core.
+#
+# IMPORTANT:
+#  - Production targets must obtain this seam via sfml1_runtime.
+#  - Test targets must provide their own seam TU and must NOT link this target.
+# ================================================================================================
+add_library(sfml1_stable_key_xxhash STATIC)
+
+target_link_libraries(sfml1_stable_key_xxhash
+    PUBLIC
+        sfml1::build_options
+    PRIVATE
+        sfml1_core
+)
+
+target_sources(sfml1_stable_key_xxhash PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/resources/keys/stable_key_impl_xxhash.cpp
+)
+
+target_precompile_headers(sfml1_stable_key_xxhash PRIVATE
+    "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
+)
+
+# ================================================================================================
+# sfml1_sfml_audio  —  SFML audio backend for core::resources::ISoundResource
+#
+# Self-sufficient static library: links SFML::Audio PUBLIC so consumers get it
+# transitively without naming SFML::Audio themselves.
+#
+# Header isolation (include_private/):
+#   SFML-specific implementation headers (sfml_sound_resource.h) live in include_private/
+#   and are visible ONLY to this target. External targets cannot resolve them even though
+#   sfml1_core exports include/ as PUBLIC — include_private/ is a disjoint tree.
+#   Public API surface is a single registration header:
+#     include/core/backends/sfml_audio/sfml_audio_loader.h
+#
+# sfml1_core linkage is PRIVATE: this target's .cpp files need core headers for compilation,
+# but every consumer already obtains sfml1_core through sfml1_runtime. If a future consumer
+# links sfml1_sfml_audio without sfml1_runtime, promote sfml1_core to PUBLIC here.
+# ================================================================================================
+if(SFML1_ENABLE_AUDIO)
+    add_library(sfml1_sfml_audio STATIC)
+
+    target_link_libraries(sfml1_sfml_audio
+        PUBLIC
+            SFML::Audio
+        PRIVATE
+            sfml1_core
+    )
+
+    # PRIVATE: only this target's TUs see include_private/.
+    # Public headers (sfml_audio_loader.h) live in include/ and are reachable
+    # via sfml1_core's PUBLIC include directory — no duplication needed here.
+    target_include_directories(sfml1_sfml_audio
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include_private
+    )
+
+    target_sources(sfml1_sfml_audio PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/core/backends/sfml_audio/sfml_audio_loader.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/core/backends/sfml_audio/sfml_sound_resource.cpp
+    )
+
+    target_precompile_headers(sfml1_sfml_audio PRIVATE
+        "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
+    )
+endif()
 
 # ================================================================================================
 # sfml1_panic_sink_default — production panic policy (MessageBox + std::exit)
@@ -401,12 +501,17 @@ target_precompile_headers(sfml1_panic_sink_default PRIVATE
 )
 
 # ================================================================================================
-# sfml1_runtime — production runtime: engine + panic policy
+# sfml1_runtime — production runtime: engine + panic policy + StableKey seam (no audio)
 #
-# INTERFACE composition point for all game targets. Links sfml1_core and
-# sfml1_panic_sink_default so consumers get a complete, linkable product.
+# INTERFACE composition point for all game targets. Links sfml1_core,
+# sfml1_panic_sink_default, and sfml1_stable_key_xxhash so consumers get a complete,
+# linkable product without naming seam libraries explicitly.
+#
+# Audio is NOT part of the minimal runtime — game targets that need audio
+# link sfml1_sfml_audio explicitly (see sfml1_skyguard).
+#
 # Test targets link sfml1_core + sfml1_core_test_support directly,
-# bypassing sfml1_panic_sink_default entirely.
+# bypassing sfml1_panic_sink_default entirely and providing StableKey seam TU.
 # ================================================================================================
 add_library(sfml1_runtime INTERFACE)
 
@@ -414,6 +519,7 @@ target_link_libraries(sfml1_runtime
     INTERFACE
         sfml1_core
         sfml1_panic_sink_default
+        sfml1_stable_key_xxhash
 )
 
 # ================================================================================================
@@ -427,7 +533,7 @@ target_link_libraries(sfml1_skyguard
         sfml1_runtime
         SFML::Graphics
         SFML::Window
-        SFML::Audio
+        $<$<BOOL:${SFML1_ENABLE_AUDIO}>:sfml1_sfml_audio>
         SFML::Network
 )
 

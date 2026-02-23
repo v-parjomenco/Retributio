@@ -343,6 +343,39 @@
     <Filter Include="src\core\log\detail">
       <UniqueIdentifier>{2d1cf540-bf01-4215-82d1-3ab1ad63731b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\core\backends">
+      <UniqueIdentifier>{0333609b-ba5d-4222-abd9-5d2040cef019}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\backends\sfml_audio">
+      <UniqueIdentifier>{cbf3724f-4a88-4e36-8798-c30459209f42}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\backends">
+      <UniqueIdentifier>{09642ed3-707e-4e9b-84fc-404dfce6e71e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core\backends\sfml_audio">
+      <UniqueIdentifier>{25588cd6-d836-4f1c-9885-909b65118fb5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core\resources\handles">
+      <UniqueIdentifier>{69a74932-1832-4f46-b851-55d0303fffe8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include_private">
+      <UniqueIdentifier>{956b8fa0-ef6f-46c4-a57a-01b4d83c5eab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include_private\core">
+      <UniqueIdentifier>{2510598a-cba8-4737-88e3-895459e05fd6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include_private\game">
+      <UniqueIdentifier>{9ee733da-78cd-4105-8c00-4f30f979accb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include_private\game\skyguard">
+      <UniqueIdentifier>{16f3bc68-15bc-424c-880d-ad820b6355b8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include_private\core\backends">
+      <UniqueIdentifier>{3cc99996-e295-45b3-918e-ee3da941e905}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include_private\core\backends\sfml_audio">
+      <UniqueIdentifier>{3576c305-c7e6-40ca-9d8c-83946da89d18}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main_skyguard.cpp">
@@ -489,6 +522,12 @@
     <ClCompile Include="src\core\resources\keys\stable_key_impl_xxhash.cpp">
       <Filter>src\core\resources\keys</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\backends\sfml_audio\sfml_audio_loader.cpp">
+      <Filter>src\core\backends\sfml_audio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\backends\sfml_audio\sfml_sound_resource.cpp">
+      <Filter>src\core\backends\sfml_audio</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\core\resources\resource_manager.h">
@@ -540,9 +579,6 @@
       <Filter>include\core\ecs\systems</Filter>
     </ClInclude>
     <ClInclude Include="include\core\resources\types\font_resource.h">
-      <Filter>include\core\resources\types</Filter>
-    </ClInclude>
-    <ClInclude Include="include\core\resources\types\soundbuffer_resource.h">
       <Filter>include\core\resources\types</Filter>
     </ClInclude>
     <ClInclude Include="include\core\resources\types\texture_resource.h">
@@ -859,6 +895,18 @@
     </ClInclude>
     <ClInclude Include="include\core\log\detail\utf8_to_wide.h">
       <Filter>include\core\log\detail</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\backends\sfml_audio\sfml_audio_loader.h">
+      <Filter>include\core\backends\sfml_audio</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\handles\sound_handle.h">
+      <Filter>include\core\resources\handles</Filter>
+    </ClInclude>
+    <ClInclude Include="include\core\resources\types\i_sound_resource.h">
+      <Filter>include\core\resources\types</Filter>
+    </ClInclude>
+    <ClInclude Include="include_private\core\backends\sfml_audio\sfml_sound_resource.h">
+      <Filter>include_private\core\backends\sfml_audio</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

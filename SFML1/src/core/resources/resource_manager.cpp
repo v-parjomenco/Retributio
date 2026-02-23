@@ -17,8 +17,9 @@ namespace core::resources {
     namespace {
 
         [[nodiscard]] std::filesystem::path toPath(std::string_view pathView) {
-            // string_view -> path без промежуточного std::string.
-            // path всё равно будет владеть строкой, но мы избегаем лишней аллокации/копии.
+            // Без промежуточного std::string объекта: конструируем filesystem::path напрямую
+            // из диапазона.
+            // filesystem::path всё равно владеет своей строкой, так что копирование остаётся.
             return std::filesystem::path{pathView.begin(), pathView.end()};
         }
 
@@ -37,18 +38,13 @@ namespace core::resources {
             return out.loadFromFile(toPath(path));
         }
 
-        [[nodiscard]] bool defaultLoadSound(types::SoundBufferResource& out,
-                                            std::string_view path) {
-            return out.loadFromFile(toPath(path));
-        }
-
         // ----------------------------------------------------------------------------------------
         // Dispatch wrappers — вызываем инъецированный загрузчик или fallback на default.
         //
         // Примечание по стоимости:
-        //  - В продакшне при Loaders{} здесь одна проверка на empty и прямой вызов default.
-        //  - При инъекции тестового загрузчика — вызов через std::function (SBO, без heap).
-        //  - Это НЕ hot-loop; стоимость тонет в файловом I/O.
+        //  - В продакшне при Loaders{} здесь одна проверка на nullptr и прямой вызов default.
+        //  - При инъекции загрузчика — вызов через Delegate (cold path, resource loading;
+        //    стоимость тонет в файловом I/O).
         // ----------------------------------------------------------------------------------------
 
         [[nodiscard]] bool doLoadTexture(const ResourceManager::Loaders& loaders,
@@ -68,15 +64,6 @@ namespace core::resources {
                 return loaders.font(out, path);
             }
             return defaultLoadFont(out, path);
-        }
-
-        [[nodiscard]] bool doLoadSound(const ResourceManager::Loaders& loaders,
-                                       types::SoundBufferResource& out,
-                                       std::string_view path) {
-            if (loaders.sound) {
-                return loaders.sound(out, path);
-            }
-            return defaultLoadSound(out, path);
         }
 
         // ----------------------------------------------------------------------------------------
@@ -110,13 +97,25 @@ namespace core::resources {
         }
     }
 
+    void ResourceManager::mergeLoaders(const Loaders& loaders) {
+        if (loaders.texture) {
+            mLoaders.texture = loaders.texture;
+        }
+        if (loaders.font) {
+            mLoaders.font = loaders.font;
+        }
+        if (loaders.createSound) {
+            mLoaders.createSound = loaders.createSound;
+        }
+    }
+
     void ResourceManager::initialize(std::span<const ResourceSource> sources, Loaders loaders) {
         if (mInitialized) {
             LOG_PANIC(core::log::cat::Resources,
                       "[ResourceManager::initialize] Key-world реестр уже инициализирован.");
         }
 
-        mLoaders = std::move(loaders);
+        mergeLoaders(loaders);
         mIoForbidden = false;
 
         mRegistry.loadFromSources(sources);
@@ -205,6 +204,13 @@ namespace core::resources {
         return mRegistry.findFontByName(canonicalName);
     }
 
+    SoundKey ResourceManager::findSound(std::string_view canonicalName) const {
+        if (!mInitialized) {
+            panicNotInitialized("findSound");
+        }
+        return mRegistry.findSoundByName(canonicalName);
+    }
+
     // --------------------------------------------------------------------------------------------
     // Key-based API (RuntimeKey32)
     // --------------------------------------------------------------------------------------------
@@ -256,6 +262,7 @@ namespace core::resources {
 
         mTextureCache[idx] = std::move(resource);
         mTextureState[idx] = ResourceState::Resident;
+        ++mTextureResidentCount;
         return *mTextureCache[idx];
     }
 
@@ -294,55 +301,72 @@ namespace core::resources {
 
         mFontCache[idx] = std::move(resource);
         mFontState[idx] = ResourceState::Resident;
+        ++mFontResidentCount;
         return *mFontCache[idx];
     }
 
-    const types::SoundBufferResource* ResourceManager::tryGetSound(SoundKey key) {
+    SoundHandle ResourceManager::tryGetSound(SoundKey key) {
         if (!mInitialized) {
             panicNotInitialized("tryGetSound(SoundKey)");
         }
 
         if (!key.valid() || key.index() >= mSoundCache.size()) {
-            return nullptr;
+            return {};
         }
 
         const std::uint32_t idx = key.index();
         const ResourceState state = mSoundState[idx];
 
         if (state == ResourceState::Resident) {
-            const auto* cached = mSoundCache[idx].get();
-            assert(cached != nullptr);
-            return cached;
+            return SoundHandle{idx};
         }
 
         if (state == ResourceState::Failed) {
-            return nullptr;
+            return {};
         }
 
         const auto* entry = mRegistry.tryGetSound(key);
         if (entry == nullptr) {
             mSoundState[idx] = ResourceState::Failed;
-            return nullptr;
+            return {};
+        }
+
+        if (!mLoaders.createSound) {
+            if (!mMissingSoundLoaderWarned) {
+                mMissingSoundLoaderWarned = true;
+                LOG_WARN(core::log::cat::Resources,
+                         "[ResourceManager::tryGetSound(SoundKey)] "
+                         "Sound loader не зарегистрирован: звук отключён.");
+            }
+            mSoundState[idx] = ResourceState::Failed;
+            return {};
         }
 
         if (mIoForbidden) {
             panicLazyLoadForbidden("tryGetSound(SoundKey)", entry->name, entry->path);
         }
 
-        auto resource = std::make_unique<types::SoundBufferResource>();
+        auto resource = mLoaders.createSound();
+        if (!resource) {
+            LOG_PANIC(core::log::cat::Resources,
+                      "[ResourceManager::tryGetSound(SoundKey)] "
+                      "createSound вернул nullptr (нарушение контракта). name='{}' path='{}'.",
+                      entry->name, entry->path);
+        }
 
-        if (!doLoadSound(mLoaders, *resource, entry->path)) {
+        if (!resource->loadFromFile(entry->path)) {
             mSoundState[idx] = ResourceState::Failed;
             LOG_WARN(core::log::cat::Resources,
                      "[ResourceManager::tryGetSound(SoundKey)] "
                      "Не удалось загрузить звук '{}'. path='{}'.",
                      entry->name, entry->path);
-            return nullptr;
+            return {};
         }
 
         mSoundCache[idx] = std::move(resource);
         mSoundState[idx] = ResourceState::Resident;
-        return mSoundCache[idx].get();
+        ++mSoundResidentCount;
+        return SoundHandle{idx};
     }
 
     // --------------------------------------------------------------------------------------------
@@ -397,22 +421,38 @@ namespace core::resources {
         return *cached;
     }
 
-    const types::SoundBufferResource*
-    ResourceManager::tryGetSoundResident(SoundKey key) const noexcept {
+    SoundHandle ResourceManager::tryGetSoundResident(SoundKey key) const noexcept {
         if (!mInitialized) {
             panicNotInitialized("tryGetSoundResident(SoundKey)");
         }
 
         if (!key.valid() || key.index() >= mSoundCache.size()) {
-            return nullptr;
+            return {};
         }
 
         const std::uint32_t idx = key.index();
         if (mSoundState[idx] != ResourceState::Resident) {
+            return {};
+        }
+
+        return SoundHandle{idx};
+    }
+
+    const ISoundResource*
+    ResourceManager::tryGetSoundResource(SoundHandle handle) const noexcept {
+        if (!mInitialized) {
+            panicNotInitialized("tryGetSoundResource(SoundHandle)");
+        }
+
+        if (!handle.valid() || handle.index >= mSoundCache.size()) {
             return nullptr;
         }
 
-        return mSoundCache[idx].get();
+        if (mSoundState[handle.index] != ResourceState::Resident) {
+            return nullptr;
+        }
+
+        return mSoundCache[handle.index].get();
     }
 
     // --------------------------------------------------------------------------------------------
@@ -420,16 +460,11 @@ namespace core::resources {
     // --------------------------------------------------------------------------------------------
 
     ResourceManager::ResourceMetrics ResourceManager::getMetrics() const noexcept {
-        const auto countResident =
-            [](const std::vector<ResourceState>& states) noexcept -> std::size_t {
-            return static_cast<std::size_t>(
-                std::count(states.begin(), states.end(), ResourceState::Resident));
-        };
-
+        // O(1): счётчики обновляются инкрементально на каждом переходе состояния.
         return ResourceMetrics{
-            .textureCount = countResident(mTextureState),
-            .fontCount    = countResident(mFontState),
-            .soundCount   = countResident(mSoundState),
+            .textureCount = mTextureResidentCount,
+            .fontCount    = mFontResidentCount,
+            .soundCount   = mSoundResidentCount,
         };
     }
 
@@ -575,6 +610,12 @@ namespace core::resources {
             entry.reset();
         }
         std::fill(mSoundState.begin(), mSoundState.end(), ResourceState::NotLoaded);
+
+        // Инварианты после очистки: missing texture/font остались Resident (не тронуты
+        // через continue выше); все звуки сброшены. Устанавливаем счётчики напрямую.
+        mTextureResidentCount = 1u;
+        mFontResidentCount    = 1u;
+        mSoundResidentCount   = 0u;
 
         bumpCacheGeneration();
     }

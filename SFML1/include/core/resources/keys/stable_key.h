@@ -7,7 +7,8 @@
 //   detail::hashCanonicalKey, which is declared here but NOT defined in sfml1_core.
 //
 //   Definition is provided by a separate link unit:
-//     production : core/resources/keys/stable_key_impl_xxhash.cpp  → sfml1_runtime / tools
+//     production : core/resources/keys/stable_key_impl_xxhash.cpp  → sfml1_stable_key_xxhash
+//                  (linked transitively by sfml1_runtime)
 //     tests      : tests/engine/src/stable_key_impl_seam.cpp       → sfml1_engine_tests
 //
 //   This allows tests to inject a deterministic constant hash and exercise the
