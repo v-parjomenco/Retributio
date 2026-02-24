@@ -5,10 +5,11 @@
 # Workflow:
 #   1. Checkout with submodules
 #   2. Set up MSVC x64 environment (cl.exe in PATH)
-#   3. Bootstrap vcpkg (sets VCPKG_ROOT env var)
-#   4. Configure with win-msvc-ninja-mc-ci preset (uses $env{VCPKG_ROOT} for toolchain)
-#   5. Build Debug config — also installs vcpkg packages on first run
-#   6. Run tests via ctest --preset ci-debug
+#   3. Install CMake 4.x (windows-latest ships with 3.x)
+#   4. Bootstrap vcpkg (sets VCPKG_ROOT env var)
+#   5. Configure with win-msvc-ninja-mc-ci preset
+#   6. Build Debug config — also installs vcpkg packages on first run
+#   7. Run tests via ctest --preset ci-debug
 #
 # Presets used:
 #   Configure : win-msvc-ninja-mc-ci  (inherits win-msvc-ninja-mc, overrides toolchain path)
@@ -49,9 +50,22 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+          
+      # ──────────────────────────────────────────────────────────────
+      # 3. CMake 4.x
+      #
+      # windows-latest ships with CMake 3.x which does not meet the
+      # project's cmake_minimum_required(VERSION 4.2.3).
+      # lukka/get-cmake installs the requested version and prepends
+      # it to PATH before the configure step.
+      # ──────────────────────────────────────────────────────────────
+      - name: Install CMake 4.x
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~4.2.0"          
 
       # ──────────────────────────────────────────────────────────────
-      # 3. vcpkg — bootstrap + cache
+      # 4. vcpkg — bootstrap + cache
       #
       # lukka/run-vcpkg bootstraps vcpkg and exports VCPKG_ROOT.
       # The vcpkg binary cache is keyed by vcpkg.json hash so
@@ -64,7 +78,7 @@ jobs:
           vcpkgGitCommitId: 'e5a1490e1409d175932ef6014519e9ae149ddb7c'
 
       # ──────────────────────────────────────────────────────────────
-      # 4. Configure
+      # 5. Configure
       #
       # Uses the ci-specific preset which reads VCPKG_ROOT from env
       # instead of the hardcoded local path in win-msvc-ninja-mc.
@@ -75,13 +89,13 @@ jobs:
         run: cmake --preset win-msvc-ninja-mc-ci
 
       # ──────────────────────────────────────────────────────────────
-      # 5. Build (Debug)
+      # 6. Build (Debug)
       # ──────────────────────────────────────────────────────────────
       - name: Build
         run: cmake --build --preset ci-debug
 
       # ──────────────────────────────────────────────────────────────
-      # 6. Test
+      # 7. Test
       # ──────────────────────────────────────────────────────────────
       - name: Test
         run: ctest --preset ci-debug
