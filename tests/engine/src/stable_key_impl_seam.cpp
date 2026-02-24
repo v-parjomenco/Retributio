@@ -1,5 +1,5 @@
 #include "core/resources/keys/stable_key.h"
-#include "tests/engine/include/stable_key_seam.h"
+#include "stable_key_seam.h"
 
 #include "adapters/xxhash/xxhash.h"
 

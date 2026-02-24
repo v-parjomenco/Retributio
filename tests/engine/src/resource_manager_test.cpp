@@ -8,6 +8,9 @@
 //  - I/O is injected via ResourceManager::Loaders (no SFML1_TESTS hooks, no global mutable state).
 //  - Each test uses a unique temp directory instance (safe for parallel execution).
 //  - Placeholder files are non-empty to avoid coupling to "empty file" semantics.
+//  - Panic assertions use expectPanic<F>() exclusively. ASSERT_DEATH / EXPECT_DEATH are
+//    forbidden in this binary: sfml1_engine_tests links log_panic_sink_throw.cpp which
+//    replaces panic_sink with a throw — incompatible with GTest death-test subprocess model.
 // ================================================================================================
 #include "core/resources/resource_manager.h"
 
@@ -28,9 +31,13 @@
 
 #include <gtest/gtest.h>
 
+#include "test_panic.h"
+
 namespace {
 
     namespace fs = std::filesystem;
+
+    using test_support::expectPanic;
 
     // --------------------------------------------------------------------------------------------
     // Мелкие утилиты
@@ -561,6 +568,7 @@ TEST_F(ResourceManagerTest, TryGetSoundResource_AllStateTransitions) {
 
     failSound = true;
     const auto failResult = manager.tryGetSound(failKey);
+
     EXPECT_FALSE(failResult.valid()); // tryGetSound returns invalid on failure
 
     // The sound at failKey.index() is now in Failed state.
@@ -688,12 +696,15 @@ TEST_F(ResourceManagerTest, PreloadAllByRegistry_RespectsContracts) {
     EXPECT_EQ(soundLoads, before);
 }
 
-#if GTEST_HAS_DEATH_TEST
-
 // ------------------------------------------------------------------------------------------------
 // setIoForbidden(true):
-//  - resident ресурсы доступны
-//  - любая попытка lazy-load нерезидентного ресурса должна приводить к panic
+//  - resident ресурсы доступны без I/O
+//  - любая попытка lazy-load нерезидентного ресурса должна panic-нуть
+//
+// Примечание: ASSERT_DEATH здесь неприменим — данный бинарник линкует
+// log_panic_sink_throw.cpp, который реализует panic_sink через throw, а не exit().
+// GTest death-test ожидает завершения дочернего процесса; исключение вместо этого
+// вызывает "threw an exception" → FAILED. Используем expectPanic<F>().
 // ------------------------------------------------------------------------------------------------
 TEST_F(ResourceManagerTest, IoForbidden_DisallowsLazyLoadButAllowsResident) {
     const auto env = makeEnv(false);
@@ -709,13 +720,21 @@ TEST_F(ResourceManagerTest, IoForbidden_DisallowsLazyLoadButAllowsResident) {
 
     manager.setIoForbidden(true);
 
-    // Fallback resident ресурсы должны оставаться доступными.
-    EXPECT_NO_FATAL_FAILURE((void)manager.getTexture(manager.missingTextureKey()));
-    EXPECT_NO_FATAL_FAILURE((void)manager.getFont(manager.missingFontKey()));
+    // Fallback resident ресурсы должны оставаться доступными — без паники.
+    EXPECT_NO_THROW((void)manager.getTexture(manager.missingTextureKey()));
+    EXPECT_NO_THROW((void)manager.getFont(manager.missingFontKey()));
 
-    // Lazy-load запрещён: должен быть panic (death).
-    ASSERT_DEATH((void)manager.getTexture(secondaryTex), ".*");
-    ASSERT_DEATH((void)manager.tryGetSound(okSound), ".*");
+    // Lazy-load запрещён: каждый вызов должен panic-нуть.
+    {
+        const std::string msg = expectPanic([&]{ (void)manager.getTexture(secondaryTex); });
+        EXPECT_NE(msg.find("getTexture"), std::string::npos)
+            << "Ожидалась паника в getTexture. Panic msg: " << msg;
+    }
+    {
+        const std::string msg = expectPanic([&]{ (void)manager.tryGetSound(okSound); });
+        EXPECT_NE(msg.find("tryGetSound"), std::string::npos)
+            << "Ожидалась паника в tryGetSound. Panic msg: " << msg;
+    }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -733,8 +752,16 @@ TEST_F(ResourceManagerTest, ExpectResident_PanicsWhenNotResident) {
     const auto secondaryFont = manager.findFont("core.font.secondary");
     ASSERT_TRUE(secondaryFont.valid());
 
-    ASSERT_DEATH((void)manager.expectTextureResident(secondaryTex), ".*");
-    ASSERT_DEATH((void)manager.expectFontResident(secondaryFont), ".*");
+    {
+        const std::string msg = expectPanic([&]{ (void)manager.expectTextureResident(secondaryTex); });
+        EXPECT_NE(msg.find("expectTextureResident"), std::string::npos)
+            << "Ожидалась паника в expectTextureResident. Panic msg: " << msg;
+    }
+    {
+        const std::string msg = expectPanic([&]{ (void)manager.expectFontResident(secondaryFont); });
+        EXPECT_NE(msg.find("expectFontResident"), std::string::npos)
+            << "Ожидалась паника в expectFontResident. Panic msg: " << msg;
+    }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -742,7 +769,7 @@ TEST_F(ResourceManagerTest, ExpectResident_PanicsWhenNotResident) {
 //  - сохраняет missing texture/font resident
 //  - сбрасывает остальные кэши/состояния
 //  - bump-ает cacheGeneration
-//  - после clearAll expectResident(non-missing) снова должен panic-ать
+//  - после clearAll expectResident(non-missing) снова должен panic-нуть
 // ------------------------------------------------------------------------------------------------
 TEST_F(ResourceManagerTest, ClearAll_ResetsCaches_KeepsFallback_BumpsGeneration) {
     const auto env = makeEnv(true);
@@ -779,18 +806,24 @@ TEST_F(ResourceManagerTest, ClearAll_ResetsCaches_KeepsFallback_BumpsGeneration)
         EXPECT_EQ(m.soundCount, 0u);
     }
 
-    // Fallback должен оставаться resident.
-    EXPECT_NO_FATAL_FAILURE((void)manager.expectTextureResident(manager.missingTextureKey()));
-    EXPECT_NO_FATAL_FAILURE((void)manager.expectFontResident(manager.missingFontKey()));
+    // Fallback должен оставаться resident — без паники.
+    EXPECT_NO_THROW((void)manager.expectTextureResident(manager.missingTextureKey()));
+    EXPECT_NO_THROW((void)manager.expectFontResident(manager.missingFontKey()));
 
-    // Non-missing не должен быть resident после clearAll.
-    ASSERT_DEATH((void)manager.expectTextureResident(secondaryTex), ".*");
-    ASSERT_DEATH((void)manager.expectFontResident(secondaryFont), ".*");
+    // Non-missing не должен быть resident после clearAll — каждый вызов panic-нет.
+    {
+        const std::string msg = expectPanic([&]{ (void)manager.expectTextureResident(secondaryTex); });
+        EXPECT_NE(msg.find("expectTextureResident"), std::string::npos)
+            << "Ожидалась паника в expectTextureResident после clearAll. Panic msg: " << msg;
+    }
+    {
+        const std::string msg = expectPanic([&]{ (void)manager.expectFontResident(secondaryFont); });
+        EXPECT_NE(msg.find("expectFontResident"), std::string::npos)
+            << "Ожидалась паника в expectFontResident после clearAll. Panic msg: " << msg;
+    }
 
     // Lazy-load по умолчанию разрешён после clearAll: ресурс должен перезагрузиться.
     const int texBefore = textureLoads;
     (void)manager.getTexture(secondaryTex);
     EXPECT_EQ(textureLoads, texBefore + 1);
 }
-
-#endif // GTEST_HAS_DEATH_TEST

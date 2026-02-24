@@ -25,3 +25,31 @@ cmake --build --preset win-profile --target stress_large  # soak: 128×128 chunk
 cmake --build --preset win-profile   # все таргеты Profile
 cmake --build --preset win-debug     # все таргеты Debug
 cmake --build --preset win-release   # все таргеты Release
+
+# 5. Google Tests (ctest)
+# Сначала собрать тесты (Debug only — sfml1_engine_tests + sfml1_skyguard_tests):
+cmake --build --preset win-debug --target sfml1_engine_tests sfml1_skyguard_tests
+
+# Собрать + запустить (одной командой):
+cmake --build --preset win-debug --target sfml1_engine_tests sfml1_skyguard_tests && ctest --preset win-debug
+
+# Только запустить (если бинарники уже актуальны):
+ctest --preset win-debug
+
+# Итеративная отладка — пересобрать и повторить только упавшие:
+cmake --build --preset win-debug --target sfml1_engine_tests sfml1_skyguard_tests && ctest --preset win-debug --rerun-failed --output-on-failure
+
+# Запустить с подробным выводом (видно каждый TEST()):
+ctest --preset win-debug --verbose
+
+# Запустить только engine-тесты:
+ctest --preset win-debug --tests-regex sfml1_engine_tests
+
+# Запустить только skyguard-тесты:
+ctest --preset win-debug --tests-regex sfml1_skyguard_tests
+
+# Список всех зарегистрированных тестов (без запуска):
+ctest --preset win-debug --show-only
+
+# Повторить только упавшие (после первого запуска):
+ctest --preset win-debug --rerun-failed --output-on-failure

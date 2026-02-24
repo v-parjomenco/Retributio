@@ -41,11 +41,14 @@
 
 #include "core/resources/keys/stable_key.h"
 #include "core/resources/registry/resource_registry.h"
-#include "tests/engine/include/stable_key_seam.h"
+#include "stable_key_seam.h"
+#include "test_panic.h"
 
 namespace {
 
     namespace fs = std::filesystem;
+
+    using test_support::expectPanic;
 
     // ============================================================================================
     // TempDir
@@ -151,25 +154,6 @@ namespace {
         src.loadOrder     = loadOrder;
         src.sourceName    = std::string(sourceName);
         return src;
-    }
-
-    // ============================================================================================
-    // Хелпер проверки паники
-    //
-    // Шаблонный — без std::function, без type-erasure, без heap-аллокации.
-    // Возвращает what() пойманного std::runtime_error для проверки маркеров [RR-*].
-    // ============================================================================================
-
-    template <class F>
-    [[nodiscard]] std::string expectPanic(F&& fn) {
-        try {
-            std::forward<F>(fn)();
-        } catch (const std::runtime_error& e) {
-            return e.what();
-        }
-        ADD_FAILURE()
-            << "Ожидалась паника (std::runtime_error) — но ничего не было брошено.";
-        return {};
     }
 
     // ============================================================================================
@@ -658,10 +642,10 @@ TEST(ResourceRegistryTest, DuplicateCanonicalKeyAcrossBlocks_InSingleSource_IsPa
 // ================================================================================================
 TEST(ResourceRegistryTest, StableKey_Collision_IsPanic) {
     // Каждый ключ хэшируется в одно и то же значение → гарантированная коллизия.
-	constexpr auto kConstantHash = std::uint64_t{0xDEADBEEFCAFEBABEull};
+    constexpr auto kConstantHash = std::uint64_t{0xDEADBEEFCAFEBABEull};
 
-	const core::resources::detail::ScopedHashOverride guard{
-		[](std::string_view) noexcept -> std::uint64_t { return kConstantHash; }};
+    const core::resources::detail::ScopedHashOverride guard{
+        [](std::string_view) noexcept -> std::uint64_t { return kConstantHash; }};
 
     TempDir dir;
 
