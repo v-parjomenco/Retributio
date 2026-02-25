@@ -29,6 +29,16 @@ if(MSVC)
 endif()
 
 # ------------------------------------------------------------------------------------------------
+# Imported targets config mapping
+#
+# We have a custom "Profile" config. Force imported packages to resolve PROFILE -> RELEASE.
+# Must be set before any find_package()/add_subdirectory() that pulls imported targets.
+# Single source of truth: root scope only.
+# ------------------------------------------------------------------------------------------------
+set(CMAKE_MAP_IMPORTED_CONFIG_PROFILE "Release" CACHE STRING
+    "Map imported targets for Profile config to Release" FORCE)
+
+# ------------------------------------------------------------------------------------------------
 # Game + engine targets
 # ------------------------------------------------------------------------------------------------
 add_subdirectory(SFML1)

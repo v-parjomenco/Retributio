@@ -20,9 +20,7 @@
                 "VCPKG_TARGET_TRIPLET": "x64-windows-static-md",
                 "VCPKG_INSTALLED_DIR": "${sourceDir}/out/vcpkg_installed/${presetName}",
                 "CMAKE_CONFIGURATION_TYPES": "Debug;Profile;Release",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-
-                "CMAKE_MAP_IMPORTED_CONFIG_PROFILE": "Release;RelWithDebInfo;MinSizeRel"
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
             }
         },
         {

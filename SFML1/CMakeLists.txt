@@ -134,11 +134,6 @@ endif()
 # ------------------------------------------------------------------------------------------------
 # Dependencies
 # ------------------------------------------------------------------------------------------------
-# CMAKE_MAP_IMPORTED_CONFIG_<CONFIG> must be a regular (non-cache) variable set BEFORE
-# find_package so CMake initialises the per-target property at imported-target creation time.
-# Profile is unknown to SFML/Vorbis/FLAC modules which ship only DEBUG/RELEASE variants.
-set(CMAKE_MAP_IMPORTED_CONFIG_PROFILE "Release")
-
 message(STATUS "SFML1: CMAKE_MAP_IMPORTED_CONFIG_PROFILE = ${CMAKE_MAP_IMPORTED_CONFIG_PROFILE}")
 
 if(SFML1_ENABLE_AUDIO)
