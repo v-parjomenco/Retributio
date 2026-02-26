@@ -730,6 +730,28 @@ target_link_libraries(sfml1_game          PRIVATE SFML::Main)
 target_link_libraries(sfml1_render_stress PRIVATE SFML::Main)
 
 # ================================================================================================
+# Shell32 — Windows shell API (SHGetFolderPathW / CSIDL_LOCAL_APPDATA)
+#
+# Required by: sfml1_skyguard/platform/user_paths.cpp
+# Purpose:     resolves %LOCALAPPDATA% for per-user config/settings paths.
+#
+# Why linked here (EXE targets) and NOT in sfml1_skyguard:
+#   CMake does not propagate PRIVATE deps of STATIC libs to EXE consumers.
+#   Shell32 is an implementation detail of user_paths.cpp — it must NOT appear
+#   in sfml1_skyguard's INTERFACE_LINK_LIBRARIES (that would be a PUBLIC lie).
+#   The linker resolves SHGetFolderPathW at final EXE link time, so each EXE
+#   must name Shell32 explicitly — same pattern as sfml1_stress_common.
+#
+# sfml1_spatial_harness: linked for consistency — it also links sfml1_skyguard
+#   transitively and could call getUserConfigDir() in future stress scenarios.
+# ================================================================================================
+if(WIN32)
+    target_link_libraries(sfml1_game            PRIVATE Shell32)
+    target_link_libraries(sfml1_render_stress   PRIVATE Shell32)
+    target_link_libraries(sfml1_spatial_harness PRIVATE Shell32)
+endif()
+
+# ================================================================================================
 # Assets sync — POST_BUILD copy for all EXE targets
 #
 # EXE output directories do not contain assets by default. fixWorkingDirectory()
