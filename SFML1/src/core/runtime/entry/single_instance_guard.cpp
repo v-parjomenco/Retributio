@@ -9,6 +9,7 @@
     // <windows.h> включён через single_instance_guard.h (который включает его явно).
     // Все Win32 API (CreateMutexW, CloseHandle и т.д.) доступны транзитивно.
 #else
+    #include <cerrno>
     #include <fcntl.h>
     #include <sys/file.h>
     #include <unistd.h>
@@ -80,10 +81,16 @@ namespace {
             // Эксклюзивный lock получен — мы единственный экземпляр.
             status_ = SingleInstanceStatus::Acquired;
         } else {
-            // EWOULDBLOCK: lock уже держит другой процесс.
-            // Закрываем fd_: он нам не нужен, мы не владеем lock-ом.
+            // errno читается немедленно: любой вызов между flock и errno
+            // перезапишет код ошибки потока.
+            const int flockErr = errno;
+            // Закрываем fd_: lock не получен, он нам не нужен.
             ::close(std::exchange(fd_, -1));
-            status_ = SingleInstanceStatus::AlreadyRunning;
+            // EWOULDBLOCK (= EAGAIN на части платформ): lock держит другой процесс.
+            // Всё остальное: деградация среды (ENOLCK, EIO, EROFS и т.д.) — OsError.
+            status_ = (flockErr == EWOULDBLOCK || flockErr == EAGAIN)
+                ? SingleInstanceStatus::AlreadyRunning
+                : SingleInstanceStatus::OsError;
         }
 #endif
     }
