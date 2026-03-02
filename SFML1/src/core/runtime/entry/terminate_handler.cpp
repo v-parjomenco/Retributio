@@ -1,3 +1,5 @@
+#include "pch.h"
+
 #include "core/runtime/entry/terminate_handler.h"
 
 #include <atomic>

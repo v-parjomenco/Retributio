@@ -1,3 +1,5 @@
+#include "pch.h"
+
 #include "core/runtime/entry/logging_lifetime.h"
 
 #include <cassert>

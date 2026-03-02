@@ -1,3 +1,5 @@
+#include "pch.h"
+
 #include "core/runtime/entry/single_instance_guard.h"
 
 #include <filesystem>

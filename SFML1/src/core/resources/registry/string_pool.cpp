@@ -1,7 +1,3 @@
-// ================================================================================================
-// File: core/resources/registry/string_pool.cpp
-// Purpose: Chunked string pool with load-time deduplication.
-// ================================================================================================
 #include "pch.h"
 
 #include "core/resources/registry/string_pool.h"
