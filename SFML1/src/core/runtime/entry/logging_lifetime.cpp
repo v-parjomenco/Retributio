@@ -3,8 +3,15 @@
 #include "core/runtime/entry/logging_lifetime.h"
 
 #include <cassert>
+#include <type_traits>
 
 #include "core/log/logging.h"
+
+static_assert(!std::is_copy_constructible_v<core::runtime::entry::LoggingLifetime>);
+static_assert(!std::is_copy_assignable_v<core::runtime::entry::LoggingLifetime>);
+static_assert(!std::is_move_constructible_v<core::runtime::entry::LoggingLifetime>);
+static_assert(!std::is_move_assignable_v<core::runtime::entry::LoggingLifetime>);
+static_assert(std::is_nothrow_destructible_v<core::runtime::entry::LoggingLifetime>);
 
 namespace core::runtime::entry {
 

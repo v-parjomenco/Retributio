@@ -47,7 +47,7 @@ namespace core::runtime::entry {
     public:
         /// Пытается захватить системную блокировку.
         /// Статус результата доступен через status().
-        SingleInstanceGuard();
+        SingleInstanceGuard() noexcept;
         ~SingleInstanceGuard() noexcept;
 
         // Move-only: передача владения OS-ресурсом без его освобождения и захвата повторно.

@@ -118,23 +118,6 @@ if(MSVC)
 endif()
 
 # -------------------------------------------------------------------------------------------------
-# MSVC debug information format (CMake 3.25+ / CMake 4.x)
-#
-# Setting CMAKE_MSVC_DEBUG_INFORMATION_FORMAT before any target is created causes CMake
-# to stop injecting /Zi into CMAKE_CXX_FLAGS_* and instead use the target property
-# mechanism, eliminating D9025 "overriding /Zi with /ZI" on every TU.
-#
-# Values: EditAndContinue -> /ZI   ProgramDatabase -> /Zi
-# -------------------------------------------------------------------------------------------------
-if(MSVC)
-    # Single string — NOT two separate set() arguments. Two args would produce a CMake
-    # list ("EditAndContinue;") because set() joins with ';'. CMake 4.2+ rejects trailing ';'.
-    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
-        "$<$<CONFIG:Debug>:EditAndContinue>$<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:ProgramDatabase>"
-    )
-endif()
-
-# -------------------------------------------------------------------------------------------------
 # Dependencies
 # -------------------------------------------------------------------------------------------------
 message(STATUS "SFML1: CMAKE_MAP_IMPORTED_CONFIG_PROFILE = ${CMAKE_MAP_IMPORTED_CONFIG_PROFILE}")
@@ -538,9 +521,8 @@ target_link_libraries(sfml1_runtime
 # user32 is also pulled transitively via SFML::Window/SFML::Graphics at EXE link time
 # and via sfml1_panic_sink_default — no duplication concern; same pattern as the latter.
 #
-# TODO(macOS): if _NSGetExecutablePath requires explicit framework linkage, add:
-#   target_link_libraries(sfml1_runtime_entry PRIVATE "-framework CoreFoundation")
-#   Validate on first macOS build before committing.
+# TODO(macOS): verify on first macOS CI build; if linker reports unresolved
+# symbol(s), fix according to the exact linker error.
 # -------------------------------------------------------------------------------------------------
 add_library(sfml1_runtime_entry STATIC)
 

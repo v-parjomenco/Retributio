@@ -2,7 +2,10 @@
 
 #include "core/runtime/entry/single_instance_guard.h"
 
-#include <filesystem>
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <utility>
 
 #ifdef _WIN32
@@ -30,11 +33,53 @@ namespace {
     // Имя lock-файла в системной temp-директории. Путь вычисляется в конструкторе.
     constexpr char kLockFileName[] = "skyguard.lock";
 
+    constexpr std::size_t kLockPathHardCap = 4096;
+
+    const char* pickTempDir() noexcept {
+        // std::filesystem::temp_directory_path может аллоцировать и бросать.
+        // Для entry-слоя это недопустимо: строим путь без аллокаций.
+        const char* dir = std::getenv("TMPDIR");
+        if (dir != nullptr && dir[0] != '\0') {
+            return dir;
+        }
+        dir = std::getenv("TMP");
+        if (dir != nullptr && dir[0] != '\0') {
+            return dir;
+        }
+        dir = std::getenv("TEMP");
+        if (dir != nullptr && dir[0] != '\0') {
+            return dir;
+        }
+        return "/tmp";
+    }
+
+    bool buildLockPath(char* out, std::size_t outSize) noexcept {
+        if (out == nullptr || outSize == 0u) {
+            return false;
+        }
+
+        const char* const dir = pickTempDir();
+        const std::size_t dirLen = std::strlen(dir);
+        if (dirLen == 0u) {
+            return false;
+        }
+
+        const bool hasSlash = (dir[dirLen - 1] == '/');
+        const int written = hasSlash
+            ? std::snprintf(out, outSize, "%s%s", dir, kLockFileName)
+            : std::snprintf(out, outSize, "%s/%s", dir, kLockFileName);
+
+        if (written <= 0) {
+            return false;
+        }
+        return static_cast<std::size_t>(written) < outSize;
+    }
+
 #endif
 
 } // namespace
 
-    SingleInstanceGuard::SingleInstanceGuard() {
+    SingleInstanceGuard::SingleInstanceGuard() noexcept {
 #ifdef _WIN32
         mutex_ = CreateMutexW(nullptr, TRUE, kMutexName);
 
@@ -59,18 +104,13 @@ namespace {
             status_ = SingleInstanceStatus::Acquired;
         }
 #else
-        // Вычисляем путь к lock-файлу локально — поле не нужно, в dtor используется fd_.
-        std::error_code ec;
-        const auto tempDir = std::filesystem::temp_directory_path(ec);
-        if (ec) {
-            // Не удалось получить temp-директорию — системная ошибка.
+        char lockPath[kLockPathHardCap]{};
+        if (!buildLockPath(lockPath, sizeof(lockPath))) {
             status_ = SingleInstanceStatus::OsError;
             return;
         }
 
-        const auto lockPath = (tempDir / kLockFileName).string();
-
-        fd_ = ::open(lockPath.c_str(), O_CREAT | O_RDWR, 0644);
+        fd_ = ::open(lockPath, O_CREAT | O_RDONLY, 0644);
         if (fd_ < 0) {
             // Не удалось открыть/создать lock-файл.
             status_ = SingleInstanceStatus::OsError;

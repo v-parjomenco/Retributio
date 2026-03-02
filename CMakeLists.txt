@@ -2,6 +2,21 @@ cmake_minimum_required(VERSION 4.2.3)
 project(sfml1_root LANGUAGES C CXX)
 
 # ------------------------------------------------------------------------------------------------
+# MSVC debug information format (project-wide — same reasoning as MSVC runtime above)
+#
+# Prevents CMake from injecting /Zi into CMAKE_CXX_FLAGS_DEBUG (causes D9025 with /ZI).
+# See SFML1/CMakeLists.txt for the full rationale. Must be set before any target creation.
+# ------------------------------------------------------------------------------------------------
+if(MSVC)
+    # Must be a single string (NOT a list joined with ';'). Use string(CONCAT) to keep
+    # the generator expression readable and within line-length limits.
+    string(CONCAT CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
+        "$<$<CONFIG:Debug>:EditAndContinue>"
+        "$<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:ProgramDatabase>"
+    )
+endif()
+
+# ------------------------------------------------------------------------------------------------
 # MSVC Runtime Library (project-wide — must be set before ANY target is created)
 #
 # Mirrors the setting in SFML1/CMakeLists.txt, but declared here in root scope so that
@@ -14,18 +29,6 @@ project(sfml1_root LANGUAGES C CXX)
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY
         "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-endif()
-
-# ------------------------------------------------------------------------------------------------
-# MSVC debug information format (project-wide — same reasoning as MSVC runtime above)
-#
-# Prevents CMake from injecting /Zi into CMAKE_CXX_FLAGS_DEBUG (causes D9025 with /ZI).
-# See SFML1/CMakeLists.txt for the full rationale. Must be set before any target creation.
-# ------------------------------------------------------------------------------------------------
-if(MSVC)
-    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
-        "$<$<CONFIG:Debug>:EditAndContinue>$<$<OR:$<CONFIG:Release>,$<CONFIG:Profile>>:ProgramDatabase>"
-    )
 endif()
 
 # ------------------------------------------------------------------------------------------------
