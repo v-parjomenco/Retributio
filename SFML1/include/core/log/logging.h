@@ -86,6 +86,16 @@ namespace core::log {
         return level >= g_minLevelAtomic.load(std::memory_order_relaxed);
     }
 
+    /// @brief Возвращает true, если логгер активен — инициализирован явно через init()
+    ///        или лениво при первом вызове log() / log_write().
+    ///        Возвращает false до любой инициализации, а также после shutdown() и panic().
+    ///
+    /// Безопасно вызывать в любой момент, включая terminate-handler до init().
+    /// Читает g_fastGateReady с acquire-барьером — нулевой overhead, нулевое новое состояние.
+    [[nodiscard]] inline bool isInitialized() noexcept {
+        return g_fastGateReady.load(std::memory_order_acquire);
+    }
+
     // --------------------------------------------------------------------------------------------
     // Жизненный цикл
     // --------------------------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-# ================================================================================================
+# =================================================================================================
 # File: SFML1/CMakeLists.txt
 #
 # Authoritative source for all build flags and project structure.
@@ -15,7 +15,7 @@
 #                 INVARIANT: must NOT define _DEBUG.
 #                 INVARIANT: full release-like optimization — /O2 /Ob2 /Ot /GL.
 #                 Only difference from Release: SFML1_PROFILE defined, dev overlay visible.
-#                 Compile-time enforcement in main_skyguard.cpp via #error.
+#                 Compile-time enforcement in build_info.h via #error.
 #   Release     - /O2 /GL + /LTCG, /MD, Windows subsystem
 #                 Defines: SFML_STATIC NDEBUG _UNICODE UNICODE
 #
@@ -38,6 +38,9 @@
 #                               All game targets link sfml1_runtime, not sfml1_core directly.
 #                               Tests link sfml1_core + sfml1_core_test_support instead and
 #                               provide StableKey seam TU explicitly.
+#   sfml1_runtime_entry       — STATIC; engine-layer entry policy (logging lifetime,
+#                               terminate handler, single-instance guard, working directory,
+#                               user dialogs, build info). Consumed PRIVATELY by EXE targets only.
 #   sfml1_skyguard            -> sfml1_runtime, sfml1_sfml_audio(SFML1_ENABLE_AUDIO),
 #                                SFML::Graphics, SFML::Window, SFML::Network
 #   sfml1_stress_common       -> sfml1_runtime  (no sfml1_skyguard dep — avoids cycle)
@@ -45,9 +48,9 @@
 #   sfml1_spatial_harness_lib -> sfml1_runtime, sfml1_skyguard, sfml1_stress_common(PRIVATE)
 #   sfml1_render_stress_lib   -> sfml1_skyguard  (INTERFACE stub)
 #   sfml1_game                -> sfml1_skyguard, sfml1_skyguard_dev(Debug+Profile),
-#                                sfml1_stress_common(Debug+Profile)
-#   sfml1_spatial_harness     -> sfml1_spatial_harness_lib
-#   sfml1_render_stress       -> sfml1_render_stress_lib
+#                                sfml1_stress_common(Debug+Profile), sfml1_runtime_entry
+#   sfml1_spatial_harness     -> sfml1_spatial_harness_lib, sfml1_runtime_entry
+#   sfml1_render_stress       -> sfml1_render_stress_lib, sfml1_runtime_entry
 #
 # Dev overlay policy (sfml1_skyguard_dev):
 #   Active in Debug (no optimization) and Profile (full /O2 optimization).
@@ -65,14 +68,14 @@
 #   Why sfml1_game links sfml1_stress_common explicitly:
 #     STATIC lib PRIVATE deps are NOT propagated to EXE consumers by CMake design.
 #     sfml1_game (EXE) must name every lib it needs at link time.
-# ================================================================================================
+# =================================================================================================
 
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Language standards
 # C17  — required for third_party/xxhash/upstream/xxhash.c
 # C++20 — required for all engine and game code
 # Extensions disabled: strict conformance, no MSVC/GCC non-standard extensions.
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 set(CMAKE_CXX_STANDARD          20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS        OFF)
@@ -82,7 +85,7 @@ set(CMAKE_C_EXTENSIONS          OFF)
 
 option(SFML1_ENABLE_AUDIO "Enable SFML audio module" ON)
 
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # MSVC Runtime Library
 # Debug   : /MDd  (MultiThreadedDebugDLL)
 # Release / Profile  : /MD   (MultiThreadedDLL)
@@ -91,18 +94,18 @@ option(SFML1_ENABLE_AUDIO "Enable SFML audio module" ON)
 # CRT is dynamic (/MD, not /MT): fully static CRT causes multiple heap instances
 # when the process loads any DLL, leading to heap corruption on cross-module alloc/free.
 # Source of truth: vcxproj <RuntimeLibrary> per config.
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY
         "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 endif()
 
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Profile configuration: CMake has no built-in knowledge of this custom config name.
 # All CMAKE-injected default flag variables must be cleared; flags are controlled
 # exclusively via sfml1_build_options INTERFACE target below.
 # Without this reset CMake silently duplicates Release defaults into Profile.
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 if(MSVC)
     foreach(_v IN ITEMS
             CMAKE_C_FLAGS_PROFILE
@@ -114,7 +117,7 @@ if(MSVC)
     endforeach()
 endif()
 
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # MSVC debug information format (CMake 3.25+ / CMake 4.x)
 #
 # Setting CMAKE_MSVC_DEBUG_INFORMATION_FORMAT before any target is created causes CMake
@@ -122,7 +125,7 @@ endif()
 # mechanism, eliminating D9025 "overriding /Zi with /ZI" on every TU.
 #
 # Values: EditAndContinue -> /ZI   ProgramDatabase -> /Zi
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 if(MSVC)
     # Single string — NOT two separate set() arguments. Two args would produce a CMake
     # list ("EditAndContinue;") because set() joins with ';'. CMake 4.2+ rejects trailing ';'.
@@ -131,9 +134,9 @@ if(MSVC)
     )
 endif()
 
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Dependencies
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 message(STATUS "SFML1: CMAKE_MAP_IMPORTED_CONFIG_PROFILE = ${CMAKE_MAP_IMPORTED_CONFIG_PROFILE}")
 
 if(SFML1_ENABLE_AUDIO)
@@ -144,7 +147,7 @@ else()
         Network Graphics Window System Main)
 endif()
 
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Config-less imported targets fix (Vorbis, FLAC)
 #
 # vcpkg's FindVorbis/FindFLAC create targets with IMPORTED_LOCATION (no config suffix)
@@ -152,7 +155,7 @@ endif()
 # per-config locations for every config in CMAKE_CONFIGURATION_TYPES and rejects
 # config-less targets for Profile. MAP_IMPORTED_CONFIG_PROFILE handles link time but
 # NOT generator validation. Fix: promote each target to config-aware mode explicitly.
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 foreach(_t IN ITEMS Ogg::ogg Vorbis::vorbis Vorbis::vorbisfile Vorbis::vorbisenc FLAC::FLAC)
     if(NOT TARGET ${_t})
         continue()
@@ -188,23 +191,23 @@ unset(_t)
 unset(_loc_debug)
 unset(_loc_release)
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # sfml1_build_options  (INTERFACE library — compile flags for ALL project targets)
 # sfml1::build_options (ALIAS         — use this name in target_link_libraries)
 #
 # Single authoritative source of compiler flags.
 # Every flag maps 1:1 to a vcxproj setting. No flag is added without a vcxproj counterpart.
 # All per-config variation is handled here via generator expressions.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 add_library(sfml1_build_options INTERFACE)
 add_library(sfml1::build_options ALIAS sfml1_build_options)
 
 target_compile_features(sfml1_build_options INTERFACE cxx_std_20)
 
-# ----------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Preprocessor definitions
 # Mirrors vcxproj <PreprocessorDefinitions> per config exactly.
-# ----------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 target_compile_definitions(sfml1_build_options INTERFACE
 
     # All configurations
@@ -224,10 +227,10 @@ target_compile_definitions(sfml1_build_options INTERFACE
 )
 
 if(MSVC)
-    # ----------------------------------------------------------------
+    # ---------------------------------------------------------------------------------------------
     # Universal compiler flags — ALL configurations, ALL languages
     # Each flag maps to an explicit vcxproj ClCompile setting.
-    # ----------------------------------------------------------------
+    # ---------------------------------------------------------------------------------------------
     target_compile_options(sfml1_build_options INTERFACE
         /utf-8               # Source and execution charset: UTF-8
         /permissive-         # Strict conformance
@@ -290,10 +293,10 @@ set_target_properties(sfml1_build_options PROPERTIES
     COMPILE_WARNING_AS_ERROR ON
 )
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # Per-source overrides
 # Declared before targets so properties are visible at target configuration time.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 set(_pch_cpp  "${CMAKE_CURRENT_SOURCE_DIR}/src/pch.cpp")
 set(_xxhash_c "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/xxhash/upstream/xxhash.c")
 
@@ -317,7 +320,7 @@ if(MSVC)
     )
 endif()
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # sfml1_core  —  Engine-layer static library (ECS, spatial, resources, logging, UI utils)
 #
 # core::log::detail::panic_sink is declared in logging.h but NOT defined in this target.
@@ -329,7 +332,7 @@ endif()
 # core::resources::detail::hashCanonicalKey is declared in stable_key.h but NOT defined here.
 # The production definition is provided by sfml1_stable_key_xxhash (linked by sfml1_runtime).
 # Tests provide their own seam TU and must NOT link sfml1_stable_key_xxhash.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 add_library(sfml1_core STATIC)
 
 target_link_libraries(sfml1_core
@@ -388,7 +391,7 @@ target_precompile_headers(sfml1_core PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
 )
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # sfml1_stable_key_xxhash — production link-time seam for StableKey64
 #
 # Defines core::resources::detail::hashCanonicalKey via xxHash3_64.
@@ -398,7 +401,7 @@ target_precompile_headers(sfml1_core PRIVATE
 # IMPORTANT:
 #  - Production targets must obtain this seam via sfml1_runtime.
 #  - Test targets must provide their own seam TU and must NOT link this target.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 add_library(sfml1_stable_key_xxhash STATIC)
 
 target_link_libraries(sfml1_stable_key_xxhash
@@ -416,7 +419,7 @@ target_precompile_headers(sfml1_stable_key_xxhash PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
 )
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # sfml1_sfml_audio  —  SFML audio backend for core::resources::ISoundResource
 #
 # Self-sufficient static library: links SFML::Audio PUBLIC so consumers get it
@@ -432,7 +435,7 @@ target_precompile_headers(sfml1_stable_key_xxhash PRIVATE
 # sfml1_core linkage is PRIVATE: this target's .cpp files need core headers for compilation,
 # but every consumer already obtains sfml1_core through sfml1_runtime. If a future consumer
 # links sfml1_sfml_audio without sfml1_runtime, promote sfml1_core to PUBLIC here.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 if(SFML1_ENABLE_AUDIO)
     add_library(sfml1_sfml_audio STATIC)
 
@@ -461,14 +464,14 @@ if(SFML1_ENABLE_AUDIO)
     )
 endif()
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # sfml1_panic_sink_default — production panic policy (MessageBox + std::exit)
 #
 # Provides the definition of core::log::detail::panic_sink required by sfml1_core.
 # Linked PRIVATE to sfml1_core to access logging internals and utf8ToWide without
 # leaking those as additional PUBLIC dependencies of this target.
 # Win32: explicit user32 dependency for MessageBoxW.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 add_library(sfml1_panic_sink_default STATIC)
 
 target_link_libraries(sfml1_panic_sink_default
@@ -495,7 +498,7 @@ target_precompile_headers(sfml1_panic_sink_default PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
 )
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # sfml1_runtime — production runtime: engine + panic policy + StableKey seam (no audio)
 #
 # INTERFACE composition point for all game targets. Links sfml1_core,
@@ -507,7 +510,7 @@ target_precompile_headers(sfml1_panic_sink_default PRIVATE
 #
 # Test targets link sfml1_core + sfml1_core_test_support directly,
 # bypassing sfml1_panic_sink_default entirely and providing StableKey seam TU.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 add_library(sfml1_runtime INTERFACE)
 
 target_link_libraries(sfml1_runtime
@@ -517,9 +520,56 @@ target_link_libraries(sfml1_runtime
         sfml1_stable_key_xxhash
 )
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
+# sfml1_runtime_entry — Engine-layer entry policy
+#
+# Owns: LoggingLifetime RAII, terminate handler, single-instance guard,
+#       working directory setup, user dialogs, build info.
+#
+# Consumed PRIVATELY by EXE entry targets only (sfml1_game, sfml1_spatial_harness,
+# sfml1_render_stress). Must NOT be linked by any library target — it is not part of
+# the engine API surface; it is the bootstrap scaffolding that wraps it.
+#
+# sfml1_core PRIVATE: entry modules use core::log API, utf8_to_wide, debug_config.
+# EXE targets already obtain sfml1_core transitively via sfml1_runtime / sfml1_skyguard —
+# no duplication in the final link graph; the linker deduplicates.
+#
+# user32 PRIVATE (Win32): MessageBoxW (user_dialog), OutputDebugStringW (terminate_handler).
+# user32 is also pulled transitively via SFML::Window/SFML::Graphics at EXE link time
+# and via sfml1_panic_sink_default — no duplication concern; same pattern as the latter.
+#
+# TODO(macOS): if _NSGetExecutablePath requires explicit framework linkage, add:
+#   target_link_libraries(sfml1_runtime_entry PRIVATE "-framework CoreFoundation")
+#   Validate on first macOS build before committing.
+# -------------------------------------------------------------------------------------------------
+add_library(sfml1_runtime_entry STATIC)
+
+target_link_libraries(sfml1_runtime_entry
+    PUBLIC
+        sfml1::build_options
+    PRIVATE
+        sfml1_core
+)
+
+if(WIN32)
+    target_link_libraries(sfml1_runtime_entry PRIVATE user32)
+endif()
+
+target_sources(sfml1_runtime_entry PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/runtime/entry/logging_lifetime.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/runtime/entry/terminate_handler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/runtime/entry/single_instance_guard.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/runtime/entry/working_directory.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/runtime/entry/user_dialog.cpp
+)
+
+target_precompile_headers(sfml1_runtime_entry PRIVATE
+    "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
+)
+
+# -------------------------------------------------------------------------------------------------
 # sfml1_skyguard  —  SkyGuard game runtime (pure game layer, no dev tooling)
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 add_library(sfml1_skyguard STATIC)
 
 target_link_libraries(sfml1_skyguard
@@ -564,7 +614,7 @@ target_precompile_headers(sfml1_skyguard PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
 )
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # sfml1_stress_common  —  Shared stress test infrastructure
 #
 # Owns stress_runtime_stamp.cpp and stress_chunk_content_provider.cpp.
@@ -573,7 +623,7 @@ target_precompile_headers(sfml1_skyguard PRIVATE
 # (both consumers already depend on sfml1_skyguard).
 # Physical files are located in src/game/skyguard/dev/; CMake target membership
 # defines ownership independently of filesystem location.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 add_library(sfml1_stress_common STATIC)
 
 target_link_libraries(sfml1_stress_common
@@ -591,7 +641,7 @@ target_precompile_headers(sfml1_stress_common PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
 )
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # sfml1_skyguard_dev  —  Developer overlay (active in Debug AND Profile)
 #
 # Provides runtime statistics, spatial metrics, and debug overlays.
@@ -602,7 +652,7 @@ target_precompile_headers(sfml1_stress_common PRIVATE
 # sfml1_stress_common is a PRIVATE dependency: its types are implementation details
 # of overlay_extras.cpp and do not appear in this target's public interface.
 # sfml1_game must therefore name sfml1_stress_common explicitly at its own link step.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 add_library(sfml1_skyguard_dev STATIC)
 
 target_link_libraries(sfml1_skyguard_dev
@@ -621,7 +671,7 @@ target_precompile_headers(sfml1_skyguard_dev PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
 )
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # sfml1_spatial_harness_lib  —  Spatial index correctness + timing harness
 #
 # Debug:   V1 vs V2 result matching, determinism checks.
@@ -629,7 +679,7 @@ target_precompile_headers(sfml1_skyguard_dev PRIVATE
 # Requires sfml1_skyguard for FrameOrchestrator.
 # sfml1_stress_common is a PRIVATE dependency: implementation detail of
 # spatial_index_harness.cpp; does not appear in this target's public interface.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 add_library(sfml1_spatial_harness_lib STATIC)
 
 target_link_libraries(sfml1_spatial_harness_lib
@@ -649,9 +699,9 @@ target_precompile_headers(sfml1_spatial_harness_lib PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
 )
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # sfml1_render_stress_lib  —  Render stress test (INTERFACE stub; no sources yet)
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 add_library(sfml1_render_stress_lib INTERFACE)
 
 target_link_libraries(sfml1_render_stress_lib
@@ -660,13 +710,38 @@ target_link_libraries(sfml1_render_stress_lib
         sfml1_skyguard
 )
 
-# ================================================================================================
-# Executables
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
+# GIT_COMMIT_HASH — short commit hash for build traceability
+#
+# Applied to EXE entry targets only (entry-layer concern, not a library ABI detail).
+# Source-level fallback "#ifndef GIT_COMMIT_HASH / #define GIT_COMMIT_HASH <unknown>"
+# in include/core/runtime/entry/build_info.h covers builds without Git.
+# -------------------------------------------------------------------------------------------------
+find_package(Git QUIET)
+if(Git_FOUND)
+    execute_process(
+        COMMAND             ${GIT_EXECUTABLE} rev-parse --short HEAD
+        WORKING_DIRECTORY   ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE     _SFML1_GIT_HASH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE     _SFML1_GIT_RESULT
+    )
+    if(NOT _SFML1_GIT_RESULT EQUAL 0)
+        set(_SFML1_GIT_HASH "")
+    endif()
+    unset(_SFML1_GIT_RESULT)
+else()
+    set(_SFML1_GIT_HASH "")
+endif()
 
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+# Executables
+# -------------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------------
 # sfml1_game  —  SkyGuard game entry point
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 add_executable(sfml1_game
     ${CMAKE_CURRENT_SOURCE_DIR}/src/game/skyguard/entry/main_skyguard.cpp
 )
@@ -681,30 +756,32 @@ target_link_libraries(sfml1_game PRIVATE
     # sfml1_stress_common is a PRIVATE dep of sfml1_skyguard_dev; STATIC lib PRIVATE deps
     # are not propagated to EXE consumers — the EXE must name them at its own link step.
     $<$<OR:$<CONFIG:Debug>,$<CONFIG:Profile>>:sfml1_stress_common>
+    sfml1_runtime_entry
 )
 
 target_precompile_headers(sfml1_game PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
 )
 
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # sfml1_spatial_harness  —  Spatial index benchmark / correctness harness (console tool)
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 add_executable(sfml1_spatial_harness
     ${CMAKE_CURRENT_SOURCE_DIR}/src/game/skyguard/entry/main_spatial_harness.cpp
 )
 
 target_link_libraries(sfml1_spatial_harness PRIVATE
     sfml1_spatial_harness_lib
+    sfml1_runtime_entry
 )
 
 target_precompile_headers(sfml1_spatial_harness PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
 )
 
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # sfml1_render_stress  —  Render stress test (entry point stub; no real code yet)
-# ------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 add_executable(sfml1_render_stress
     ${CMAKE_CURRENT_SOURCE_DIR}/src/game/skyguard/entry/main_render_stress.cpp
 )
@@ -713,23 +790,24 @@ set_target_properties(sfml1_render_stress PROPERTIES WIN32_EXECUTABLE TRUE)
 target_link_libraries(sfml1_render_stress PRIVATE
     sfml1_render_stress_lib
     $<$<OR:$<CONFIG:Debug>,$<CONFIG:Profile>>:sfml1_skyguard_dev>
+    sfml1_runtime_entry
 )
 
 target_precompile_headers(sfml1_render_stress PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h>"
 )
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # SFML::Main — Windows entry point wrapper
 #
 # Required for /SUBSYSTEM:WINDOWS (Release + Profile): OS calls WinMain, not main().
 # Linked in all configs to match vcxproj (sfml-main[-d].lib in all configurations).
 # sfml1_spatial_harness excluded: pure console tool, no WinMain needed.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 target_link_libraries(sfml1_game          PRIVATE SFML::Main)
 target_link_libraries(sfml1_render_stress PRIVATE SFML::Main)
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # Shell32 — Windows shell API (SHGetFolderPathW / CSIDL_LOCAL_APPDATA)
 #
 # Required by: sfml1_skyguard/platform/user_paths.cpp
@@ -744,21 +822,34 @@ target_link_libraries(sfml1_render_stress PRIVATE SFML::Main)
 #
 # sfml1_spatial_harness: linked for consistency — it also links sfml1_skyguard
 #   transitively and could call getUserConfigDir() in future stress scenarios.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 if(WIN32)
     target_link_libraries(sfml1_game            PRIVATE Shell32)
     target_link_libraries(sfml1_render_stress   PRIVATE Shell32)
     target_link_libraries(sfml1_spatial_harness PRIVATE Shell32)
 endif()
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
+# GIT_COMMIT_HASH — apply to EXE targets and clean up
+# -------------------------------------------------------------------------------------------------
+if(_SFML1_GIT_HASH)
+    foreach(_exe IN ITEMS sfml1_game sfml1_spatial_harness sfml1_render_stress)
+        target_compile_definitions(${_exe} PRIVATE
+            "GIT_COMMIT_HASH=\"${_SFML1_GIT_HASH}\""
+        )
+    endforeach()
+    unset(_exe)
+endif()
+unset(_SFML1_GIT_HASH)
+
+# -------------------------------------------------------------------------------------------------
 # Assets sync — POST_BUILD copy for all EXE targets
 #
-# EXE output directories do not contain assets by default. fixWorkingDirectory()
+# EXE output directories do not contain assets by default. setWorkingDirectoryFromExecutable()
 # searches upward from the EXE for assets/ and fails when running from the output
 # directory directly. copy_directory_if_different is timestamp-based: only changed
 # files are copied, so incremental builds pay negligible cost.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets")
     message(WARNING
         "SFML1: assets directory not found: '${CMAKE_CURRENT_SOURCE_DIR}/assets'. "
@@ -779,10 +870,10 @@ else()
     unset(_exe)
 endif()
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # Linker options (MSVC only)
 # Source of truth: vcxproj <Link> section per config.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 if(MSVC)
 
     target_link_options(sfml1_game PRIVATE
@@ -808,7 +899,7 @@ if(MSVC)
 
 endif() # MSVC
 
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 # Stress preset custom targets
 #
 # One-click stress runs from MSVC Solution Explorer or CLI:
@@ -818,7 +909,7 @@ endif() # MSVC
 # Configuration is read from .env files (12-factor). cmake/run_with_env.cmake provides
 # a portable env-file runner without shell dependency. USES_TERMINAL routes output
 # directly to the MSVC Output window.
-# ================================================================================================
+# -------------------------------------------------------------------------------------------------
 set(_stress_presets_dir  "${CMAKE_SOURCE_DIR}/tools/presets")
 set(_run_with_env_script "${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_with_env.cmake")
 
