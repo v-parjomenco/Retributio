@@ -2,8 +2,8 @@
 // File: tests/engine/include/stable_key_seam.h
 // Purpose: Test-only API for injecting a hash override into the StableKey64 seam.
 //
-// Include ONLY from test TUs that are compiled into sfml1_engine_tests.
-// NEVER include from sfml1_core or any production target — this header has no meaning
+// Include ONLY from test TUs that are compiled into retributio_engine_tests.
+// NEVER include from retributio_core or any production target — this header has no meaning
 // outside the test seam link unit (stable_key_impl_seam.cpp).
 //
 // Usage pattern:

@@ -56,7 +56,7 @@ Replace compile-time enum IDs with runtime registry:
 
 ## 2. Changes to Requirements Guide
 
-The following sections of `SFML1_SkyGuard_Requirements_Guide.pdf` must be updated:
+The following sections of `retributio_atrapacielos_Requirements_Guide.pdf` must be updated:
 
 ### 2.1 Section 6.1 — Resource Layer Rules
 
@@ -247,8 +247,8 @@ public:
 ```
 core.texture.missing
 core.font.default
-skyguard.sprite.player
-skyguard.background.desert
+atrapacielos.sprite.player
+atrapacielos.background.desert
 mod.johndoe.elves.texture.archer
 mod.jane-doe.orcs.sound.battle_cry
 ```
@@ -325,7 +325,7 @@ template <typename Key, typename Config>
 struct ResourceEntry {
     Key key;                    // RuntimeKey32
     uint64_t stableKey;         // StableKey64 (xxHash3_64)
-    std::string_view name;      // interned "skyguard.sprite.player"
+    std::string_view name;      // interned "atrapacielos.sprite.player"
     std::string_view path;      // interned "assets/..."
     Config config;              // Type-specific config
 };
@@ -461,19 +461,19 @@ private:
   "version": 1,
   "textures": {
     "core.texture.missing": {
-      "path": "assets/core/images/missing.png",
+      "path": "assets/textures/placeholders/missing_texture.png",
       "smooth": false,
       "repeated": false,
       "mipmap": false
     },
-    "skyguard.sprite.player": {
-      "path": "assets/game/skyguard/images/0000su-57.png",
+    "atrapacielos.sprite.player": {
+      "path": "assets/textures/su57.png",
       "smooth": true,
       "repeated": false,
       "mipmap": false
     },
-    "skyguard.background.desert": {
-      "path": "assets/game/skyguard/images/backgrounds/desert.png",
+    "atrapacielos.background.desert": {
+      "path": "assets/textures/backgrounds/desert_tile.png",
       "smooth": true,
       "repeated": true,
       "mipmap": false
@@ -481,7 +481,7 @@ private:
   },
   "fonts": {
     "core.font.default": {
-      "path": "assets/core/fonts/Wolgadeutsche.otf"
+      "path": "assets/fonts/Wolgadeutsche.otf"
     }
   },
   "sounds": {}
@@ -504,7 +504,7 @@ private:
 {
   "version": 1,
   "textures": {
-    "skyguard.sprite.player": { "path": "...", ... }
+    "atrapacielos.sprite.player": { "path": "...", ... }
   }
 }
 ```
@@ -724,7 +724,7 @@ std::unordered_map<uint64_t, RuntimeKey32> runtimeKeyByStableKey;
 ### 10.1 New Files
 
 ```
-core/resources/
+engine/include/core/resources/
 ├── keys/
 │   ├── resource_key.h          // ResourceKey<Tag> template
 │   └── stable_key.h            // StableKey64 + xxHash3 wrapper
@@ -743,21 +743,21 @@ third_party/
 ### 10.2 Modified Files
 
 ```
-core/resources/
+engine/include/core/resources/
 ├── resource_manager.h          // RuntimeKey32 API
 ├── resource_manager.cpp
 └── holders/resource_holder.h   // Vector-based cache
 
-core/ecs/
+engine/include/core/ecs/
 ├── components/sprite_component.h    // TextureKey
 └── systems/
     ├── render_system.h              // TextureKey + epoch arrays
     └── render_system.cpp
 
-core/config/
+engine/include/core/config/
 └── properties/sprite_properties.h   // TextureKey
 
-game/skyguard/
+games/atrapacielos/include/
 ├── config/loader/config_loader.cpp  // string → TextureKey
 ├── game.cpp                         // Registry init
 ├── presentation/
@@ -767,22 +767,22 @@ game/skyguard/
     ├── stress_scene.h               // Remove dense enum hack
     └── stress_scene.cpp
 
-assets/config/
+games/atrapacielos/assets/config/
 └── resources.json                   // New namespaced format
 
 docs/
-└── SFML1_SkyGuard_Requirements_Guide.pdf  // Updated sections
+└── retributio_atrapacielos_Requirements_Guide.pdf  // Updated sections
 ```
 
 ### 10.3 Deleted Files and Folders
 
 ```
-core/resources/ids/resource_ids.h
-core/resources/ids/resource_id_utils.h
-core/resources/paths/resource_paths.h
-core/resources/paths/resource_paths.cpp
-core/resources/ids/        // legacy enum IDs + helpers
-core/resources/paths/      // legacy ResourcePaths registry
+engine/include/core/resources/ids/resource_ids.h
+engine/include/core/resources/ids/resource_id_utils.h
+engine/include/core/resources/paths/resource_paths.h
+engine/include/core/resources/paths/resource_paths.cpp
+engine/include/core/resources/ids/        // legacy enum IDs + helpers
+engine/include/core/resources/paths/      // legacy ResourcePaths registry
 ```
 
 ---
@@ -794,7 +794,7 @@ core/resources/paths/      // legacy ResourcePaths registry
 **Goal:** Lock contracts, update Requirements Guide.
 
 **Changes:**
-- Update `SFML1_SkyGuard_Requirements_Guide.pdf`:
+- Update `retributio_atrapacielos_Requirements_Guide.pdf`:
   - Section 6.1, 6.4, 14.2, A.1
   - Section 5.7 (SpriteComponent)
 - Create `docs/resource_registry_spec.md` (this document)
@@ -813,10 +813,10 @@ core/resources/paths/      // legacy ResourcePaths registry
 
 **New Files:**
 ```
-core/resources/keys/resource_key.h
-core/resources/keys/stable_key.h
-core/resources/registry/string_pool.h
-core/resources/registry/string_pool.cpp
+engine/include/core/resources/keys/resource_key.h
+engine/include/core/resources/keys/stable_key.h
+engine/include/core/resources/registry/string_pool.h
+engine/include/core/resources/registry/string_pool.cpp
 third_party/xxhash/xxhash.h
 ```
 
@@ -846,9 +846,9 @@ third_party/xxhash/xxhash.h
 
 **New Files:**
 ```
-core/resources/registry/resource_entry.h
-core/resources/registry/resource_registry.h
-core/resources/registry/resource_registry.cpp
+engine/include/core/resources/registry/resource_entry.h
+engine/include/core/resources/registry/resource_registry.h
+engine/src/core/resources/registry/resource_registry.cpp
 ```
 
 **Functionality:**
@@ -885,9 +885,9 @@ core/resources/registry/resource_registry.cpp
 
 **Changes:**
 ```
-core/resources/resource_manager.h
-core/resources/resource_manager.cpp
-core/resources/holders/resource_holder.h (if needed)
+engine/include/core/resources/resource_manager.h
+engine/src/core/resources/resource_manager.cpp
+engine/include/core/resources/holders/resource_holder.h (if needed)
 ```
 
 **Functionality:**
@@ -972,12 +972,12 @@ core/resources/holders/resource_holder.h (if needed)
 
 **Delete:**
 ```
-core/resources/ids/resource_ids.h
-core/resources/ids/resource_id_utils.h
-core/resources/paths/resource_paths.h
-core/resources/paths/resource_paths.cpp
-core/resources/ids/        // legacy enum IDs + helpers
-core/resources/paths/      // legacy ResourcePaths registry
+engine/include/core/resources/ids/resource_ids.h
+engine/include/core/resources/ids/resource_id_utils.h
+engine/include/core/resources/paths/resource_paths.h
+engine/src/core/resources/paths/resource_paths.cpp
+engine/include/core/resources/ids/
+engine/include/core/resources/paths/
 ```
 
 **Remove from code:**
@@ -986,7 +986,7 @@ core/resources/paths/      // legacy ResourcePaths registry
 - All includes of deleted headers
 
 **Acceptance Criteria:**
-- [ ] `grep -r "TextureID\|FontID\|SoundID" core/` = 0 results
+- [ ] `grep -r "TextureID\|FontID\|SoundID" engine/` = 0 results
 - [ ] `grep -r "resource_ids.h\|resource_paths.h" .` = 0 results
 - [ ] `grep -r "legacy resource ids/paths" .` = 0 results
 - [ ] Compiles without warnings
@@ -1028,9 +1028,9 @@ tools/resource_compiler/CMakeLists.txt
 
 **New Files:**
 ```
-core/resources/watcher/file_watcher.h
-core/resources/watcher/file_watcher_win32.cpp
-core/resources/watcher/file_watcher_linux.cpp
+engine/include/core/resources/watcher/file_watcher.h
+engine/src/core/resources/watcher/file_watcher_win32.cpp
+engine/src/core/resources/watcher/file_watcher_linux.cpp
 ```
 
 **Functionality:**
@@ -1045,24 +1045,28 @@ core/resources/watcher/file_watcher_linux.cpp
 
 **Time:** 2-3 days
 
-PR8 — Texture color space flag (sRGB)
+---
+
+### PR8 — Texture color space flag (sRGB)
 
 Причина: в RRv1 примере для текстур есть smooth/repeated/mipmap, но нет srgb; а в Texture Standard sRGB — non-negotiable.
 Суть:
 
 добавить bool srgb в TextureResourceConfig
 
-расширить resources.json ("srgb": true/false, default = true для color textures в SkyGuard)
+расширить resources.json ("srgb": true/false, default = true для color textures в Atrapacielos)
 
 загрузчик: sf::Texture::loadFromFile(path, {srgb}) (или эквивалентный вызов SFML 3)
 
-Почему это не конфликтует с RRv1: это просто расширение config’а; ключи/StableKey/RuntimeKey остаются прежними. RRv1 принцип “validate-on-write” сохраняется. 
+Почему это не конфликтует с RRv1: это просто расширение config'а; ключи/StableKey/RuntimeKey остаются прежними. RRv1 принцип "validate-on-write" сохраняется. 
 
 resource_registry_v1_spec v2
 
-PR9 — Arrays sharding + capability-driven fallback (engine backend)
+---
 
-Причина: убрать магические пороги вида “<2048 → fallback” и перейти на “need vs supported”.
+### PR9 — Arrays sharding + capability-driven fallback (engine backend)
+
+Причина: убрать магические пороги вида "<2048 → fallback" и перейти на "need vs supported".
 Суть:
 
 backend выбирается по capabilities
@@ -1071,9 +1075,9 @@ arrays шардируются по maxLayers
 
 multi-atlas остаётся гарантированным fallback (и forced-test)
 
-(Это согласуется с вашим RoadMap, где multi-atlas already primary, arrays optional; мы лишь делаем arrays “primary where applicable” без потери fallback.) 
+(Это согласуется с вашим RoadMap, где multi-atlas already primary, arrays optional; мы лишь делаем arrays "primary where applicable" без потери fallback.) 
 
-SFML1_SkyGuard_RoadMap_v2.3
+retributio_atrapacielos_RoadMap_v2.3
 
 ---
 
@@ -1081,9 +1085,9 @@ SFML1_SkyGuard_RoadMap_v2.3
 
 ### 12.1 Post-PR5 Validation
 
-- [ ] `grep -r "TextureID" core/` = 0 results
-- [ ] `grep -r "FontID" core/` = 0 results
-- [ ] `grep -r "SoundID" core/` = 0 results
+- [ ] `grep -r "TextureID" engine/` = 0 results
+- [ ] `grep -r "FontID" engine/` = 0 results
+- [ ] `grep -r "SoundID" engine/` = 0 results
 - [ ] `grep -r "resource_ids.h" .` = 0 results
 - [ ] `grep -r "resource_paths.h" .` = 0 results
 - [ ] `grep -r "fromString.*Texture" .` = 0 results
@@ -1120,7 +1124,7 @@ SFML1_SkyGuard_RoadMap_v2.3
 ### A.1 ResourceKey Template (v1.0.1 — zero sentinel)
 
 ```cpp
-// core/resources/keys/resource_key.h
+// engine/include/core/resources/keys/resource_key.h
 #pragma once
 
 #include <cstdint>
@@ -1201,7 +1205,7 @@ struct SoundKeyHash {
 ### A.2 StableKey Computation
 
 ```cpp
-// core/resources/keys/stable_key.h
+// engine/include/core/resources/keys/stable_key.h
 #pragma once
 
 #include <cstdint>
@@ -1225,7 +1229,7 @@ inline constexpr uint64_t StableKeySeed = 0;
 ### A.3 Key Validation
 
 ```cpp
-// In resource_registry.cpp
+// In engine/src/core/resources/registry/resource_registry.cpp
 
 namespace {
 

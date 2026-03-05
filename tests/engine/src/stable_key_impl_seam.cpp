@@ -12,7 +12,7 @@
 // но дополнительно экспонирует setHashOverride() для инжекции константного хэша.
 // Когда override не установлен — поведение идентично production (xxHash3_64).
 //
-// Линкуется ТОЛЬКО в sfml1_engine_tests. Совместная линковка со
+// Линкуется ТОЛЬКО в retributio_engine_tests. Совместная линковка со
 // stable_key_impl_xxhash.cpp приводит к ошибке multiple-definition.
 namespace core::resources::detail {
 

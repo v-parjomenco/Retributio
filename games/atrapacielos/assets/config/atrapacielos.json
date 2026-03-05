@@ -1,0 +1,16 @@
+{
+  "app": {
+    "id": "atrapacielos",
+    "display_name": "Atrapacielos"
+  },
+  "window": {
+    "mode": "borderless_fullscreen",
+    "width": 1920,
+    "height": 1080
+  },
+  "view": {
+    "world_logical_size": [ 1920, 1080 ],
+    "ui_logical_size": [ 1920, 1080 ],
+    "camera_offset": [ 0, -100 ]
+  }
+}

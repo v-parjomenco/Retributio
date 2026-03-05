@@ -1,0 +1,25 @@
+{
+  "texture": "atrapacielos.sprite.player",
+  "scale": {
+    "x": 0.12,
+    "y": 0.12
+  },
+
+  "speed": 400.0,
+  "acceleration": 800.0,
+  "friction": 100.0,
+  "turn_rate": 80.0,
+  "initial_rotation_degrees": 270.0,
+
+  "start_position": {
+    "x": 960,
+    "y": 1080
+  },
+
+  "controls": {
+    "thrust_forward": "W",
+    "thrust_backward": "S",
+    "turn_left": "A",
+    "turn_right": "D"
+  }
+}

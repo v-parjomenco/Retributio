@@ -5,17 +5,21 @@ cmake --preset win-msvc-ninja-mc
 rmdir /s /q out\build\win-msvc-ninja-mc   # cmd
 Remove-Item -Recurse -Force .\out\build\win-msvc-ninja-mc  # powershell
 
+# Аналогично для ci:
+rmdir /s /q out\build\win-msvc-ninja-mc-ci
+cmake --preset win-msvc-ninja-mc-ci
+
 # Когда удалять: configure упал → удалить обязательно.
 # Когда НЕ удалять: build упал / изменил .cpp/.h / изменил CMakeLists.txt.
 # Правило: поменял CMakeLists.txt → cmake --preset (без удаления). Поменял .cpp/.h → сразу build.
 
 # 2. Игра
-cmake --build --preset win-debug   --target sfml1_game   # Debug: /Od, overlay, консоль
-cmake --build --preset win-profile --target sfml1_game   # Profile: /O2, overlay, без консоли
-cmake --build --preset win-release --target sfml1_game   # Release: /O2, без overlay, shipping
+cmake --build --preset win-debug   --target retributio_atrapacielos_game   # Debug: /Od, overlay, консоль
+cmake --build --preset win-profile --target retributio_atrapacielos_game   # Profile: /O2, overlay, без консоли
+cmake --build --preset win-release --target retributio_atrapacielos_game   # Release: /O2, без overlay, shipping
 
 # 3. Spatial harness (standalone, без GUI)
-cmake --build --preset win-profile --target sfml1_spatial_harness  # просто собрать EXE
+cmake --build --preset win-profile --target retributio_spatial_harness  # просто собрать EXE
 
 # Запуск с пресетами (тест + метрики):
 cmake --build --preset win-profile --target stress_small  # smoke: 4×4 chunks, ~198 entities
@@ -27,26 +31,26 @@ cmake --build --preset win-debug     # все таргеты Debug
 cmake --build --preset win-release   # все таргеты Release
 
 # 5. Google Tests (ctest)
-# Сначала собрать тесты (Debug only — sfml1_engine_tests + sfml1_skyguard_tests):
-cmake --build --preset win-debug --target sfml1_engine_tests sfml1_skyguard_tests
+# Сначала собрать тесты (Debug only — retributio_engine_tests + retributio_atrapacielos_tests):
+cmake --build --preset win-debug --target retributio_engine_tests retributio_atrapacielos_tests
 
 # Собрать + запустить (одной командой):
-cmake --build --preset win-debug --target sfml1_engine_tests sfml1_skyguard_tests && ctest --preset win-debug
+cmake --build --preset win-debug --target retributio_engine_tests retributio_atrapacielos_tests && ctest --preset win-debug
 
 # Только запустить (если бинарники уже актуальны):
 ctest --preset win-debug
 
 # Итеративная отладка — пересобрать и повторить только упавшие:
-cmake --build --preset win-debug --target sfml1_engine_tests sfml1_skyguard_tests && ctest --preset win-debug --rerun-failed --output-on-failure
+cmake --build --preset win-debug --target retributio_engine_tests retributio_atrapacielos_tests && ctest --preset win-debug --rerun-failed --output-on-failure
 
 # Запустить с подробным выводом (видно каждый TEST()):
 ctest --preset win-debug --verbose
 
 # Запустить только engine-тесты:
-ctest --preset win-debug --tests-regex sfml1_engine_tests
+ctest --preset win-debug --tests-regex retributio_engine_tests
 
-# Запустить только skyguard-тесты:
-ctest --preset win-debug --tests-regex sfml1_skyguard_tests
+# Запустить только atrapacielos-тесты:
+ctest --preset win-debug --tests-regex retributio_atrapacielos_tests
 
 # Список всех зарегистрированных тестов (без запуска):
 ctest --preset win-debug --show-only

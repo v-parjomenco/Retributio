@@ -1,0 +1,71 @@
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++20
+
+# Отступы
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+# Длина строки
+ColumnLimit: 100
+
+# Скобки — { на той же строке
+BreakBeforeBraces: Attach
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: false
+
+# Пространства имён
+NamespaceIndentation: All
+FixNamespaceComments: true
+
+# Выравнивание по столбикам не включаем
+AlignConsecutiveDeclarations: None
+AlignConsecutiveAssignments: None
+AlignConsecutiveMacros: None
+
+# Пробелы
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceAfterCStyleCast: true
+
+# Указатели и ссылки прилеплены к типу
+DerivePointerAlignment: false
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# include-ы
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  # -1) PCH — всегда первым
+  - Regex: '^"pch.h"'
+    Priority: -10
+
+  # 0) Compiler infrastructure (warnings, platform и т.п.)
+  - Regex: '^"core/compiler/.*"'
+    Priority: -9
+
+  # 1) Стандартная библиотека
+  - Regex: '^<[^/]*>$'
+    Priority: 0
+
+  # 2) SFML-хедеры
+  - Regex: '^<SFML/.*>'
+    Priority: 1
+
+  # 3) Third-party (vendor)
+  - Regex: '^<(entt|nlohmann|xxhash)/.*>'
+    Priority: 2
+
+  # 4) Engine headers (adapters/, core/)
+  - Regex: '^"(adapters|core)/.*"'
+    Priority: 3
+
+  # 5) Всё остальное в кавычках (game headers, tools headers)
+  - Regex: '^".*"'
+    Priority: 4
+
+# Комментарии — не трогаем текст, чтобы не ломать смысл
+ReflowComments: false

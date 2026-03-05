@@ -2,14 +2,14 @@
 // File: tests/engine/src/resource_manager_test.cpp
 // Purpose: Google Tests for ResourceManager key-based API (init, lazy-load, resident-only, preload,
 //          metrics, cache generation, clearAll, IO-forbidden contract).
-// Used by: sfml1_engine_tests
+// Used by: retributio_engine_tests
 // Related headers: core/resources/resource_manager.h
 // Notes:
-//  - I/O is injected via ResourceManager::Loaders (no SFML1_TESTS hooks, no global mutable state).
+//  - I/O is injected via ResourceManager::Loaders (no RETRIBUTIO_TESTS hooks, no global mutable state).
 //  - Each test uses a unique temp directory instance (safe for parallel execution).
 //  - Placeholder files are non-empty to avoid coupling to "empty file" semantics.
 //  - Panic assertions use expectPanic<F>() exclusively. ASSERT_DEATH / EXPECT_DEATH are
-//    forbidden in this binary: sfml1_engine_tests links log_panic_sink_throw.cpp which
+//    forbidden in this binary: retributio_engine_tests links log_panic_sink_throw.cpp which
 //    replaces panic_sink with a throw — incompatible with GTest death-test subprocess model.
 // ================================================================================================
 #include "core/resources/resource_manager.h"
@@ -84,7 +84,7 @@ namespace {
     class TempDir final {
     public:
         explicit TempDir(std::string_view tag) {
-            const fs::path base = fs::temp_directory_path() / "sfml1_tests_resource_manager";
+            const fs::path base = fs::temp_directory_path() / "RETRIBUTIO_TESTS_resource_manager";
 
             std::error_code ec;
             fs::create_directories(base, ec);

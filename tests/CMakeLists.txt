@@ -1,14 +1,12 @@
-# ================================================================================================
+# =================================================================================================
 # File: tests/CMakeLists.txt
-#
-# Google Tests root. Aggregates all test sub-projects.
-#
-# Invariants (from Architecture ROADMAP):
+# Purpose: Google Tests root aggregator.
+# Invariants:
 #   - tests/ contains only Google Tests; never linked into release game binaries.
-#   - tests/engine/ tests sfml1_core only (no game/ includes, no sfml1_skyguard dep).
-#   - tests/skyguard/ tests game::skyguard layer.
+#   - tests/engine/ tests retributio_core only (no game deps).
+#   - tests/atrapacielos/ tests the atrapacielos game layer.
 #   - Run via: ctest --preset win-debug
-# ================================================================================================
+# =================================================================================================
 
 add_subdirectory(engine)
-add_subdirectory(skyguard)
+add_subdirectory(atrapacielos)

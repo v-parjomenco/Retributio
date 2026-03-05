@@ -3,11 +3,11 @@
 // Purpose: Test-only definition of core::log::detail::panic_sink.
 //          Throws std::runtime_error instead of exiting the process, allowing tests to
 //          assert on panic paths via expectPanicMessage() / EXPECT_THROW.
-// Used by: sfml1_engine_tests
+// Used by: retributio_engine_tests
 // Related headers: core/log/logging.h
 // Notes:
-//  - This file satisfies the linker requirement for panic_sink that sfml1_core declares
-//    but does not define. Must be linked ONLY into targets that do NOT link sfml1_runtime;
+//  - This file satisfies the linker requirement for panic_sink that retributio_core declares
+//    but does not define. Must be linked ONLY into targets that do NOT link retributio_runtime;
 //    linking both causes a multiple-definition error.
 // ================================================================================================
 #include "core/log/logging.h"

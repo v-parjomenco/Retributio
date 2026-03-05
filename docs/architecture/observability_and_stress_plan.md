@@ -1,6 +1,6 @@
 # Observability & Stress Testing Plan
 
-**Engine:** SkyGuard (tech demo / 4X Titan lab)
+**Engine:** Atrapacielos (tech demo / 4X Auctoritas lab)
 **Status:** Pre-CMake, VS .sln, solo/small-team
 **Principle:** YAGNI — build only what solves real problems today; scaffold for tomorrow only when the cost is zero.
 
@@ -11,7 +11,7 @@
 ### Что работает
 
 - **Debug overlay** — полный набор метрик: FPS, Counts, Render, Textures, Culling, RenderFilter, CPU timings (Profile), SpatialGrid, SpatialQuery, SpatialVisit, Storages, Background, View, CellsHealth, Player, PlayerVis.
-- **ActiveSet stress mode** — ENV-driven (`SFML1_PROFILE` build), 1M+ entities, deterministic spatial streaming.
+- **ActiveSet stress mode** — ENV-driven (`RETRIBUTIO_PROFILE` build), 1M+ entities, deterministic spatial streaming.
 - **Epoch-based texture cache** — per-frame O(1) lookups, generation-safe.
 - **CappedAppender** — bounded overlay buffers, visible truncation marker, zero realloc in steady-state.
 - **Validate-on-write / trust-on-read** — контракт соблюдён сквозь всю цепочку loader → props → system.
@@ -58,7 +58,7 @@
 **Когда:** Когда ActiveSet stress стабильно работает и метрики читаемы (после Фаз 0-1).
 **Цель:** Изолированно стрессовать render pipeline: видимые спрайты, batching, texture switches.
 
-**Почему раньше QueryStress:** SkyGuard — это 2D sprite renderer. Render pipeline — то, что реально существует и работает. QueryStress имитирует 4X-паттерны, которых ещё нет. YAGNI.
+**Почему раньше QueryStress:** Atrapacielos — это 2D sprite renderer. Render pipeline — то, что реально существует и работает. QueryStress имитирует 4X-паттерны, которых ещё нет. YAGNI.
 
 #### 2.1 RenderStress content provider
 
@@ -220,5 +220,5 @@ presets/
 2. **Measure before optimize:** Каждый режим сначала даёт baseline, потом оптимизируем.
 3. **Reproducibility:** Каждый прогон — пресет с фиксированным seed. Никаких "ручных ENV".
 4. **Observability first:** Метрики должны быть однозначно читаемы без исходников. Двусмысленность дороже бага.
-5. **Zero overhead in Release:** Все stress/debug метрики — `#if !defined(NDEBUG) || defined(SFML1_PROFILE)`. В Release — zeroed structs, no-op methods.
+5. **Zero overhead in Release:** Все stress/debug метрики — `#if !defined(NDEBUG) || defined(RETRIBUTIO_PROFILE)`. В Release — zeroed structs, no-op methods.
 6. **Validate-on-write, trust-on-read:** Конфиги валидируются на границе загрузки. Hot path не проверяет инварианты.

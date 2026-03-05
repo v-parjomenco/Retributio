@@ -16,7 +16,7 @@
 //   [RR-MISSING-FALLBACK-FONT]    No core.font.default in loaded set → LOG_PANIC.
 //
 // Panic interception:
-//   log_panic_sink_throw.cpp (linked into sfml1_engine_tests) overrides panic_sink to throw
+//   log_panic_sink_throw.cpp (linked into retributio_engine_tests) overrides panic_sink to throw
 //   std::runtime_error. expectPanic<F>(fn) catches it and returns the what() string.
 //   Tests assert on structured [RR-*] markers — not on human-readable message text.
 //
@@ -71,7 +71,7 @@ namespace {
             const auto id = s_counter.fetch_add(1u, std::memory_order_relaxed);
 
             const std::string name =
-                "sfml1_rr_" + std::to_string(tick ^ (id * 0x9e3779b97f4a7c15ull));
+                "retributio_rr_" + std::to_string(tick ^ (id * 0x9e3779b97f4a7c15ull));
 
             mPath = fs::temp_directory_path() / name;
 

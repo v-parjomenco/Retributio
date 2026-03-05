@@ -5,7 +5,7 @@
 - Spatial index + culling working efficiently
 - Zero-overhead EnTT integration
 
-**NOTE:** This document covers EnTT-specific optimizations. See `SFML1_SkyGuard_RoadMap_v2_2_FINAL.md` for master timeline.
+**NOTE:** This document covers EnTT-specific optimizations. See `retributio_atrapacielos_RoadMap_v2_2_FINAL.md` for master timeline.
 
 ---
 
@@ -191,10 +191,10 @@ Future optimizations should be driven by:
 2. **Actual production requirements** (not theoretical max)
 3. **YAGNI principle** (implement when needed, not before)
 
-**Current Priority:** Build SkyGuard (Phase 1-3), validate architecture with real gameplay, THEN optimize based on actual 4X workload (Phase 4+).
+**Current Priority:** Build Atrapacielos (Phase 1-3), validate architecture with real gameplay, THEN optimize based on actual 4X workload (Phase 4+).
 
 ---
 
 **END OF DOCUMENT**
 
-See `SFML1_SkyGuard_RoadMap_v2_2_FINAL.md` for complete master timeline.
+See `retributio_atrapacielos_RoadMap_v2_2_FINAL.md` for complete master timeline.

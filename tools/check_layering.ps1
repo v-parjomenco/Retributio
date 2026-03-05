@@ -1,74 +1,69 @@
-# ============================================================================
+# =================================================================================================
 # File: tools/check_layering.ps1
-# Purpose: Verify layering rules between core/ and game/ in SFML1 project
-# Rules:
-#   - core/* (и pch.h) не имеют права зависеть от game/* (ни прямых include, ни namespace)
-#   - game/* может зависеть от core/* (это нормально)
-# Usage:
-#   - Запускать из корня репозитория SFML1:
-#       .\tools\check_layering.ps1
-# ============================================================================
+# Purpose: Verify layering rule — engine must not depend on game layer.
+# Rule: engine/include/* and engine/src/* must not reference atrapacielos:: or
+#       include game headers. games/* may depend on engine (allowed).
+# Usage: Run from repo root: .\tools\check_layering.ps1
+# =================================================================================================
 
-param (
+param(
     [switch]$VerboseOutput
 )
 
 $ErrorActionPreference = "Stop"
 
-# Определяем корень репозитория как родитель папки tools/
 $repoRoot   = Split-Path -Parent $PSScriptRoot
-$projectRoot = Join-Path $repoRoot "SFML1"
+$engineRoot = Join-Path $repoRoot "engine"
 
-Write-Host "Repo root:     $repoRoot"
-Write-Host "Project root:  $projectRoot"
+Write-Host "Repo root:    $repoRoot"
+Write-Host "Engine root:  $engineRoot"
 Write-Host ""
 
-# Пути, которые считаются "core-слоем"
-$corePaths = @(
-    (Join-Path $projectRoot "include\core"),
-    (Join-Path $projectRoot "src\core"),
-    (Join-Path $projectRoot "include\pch.h")
+$enginePaths = @(
+    (Join-Path $engineRoot "include"),
+    (Join-Path $engineRoot "src")
 )
 
 if ($VerboseOutput) {
-    Write-Host "Core paths:"
-    $corePaths | ForEach-Object { Write-Host "  $_" }
+    Write-Host "Проверяемые пути:"
+    $enginePaths | ForEach-Object { Write-Host "  $_" }
     Write-Host ""
 }
 
-# Паттерны, которые запрещены в core-слое
+# Запрещены любые прямые зависимости от game-слоя в коде движка
 $patterns = @(
-    '#\s*include\s*["<]\s*game/',
-    '#\s*include\s*["<]\s*game\\',
-    'game::skyguard'
+    '#\s*include\s*["<]\s*atrapacielos/',
+    '#\s*include\s*["<]\s*atrapacielos\\',
+    'atrapacielos::'
 )
 
 $hasViolations = $false
 
 foreach ($pattern in $patterns) {
     if ($VerboseOutput) {
-        Write-Host "Checking pattern: $pattern"
+        Write-Host "Проверяем паттерн: $pattern"
     }
 
-    $matches = Get-ChildItem -Recurse -Path $corePaths -Include *.h,*.hpp,*.inl,*.cpp -ErrorAction SilentlyContinue |
+    $matches = Get-ChildItem -Recurse -Path $enginePaths `
+                   -Include *.h,*.hpp,*.inl,*.cpp -ErrorAction SilentlyContinue |
                Select-String -Pattern $pattern -ErrorAction SilentlyContinue
 
     if ($matches) {
         $hasViolations = $true
-        Write-Host ""
-        Write-Host "===============================================" -ForegroundColor Red
-        Write-Host " LAYERING VIOLATION: pattern '$pattern' found" -ForegroundColor Red
-        Write-Host "===============================================" -ForegroundColor Red
-
+        Write-Host "" 
+        Write-Host "================================================" -ForegroundColor Red
+        Write-Host " LAYERING VIOLATION: pattern '$pattern' found"   -ForegroundColor Red
+        Write-Host "================================================" -ForegroundColor Red
         $matches | ForEach-Object {
-            Write-Host ("{0}:{1}: {2}" -f $_.Path, $_.LineNumber, $_.Line.Trim()) -ForegroundColor Red
+            Write-Host ("{0}:{1}: {2}" -f $_.Path, $_.LineNumber, $_.Line.Trim()) `
+                -ForegroundColor Red
         }
     }
 }
 
 if (-not $hasViolations) {
     Write-Host ""
-    Write-Host "Layering check passed: core/* does not depend on game/*." -ForegroundColor Green
+    Write-Host "Layering check passed: engine/* does not depend on game/*." -ForegroundColor Green
     exit 0
 }
 

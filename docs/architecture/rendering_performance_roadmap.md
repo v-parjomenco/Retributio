@@ -1,10 +1,10 @@
-# ENGINEERING ROADMAP: "Titan" 4X Strategy Engine
+# ENGINEERING ROADMAP: "Auctoritas" 4X Strategy Engine
 
 **Target Scale:**        1,000,000+ Entities     | 100,000+ Unique Textures | Neural AI
 **Target Hardware:** Ryzen 9 7945HX (32 Threads) | 32GB RAM                 | Discrete GPU
 **Tech Stack:**          C++20                   | EnTT 3.16                | SFML 3.0.2 (OpenGL backend)
 
-**NOTE:** This document details rendering/performance strategies. See `SFML1_SkyGuard_RoadMap_v2_2_FINAL.md` for master timeline.
+**NOTE:** This document details rendering/performance strategies. See `retributio_atrapacielos_RoadMap_v2_2_FINAL.md` for master timeline.
 
 ---
 
@@ -150,12 +150,12 @@
 
 ## 6. Success Criteria (Updated)
 
-### Milestone: SkyGuard (Baseline)
+### Milestone: Atrapacielos (Baseline)
 - [x] 500k entities simulated (Background).
 - [x] 50k visible sprites @ 60 FPS (Single Threaded).
 - [x] **Architecture:** Systems strictly separated from Data (Pure ECS).
 
-### Milestone: 4X "Titan" Prototype (Month 24)
+### Milestone: 4X "Auctoritas" Prototype (Month 24)
 - [ ] **Rendering:** Multi-atlas system implemented. 100K *unique* textures rendering @ 144 FPS.
 - [ ] **Job System:** Simulation loop utilizing 30+ threads.
 - [ ] **AI:** Heuristic AI baseline running <5s per turn for 20 civs.
@@ -194,4 +194,4 @@
 
 **END OF ROADMAP**
 
-See `SFML1_SkyGuard_RoadMap_v2_2_FINAL.md` for complete master timeline and all phases.
+See `retributio_atrapacielos_RoadMap_v2_2_FINAL.md` for complete master timeline and all phases.

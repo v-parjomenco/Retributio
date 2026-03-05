@@ -38,7 +38,7 @@
 *.out
 *.app
 
-# debug information files
+# Debug information files
 *.dwo
 
 # Builds (только корневые и билд-папки, НЕ исходники)
@@ -47,11 +47,6 @@
 /Release/
 /DebugTests/
 /x64/
-/SFML1/Debug/
-/SFML1/Profile/
-/SFML1/Release/
-/SFML1/DebugTests/
-/SFML1/x64/
 /bin/
 /obj/
 **/build/Debug/
@@ -73,6 +68,7 @@
 .vs/
 *.vcxproj.user
 *.suo
+*.sln.docstates
 
 # Logs, temporary files
 logs/
@@ -83,7 +79,7 @@ build/**/logs/
 *.log
 *.tmp
 
-#CMake files
+# CMake files
 CMakeFiles/
 CMakeCache.txt
 
@@ -98,19 +94,13 @@ build/**
 
 # Windows thumbnails
 Thumbs.db
-
-*.sln.docstates
+desktop.ini
 
 # VS Code
 .vscode/
 
 # CLion / JetBrains
 .idea/
-
-# SFML cache/
-.sfml/
-
-desktop.ini
 
 # vcpkg (manifest mode local installs)
 vcpkg_installed/

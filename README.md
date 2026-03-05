@@ -1,49 +1,48 @@
-# **SkyGuard Engine**
+# Retributio Engine
 
-A high-performance, modular 2D game engine built with **C++20 + SFML 3.0.2**, designed to scale from indie prototypes to large-scale 4X strategy games with hundreds of thousands of entities.
-
----
-
-## 🎯 **Vision**
-
-**SkyGuard** is architected as a universal 2D engine targeting "indie-AAA" quality — comparable in ambition to UE5 or Paradox's Clausewitz engine, but optimized for 2D and small teams.
-
-### Development Phases
-1. **Phase 1 (Current):** Aerial combat prototype as engine testbed
-2. **Phase 2 (Year 1-2):** Multiple casual games validating engine flexibility
-3. **Phase 3 (Year 3-5):** Full-scale 4X grand strategy game (Civilization/Europa Universalis level)
+A high-performance, modular 2D game engine built with **C++20 + SFML 3.0.2**, designed to scale from casual games to large-scale 4X strategy with hundreds of thousands of entities.
 
 ---
 
-## 🚀 **Core Features**
+## Vision
 
-- **Strict Layered Architecture** — Reusable engine core (`core/`) cleanly separated from game-specific code (`game/skyguard/`)
+**Retributio Engine** targets "indie-AAA" quality — production-grade architecture optimized for 2D and small teams.
+
+### Games
+- **Atrapacielos** — aerial combat / casual game (current focus)
+- **Auctoritas** — 4X grand strategy (Civilization / Europa Universalis scale, planned)
+
+---
+
+## Core Features
+
+- **Strict Layered Architecture** — Reusable engine core (`engine/`) cleanly separated from game-specific code (`games/`)
 - **Data-Driven Design** — All gameplay, configs, and resources defined in JSON; zero hardcoded magic constants
 - **Entity–Component–System (ECS)** — Performance-focused ECS with EnTT backend, designed for 100K+ entities
 - **Key-Based Resource Management** — RuntimeKey32 handles, centralized registry, automatic caching and validation
 - **Resolution-Independent UI** — Anchor policies, scaling behaviors, and lock systems for adaptive layouts
 - **Deterministic Simulation** — Fixed timestep, stable iteration order, seeded RNG for replay and multiplayer support
-- **Production-Grade Tooling** — Structured logging, debug overlay, profiling hooks, and hot-reload infrastructure
+- **Production-Grade Tooling** — Structured logging, debug overlay, profiling hooks, spatial stress harness
 
 ---
 
-## 🏛️ **Design Principles**
+## Design Principles
 
 1. **Data-Driven First** — Behavior expressed through configs and blueprints, not inheritance hierarchies
 2. **ECS Over OOP** — Components are pure data, systems are pure logic, no virtual gameplay classes
-3. **Separation of Concerns** — Core stays game-agnostic and cross-platform; simulation ≠ rendering
+3. **Separation of Concerns** — Core stays game-agnostic; simulation ≠ rendering
 4. **Performance Over Beauty** — Target: 60 FPS with hundreds of thousands of active entities
 5. **Fail-Fast Validation** — Invalid configs, broken registries, and impossible invariants terminate immediately
-6. **Incremental Complexity** — Start simple, add features gradually as profiling reveals bottlenecks
+6. **Incremental Complexity** — Start simple, add features as profiling reveals bottlenecks
 
 ---
 
-## 🧱 **Architecture Overview**
+## Architecture Overview
 
 ### ECS Core (`core::ecs`)
 - **Entity** — Lightweight numeric ID
 - **Component** — Plain data structs (Transform, Velocity, Sprite, etc.)
-- **System** — Logic operating over entity views (Movement, Rendering, Input, Scaling, etc.)
+- **System** — Logic operating over entity views (Movement, Rendering, Input, etc.)
 - **World** — Thin façade over EnTT registry coordinating entities and systems
 
 ### Resource Layer (`core::resources`)
@@ -59,14 +58,15 @@ Vector caches (per-type, indexed by RuntimeKey32)
 SFML primitives
 ```
 
-**Key Principle:** Resources accessed via RuntimeKey32 handles (`TextureKey`, `FontKey`, `SoundKey`), never raw strings or SFML types in gameplay code.
+**Key Principle:** Resources accessed via RuntimeKey32 handles (`TextureKey`, `FontKey`, `SoundKey`),
+never raw strings or SFML types in gameplay code.
 
 ### Configuration Pipeline
 ```
 JSON files → FileLoader → JsonValidator → Typed Blueprints/Settings → Systems
 ```
 
-All configs validated on load; failures are logged and terminate early. Engine settings and game configs are separate (`assets/core/` vs `assets/game/skyguard/`).
+All configs validated on load; failures are logged and terminate early.
 
 ### Time & Main Loop
 - `TimeService` — Fixed timestep updates, frame timing, FPS metrics
@@ -75,132 +75,137 @@ All configs validated on load; failures are logged and terminate early. Engine s
 
 ---
 
-## 📁 **Project Structure**
+## Project Structure
 
 ```text
-SFML1/
-├─ assets/
-│  ├─ core/config/           # Engine configs (engine_settings.json, debug_overlay.json)
-│  ├─ core/fonts/            # Shared engine fonts
-│  └─ game/skyguard/
-│     ├─ config/             # Game configs (player.json, resources.json)
-│     ├─ images/             # Textures and sprites
-│     └─ sounds/             # Audio assets
-├─ include/
-│  ├─ core/                  # Engine headers (ECS, resources, time, UI, logging)
-│  ├─ game/skyguard/         # SkyGuard-specific headers
-   ├─ entt/			   		 # Fast and reliable ECS system
-│  ├─ nlohmann/			     # nlohmann-json (vendored)
-│  ├─ third_party/           # Thin wrappers over nlohmann-json and EnTT (json_silent, json_fwd)
-│  │  ├─ entt/				 # Wrappers over entt   
-│  │  ├─ json/				 # Wrappers over <nlohmann/json>
-│  │  └─ licenses/ 			 # Third party licenses
-│  └─ pch.h                  # Precompiled header (shared across core/game)
-├─ src/
-│  ├─ core/                  # Engine implementations
-│  └─ game/skyguard/         # Game implementations
-├─ docs/architecture/        # Architecture documentation
-├─ tools/                    # Static analysis and layering checks
-└─ main_skyguard.cpp         # Entry point
-
+Retributio/
+├── engine/
+│   ├── include/                 # Public engine headers (core/, adapters/, pch.h)
+│   ├── include_private/         # Backend-specific implementation headers
+│   ├── src/core/                # Engine implementations
+│   ├── assets/                  # Engine assets (config, fonts, placeholders)
+│   └── cmake/                   # CMake helpers (run_with_env.cmake)
+├── games/
+│   ├── atrapacielos/
+│   │   ├── include/             # Game headers
+│   │   ├── src/                 # Game implementations
+│   │   └── assets/              # Game assets (textures, sounds, configs)
+│   └── auctoritas/
+│       └── src/                 # Stub entry point
+├── tools/
+│   ├── src/                     # Spatial harness, render stress
+│   └── presets/atrapacielos/    # Stress preset .env files
+├── tests/
+│   ├── engine/                  # Google Tests for engine layer
+│   └── atrapacielos/            # Google Tests for game layer
+├── third_party/                 # xxhash, EnTT, nlohmann-json
+├── CMakeLists.txt               # Solution root
+└── CMakePresets.json
 ```
 
-**Full structure:** See [STRUCTURE.md](./STRUCTURE.md)
-
 ---
 
-## 🧩 **Build Instructions**
+## Build Instructions
 
 ### Prerequisites
-- **C++20-capable compiler** (MSVC 19.29+, Clang 13+, GCC 11+)
-- **SFML 3.0.2** ([Download](https://www.sfml-dev.org/download/sfml/3.0.2/))
-- **Visual Studio 2026+** (Windows primary target)
-- **nlohmann-json** (vendored, no install needed)
+- **Visual Studio 2022+** with C++ workload (MSVC 19.29+)
+- **CMake 3.25+**
+- **Ninja** (bundled with Visual Studio)
+- **vcpkg** — manages all dependencies (SFML, GTest)
 
-### Building with Visual Studio (Windows)
+### First-time setup
 
-1. **Install SFML 3.0.2**
-   ```bash
-   # Extract to: C:\dev\SFML-3.0.2-64
-   ```
+```powershell
+# Clone
+git clone https://github.com/v-parjomenco/Retributio.git
+cd Retributio
 
-2. **Clone the repository**
-   ```bash
-   git clone https://github.com/v-parjomenco/SFML1.git
-   cd SFML1
-   ```
+# Configure (vcpkg runs automatically via CMakePresets.json)
+cmake --preset win-msvc-ninja-mc
+```
 
-3. **Open solution**
-   - Open `SFML1.sln` in Visual Studio 2026+
-   - Configure SFML include/lib paths in project properties
-   - Select configuration: `Debug x64` or `Release x64`
+### Build
 
-4. **Build and run**
-   - Entry point: `main_skyguard.cpp`
-   - Assets are loaded from `SFML1/assets/`
-   - Logs written to `SFML1/logs/`
+```powershell
+# Debug — /Od, dev overlay, console subsystem
+cmake --build --preset win-debug --target retributio_atrapacielos_game
 
-### Cross-Platform Builds
-CMake support for Linux/macOS is planned for Phase 2.
+# Profile — /O2, dev overlay, no console
+cmake --build --preset win-profile --target retributio_atrapacielos_game
+
+# Release — /O2, no overlay, shipping
+cmake --build --preset win-release --target retributio_atrapacielos_game
+```
+
+### Tests
+
+```powershell
+# Build + run
+cmake --build --preset win-debug --target retributio_engine_tests retributio_atrapacielos_tests
+ctest --preset win-debug
+
+# Only failed
+ctest --preset win-debug --rerun-failed --output-on-failure
+```
+
+### Stress tools
+
+```powershell
+# Build spatial harness
+cmake --build --preset win-profile --target retributio_spatial_harness
+
+# Run with preset (smoke / soak)
+cmake --build --preset win-profile --target stress_small
+cmake --build --preset win-profile --target stress_large
+```
 
 ---
 
-## ⚙️ **Development Tools & Code Style**
+## Development Tools & Code Style
 
 ### Code Standards
-- **C++20 modern style** — No legacy OOP hierarchies, embrace ECS and data-driven patterns
+- **C++20** — No legacy OOP hierarchies; ECS and data-driven patterns throughout
 - **Indentation:** 4 spaces, no tabs
 - **Braces:** Same line (`if (...) {`)
-- **Naming:** `snake_case` files, `PascalCase` classes, `camelCase` members
-- **Include order:** Corresponding header → STL → SFML → Project headers (sorted alphabetically per block)
-- **Value initialization:** Always use `Type obj{};` for Config/Blueprint/Settings/Component types
+- **Naming:** `snake_case` files, `PascalCase` classes, `camelCase` members with `m` prefix
+- **Include order:** PCH → STL → SFML → third-party → engine headers → game headers
+- **Value initialization:** Always `Type obj{};` for Config/Blueprint/Settings/Component types
+- **Comments:** File banner headers in English; all inline comments in Russian
 
 ### Static Analysis & Formatting
 
-```bash
-# Install LLVM tools (Windows)
-winget install LLVM.LLVM
-
-# Run clang-tidy
+```powershell
+# Run clang-tidy (all layers)
 .\tools\run-clang-tidy.ps1
 
-# Check include layering (core vs game separation)
+# Run clang-tidy (engine layer only)
+.\tools\run-clang-tidy.ps1 -Layer engine
+
+# Check layering (engine must not depend on games/)
 .\tools\check_layering.ps1
 
-# Format code (recommended: enable "format on save")
+# Format
 clang-format -i $(git ls-files *.h *.cpp)
 ```
 
 ---
 
-## 🤝 **Contributing Guidelines**
-
-1. **Follow ECS principles** — Components are data, systems are logic, no gameplay inheritance
-2. **Keep core game-agnostic** — Engine code in `core/` must never depend on `game/`
-3. **Validate all configs** — Use `JsonValidator` for all JSON parsing
-4. **Log appropriately** — Use correct categories (`Engine`, `Config`, `Resources`, `Gameplay`, etc.)
-5. **Value-initialize data types** — `PlayerBlueprint player{};` not `PlayerBlueprint player;`
-6. **Document non-obvious code** — File headers in English, inline comments in Russian
-7. **Test before committing** — Project must build and run after every change
-8. **Avoid external dependencies** — Only add libraries when absolutely essential
-
----
-
-## 🧰 **Quick Start for Developers**
+## Quick Start for Developers
 
 ### Adding a New Resource
 
 1. **Add asset file**
-   ```bash
-   assets/game/skyguard/images/ship.png
+   ```
+   games/atrapacielos/assets/textures/ship.png
    ```
 
 2. **Register in resources.json**
    ```json
    {
+     "version": 1,
      "textures": {
-       "skyguard.sprite.player": {
-         "path": "assets/game/skyguard/images/aircraft.png",
+       "atrapacielos.sprite.ship": {
+         "path": "assets/textures/ship.png",
          "smooth": true,
          "repeated": false,
          "mipmap": false
@@ -211,38 +216,32 @@ clang-format -i $(git ls-files *.h *.cpp)
 
 3. **Use in code**
    ```cpp
-   const auto key = resourceManager.findTexture("skyguard.sprite.player");
-   auto& texture = resourceManager.getTexture(key);
+   const TextureKey key = resourceManager.findTexture("atrapacielos.sprite.ship");
+   const sf::Texture& tex = resourceManager.getTexture(key);
    ```
 
 ### Creating a New ECS Component
 
-1. **Define in `include/core/ecs/components/`**
+1. **Define in `engine/include/core/ecs/components/`**
    ```cpp
-   // health_component.h
    struct HealthComponent {
        int current{100};
        int maximum{100};
    };
    ```
 
-2. **Register with World**
-   ```cpp
-   world.registerComponent<HealthComponent>();
-   ```
-
-3. **Use in systems**
+2. **Use in systems**
    ```cpp
    auto view = world.view<HealthComponent, TransformComponent>();
    for (auto entity : view) {
        auto& health = view.get<HealthComponent>(entity);
-       // ... logic
+       // ...
    }
    ```
 
 ### Creating a New ECS System
 
-1. **Implement in `include/core/ecs/systems/`**
+1. **Implement in `engine/include/core/ecs/systems/`**
    ```cpp
    class HealthRegenSystem : public ISystem {
    public:
@@ -258,35 +257,47 @@ clang-format -i $(git ls-files *.h *.cpp)
    };
    ```
 
-2. **Register in Game initialization**
+2. **Register in game initialization**
    ```cpp
    systemManager.addSystem<HealthRegenSystem>();
    ```
 
 ---
 
-## 🧭 **Roadmap**
+## Contributing Guidelines
 
-### Phase 1: Foundation (Current)
-- [x] ECS framework with gradual migration to EnTT backend
-- [x] Resource management with ID-based registry
+1. **Follow ECS principles** — Components are data, systems are logic, no gameplay inheritance
+2. **Keep engine game-agnostic** — `engine/` must never `#include` anything from `games/`
+3. **Validate all configs** — Use project JSON accessors for all JSON parsing
+4. **Log appropriately** — Use correct categories (`Engine`, `Config`, `Resources`, `Gameplay`, etc.)
+5. **Value-initialize data types** — `PlayerBlueprint player{};` not `PlayerBlueprint player;`
+6. **Test before committing** — Project must build and all tests pass after every change
+7. **Avoid external dependencies** — Only add libraries when absolutely essential
+
+---
+
+## Roadmap
+
+### Foundation (Current)
+- [x] ECS framework with EnTT backend
+- [x] Key-based resource registry (RuntimeKey32 / StableKey64)
 - [x] Fixed timestep time service
-- [x] Config-driven architecture
+- [x] Config-driven architecture with JSON validation
 - [x] Debug overlay and structured logging
+- [x] Spatial indexing (quad-tree V1 + V2)
+- [x] Ninja Multi-Config CMake build (Debug / Profile / Release)
+- [x] Google Tests foundation
 - [ ] Hot-reload for JSON configs
-- [ ] Memory profiling and custom allocators
 - [ ] Stress testing with 10K+ entities
 
-### Phase 2: Engine Maturity (Year 1-2)
-- [ ] CMake builds and cross-platform support (Linux/macOS)
+### Engine Maturity
 - [ ] Asynchronous resource loading and streaming
-- [ ] Spatial indexing (quad-tree) for large worlds
 - [ ] Event bus and scriptable triggers
 - [ ] Save/load system with versioning
-- [ ] Multiple prototype games (Bomberman-like, platformer, etc.)
+- [ ] Cross-platform CMake (Linux/macOS)
 
-### Phase 3: 4X Grand Strategy (Year 3-5)
-- [ ] Layered simulation (tactical/operational/strategic)
+### Auctoritas (4X Grand Strategy)
+- [ ] Layered simulation (tactical / operational / strategic)
 - [ ] Data-driven AI (Utility AI + GOAP/HTN + Behavior Trees)
 - [ ] Deterministic replay and lock-step multiplayer
 - [ ] Delta saves and chunked loading
@@ -295,25 +306,21 @@ clang-format -i $(git ls-files *.h *.cpp)
 
 ---
 
-## 📚 **Documentation**
+## Documentation
 
 - **[Architecture Reference](./docs/architecture/)** — Deep-dive into engine design
-- **[STRUCTURE.md](./STRUCTURE.md)** — Detailed file layout
+- **[CMake Roadmap](./docs/CMake_Integration_ROADMAP.md)** — Build system phases and acceptance gates
 - **Code Comments** — Inline Russian comments explain intent and invariants
 
 ---
 
-## 🪪 **Licenses**
+## Licenses
 
-- **Engine code:** License TBD (to be formalized)
+- **Engine code:** License TBD
 - **Third-party libraries:**
-	- nlohmann-json under MIT License — see [json_license.mit](./SFML1/include/third_party/licenses/json_license.mit)
-	- entt under MIT License — see [entt_license.mit](./SFML1/include/third_party/licenses/entt_license.mit)
----
-
-## 🙏 **Credits**
-
-See [CREDITS.md](./CREDITS.md) for acknowledgments.
+  - nlohmann-json — MIT License, see `third_party/licenses/json_license.mit`
+  - EnTT — MIT License, see `third_party/licenses/entt_license.mit`
+  - xxHash — BSD 2-Clause License, see `third_party/licenses/xxhash_license.txt`
 
 ---
 

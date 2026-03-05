@@ -3,7 +3,7 @@
 This document describes the **resource layer** of the engine: how textures, fonts and sounds are
 **identified**, **defined**, **loaded**, **cached**, and **accessed** in a consistent, data-driven way.
 
-The design scales from small games (SkyGuard) up to large 4X projects (100k+ unique resources, data-only mods),
+The design scales from small games (Atrapacielos) up to large 4X projects (100k+ unique resources, data-only mods),
 while keeping **zero-overhead in hot paths** and **deterministic behavior**.
 
 ---
@@ -130,14 +130,14 @@ Example:
 ```json
 {
   "textures": {
-    "skyguard.sprite.player": {
-      "path": "assets/game/skyguard/images/su-57.png",
+    "atrapacielos.sprite.player": {
+      "path": "assets/images/su-57.png",
       "smooth": true,
       "repeated": false,
       "mipmap": false
     },
     "core.texture.missing": {
-      "path": "assets/core/images/missing.png",
+      "path": "assets/images/missing.png",
       "smooth": false,
       "repeated": false,
       "mipmap": false
@@ -145,12 +145,12 @@ Example:
   },
   "fonts": {
     "core.font.default": {
-      "path": "assets/core/fonts/Wolgadeutsche.otf"
+      "path": "assets/fonts/Wolgadeutsche.otf"
     }
   },
   "sounds": {
-    "skyguard.ui.click": {
-      "path": "assets/core/sounds/ui_click.wav"
+    "atrapacielos.ui.click": {
+      "path": "assets/sounds/ui_click.wav"
     }
   }
 }
@@ -285,7 +285,7 @@ Blueprint/config loaders parse canonical key strings and resolve them **once** a
 ```cpp
 // Load-time boundary code (may log/PANIC based on policy).
 // After this point, the runtime stores only TextureKey.
-TextureKey playerTex = registry.resolveTextureKey("skyguard.sprite.player");
+TextureKey playerTex = registry.resolveTextureKey("atrapacielos.sprite.player");
 entity.add<SpriteComponent>({ .textureKey = playerTex, /* ... */ });
 ```
 
@@ -300,7 +300,7 @@ const sf::Texture& tex = resourceManager.getTexture(sprite.textureKey);
 
 ```cpp
 // Tools/overlay: canonical name lookup is allowed (O(log N)), not in hot loops.
-auto key = registry.tryResolveTextureKeyByName("skyguard.sprite.player");
+auto key = registry.tryResolveTextureKeyByName("atrapacielos.sprite.player");
 ```
 
 ---

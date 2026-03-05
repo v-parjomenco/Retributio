@@ -1,10 +1,10 @@
 // ================================================================================================
 // File: tests/engine/src/string_pool_test.cpp
 // Purpose: Google Tests for ResourceKey<T> encoding/decoding, StableKey64, and StringPool.
-// Used by: sfml1_engine_tests (CTest, Debug config only)
+// Used by: retributio_engine_tests (CTest, Debug config only)
 // Related headers: resource_key.h, stable_key.h, string_pool.h
 // Notes:
-//  - Migrated from string_pool_self_test.cpp (SFML1_TESTS / static initializer pattern).
+//  - Migrated from string_pool_self_test.cpp (RETRIBUTIO_TESTS / static initializer pattern).
 //  - No PCH — all includes are explicit.
 //  - StableKey64 golden values: xxHash3 64-bit, seed=0, input bytes of key (no null terminator).
 //    Strings use canonical dot-format (core.category.name) matching real registry contract.

@@ -1,0 +1,24 @@
+Checks: >-
+  bugprone-*,
+  performance-*,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-loop-convert,
+  readability-braces-around-statements,
+  clang-diagnostic-*,
+  -clang-diagnostic-pragma-once-outside-header,
+  -clang-diagnostic-pre-c++17-compat,
+  -clang-diagnostic-c++98-compat-pedantic
+
+WarningsAsErrors: ''
+
+# Диагностика только из исходников проекта (engine/ и games/).
+# Матчится по абсолютному пути: ...engine/src/..., ...engine/include/...,
+# ...games/<game>/src/..., ...games/<game>/include/...
+HeaderFilterRegex: '.*[\\/](engine|games[\\/][^\\/]+)[\\/](src|include)[\\/]'
+
+FormatStyle: none
+
+CheckOptions:
+  - key: modernize-use-override.IgnoreDestructors
+    value: '1'

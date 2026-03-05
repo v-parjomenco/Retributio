@@ -1,4 +1,4 @@
-# Stress Modes (SkyGuard now, Titan later)
+# Stress Modes (Atrapacielos now, Auctoritas later)
 
 ## ActiveSet (implemented)
 

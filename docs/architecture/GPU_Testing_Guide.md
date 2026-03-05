@@ -1,4 +1,4 @@
-# GPU Testing Guide — SkyGuard / Titan 4X
+# GPU Testing Guide — Atrapacielos / Auctoritas
 
 **Your Hardware:**
 - Primary: **NVIDIA RTX 4080** (discrete, development)
@@ -32,17 +32,17 @@ glxinfo | grep "OpenGL renderer"
 
 ### **Run on RTX 4080 (default):**
 ```bash
-./skyguard
+./atrapacielos
 # Uses primary GPU automatically
 ```
 
 ### **Run on Radeon 610M (integrated):**
 ```bash
-DRI_PRIME=1 ./skyguard
+DRI_PRIME=1 ./atrapacielos
 
 # Or set globally:
 export DRI_PRIME=1
-./skyguard
+./atrapacielos
 ```
 
 ### **Query GPU in runtime:**
@@ -69,17 +69,17 @@ LOG_INFO("Max texture array layers: {}", maxLayers);
 # Normal build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j$(nproc)
-./skyguard
+./atrapacielos
 
 # Profile build
 cmake -DCMAKE_BUILD_TYPE=Profile ..
 make -j$(nproc)
-./skyguard --stress-test
+./atrapacielos --stress-test
 ```
 
 **What to Check:**
 - [ ] 240 FPS @ empty scene
-- [ ] 240 FPS @ 5K entities (SkyGuard target)
+- [ ] 240 FPS @ 5K entities (Atrapacielos target)
 - [ ] 144 FPS @ 50K entities (4X stress test)
 - [ ] Texture arrays active (`glGetIntegerv` confirms 16K layers)
 - [ ] No memory leaks (Valgrind)
@@ -94,43 +94,41 @@ make -j$(nproc)
 **Commands:**
 ```bash
 # Switch to integrated GPU
-DRI_PRIME=1 ./skyguard
+DRI_PRIME=1 ./atrapacielos
 
 # Profile on integrated
-DRI_PRIME=1 ./skyguard --stress-test --log-performance
+DRI_PRIME=1 ./atrapacielos --stress-test --log-performance
 ```
 
 **What to Check:**
 - [ ] 60 FPS minimum @ empty scene
-- [ ] 60 FPS minimum @ 5K entities (SkyGuard target)
+- [ ] 60 FPS minimum @ 5K entities (Atrapacielos target)
 - [ ] 30 FPS acceptable @ 50K entities (4X stress test)
 - [ ] Texture arrays supported? (check max layers: 2048 typical)
 - [ ] Fallback activates if layers < required
 - [ ] No visual artifacts (compare screenshots vs RTX 4080)
-- [ ] Memory usage acceptable (<2GB for SkyGuard)
+- [ ] Memory usage acceptable (<2GB for Atrapacielos)
 
 **Expected Performance:**
-- SkyGuard (5K entities): **60-120 FPS** ✅
+- Atrapacielos (5K entities): **60-120 FPS** ✅
 - 4X Stress (50K entities): **30-60 FPS** ⚠️
-- If FPS < 60 on SkyGuard → optimize or reduce quality settings
+- If FPS < 60 on Atrapacielos → optimize or reduce quality settings
 
 ---
 
 ### **3. Forced Fallback Testing (Multi-Atlas Path)**
-
-**When:** After implementing texture system (Month 7-8, then every major change)
-
+**When:** After implementing texture system, then after every major change.
 **Commands:**
-```bash
-# Build with forced fallback
-cmake -DCMAKE_BUILD_TYPE=Release -DSFML1_FORCE_MULTI_ATLAS=ON ..
-make -j$(nproc)
-./skyguard
+```powershell
+# Configure with forced fallback (один раз)
+cmake --preset win-msvc-ninja-mc -DRETRIBUTIO_FORCE_MULTI_ATLAS=ON
 
-# Test on RTX 4080 (validates fallback even on good hardware)
-./skyguard --stress-test
+# Build Release
+cmake --build --preset win-release --target retributio_atrapacielos_game
+
+# Запуск
+.\out\build\win-msvc-ninja-mc\Release\retributio_atrapacielos_game.exe
 ```
-
 **What to Check:**
 - [ ] Multi-atlas path active (log confirms "Using multi-atlas renderer")
 - [ ] Visual correctness (identical to texture array path)
@@ -144,7 +142,7 @@ make -j$(nproc)
 
 ### **4. Intel Integrated Testing (Optional, Wife's Laptop)**
 
-**When:** Before Steam releases (SkyGuard Month 6, Titan 4X Month 33)
+**When:** Before Steam releases (Atrapacielos Month 6, Auctoritas Month 33)
 
 **Hardware Examples:**
 - Intel UHD 630 (common in office laptops)
@@ -156,8 +154,8 @@ make -j$(nproc)
 # Windows: Set integrated GPU in NVIDIA/AMD control panel
 # Linux: Usually default if no discrete GPU
 
-./skyguard
-./skyguard --stress-test
+./atrapacielos
+./atrapacielos --stress-test
 ```
 
 **What to Check:**
@@ -168,7 +166,7 @@ make -j$(nproc)
 - [ ] Fallback activates gracefully if arrays unsupported
 - [ ] No visual artifacts
 - [ ] Settings menu works (resolution, quality, fullscreen)
-- [ ] 1v1 multiplayer playable (Month 4 SkyGuard)
+- [ ] 1v1 multiplayer playable (Month 4 Atrapacielos)
 
 **Expected Performance:**
 - Intel UHD 630: **60 FPS @ LOW settings** (5K entities)
@@ -189,7 +187,7 @@ make -j$(nproc)
 - [ ] Implement GPU capability query (max texture array layers)
 - [ ] Radeon 610M: Basic rendering works @ 60 FPS
 
-### **Phase 2-3 (Months 2-6, SkyGuard):**
+### **Phase 2-3 (Months 2-6, Atrapacielos):**
 - [ ] RTX 4080: 240 FPS @ 5K entities + particles
 - [ ] Radeon 610M: 60 FPS @ 5K entities
 - [ ] Forced fallback: Multi-atlas path validated
@@ -231,7 +229,7 @@ echo $DRI_PRIME  # Should output: 1
 DRI_PRIME=1 glxinfo | grep "OpenGL renderer"
 
 # If still uses NVIDIA, try:
-__GLX_VENDOR_LIBRARY_NAME=mesa DRI_PRIME=1 ./skyguard
+__GLX_VENDOR_LIBRARY_NAME=mesa DRI_PRIME=1 ./atrapacielos
 ```
 
 ### **Issue: Intel laptop crashes on startup**
@@ -255,7 +253,7 @@ glxinfo | grep "OpenGL version"
 
 ---
 
-## 🎯 MINIMUM SPECS (SkyGuard)
+## 🎯 MINIMUM SPECS (Atrapacielos)
 
 Based on testing, document in Steam page:
 
@@ -277,14 +275,14 @@ Based on testing, document in Steam page:
 
 ### **Quick Performance Check:**
 ```bash
-# SkyGuard stress (5K entities)
-./skyguard --stress-test --entities=5000 --duration=60
+# Atrapacielos stress (5K entities)
+./atrapacielos --stress-test --entities=5000 --duration=60
 
 # 4X stress (100K entities)
-./skyguard --stress-test --entities=100000 --duration=60
+./atrapacielos --stress-test --entities=100000 --duration=60
 
 # Profile mode (Tracy capture)
-./skyguard --profile --stress-test --entities=50000
+./atrapacielos --profile --stress-test --entities=50000
 ```
 
 ### **Automated Testing (CI):**
@@ -302,7 +300,7 @@ Based on testing, document in Steam page:
 
 ## ✅ FINAL CHECKLIST (Before Steam Release)
 
-### **Month 6 (SkyGuard):**
+### **Month 6 (Atrapacielos):**
 - [ ] RTX 4080: 240 FPS @ 5K entities (HIGH settings)
 - [ ] Radeon 610M: 60 FPS @ 5K entities (MEDIUM settings)
 - [ ] Forced fallback: Multi-atlas validated
@@ -311,7 +309,7 @@ Based on testing, document in Steam page:
 - [ ] Memory leaks: 0 (Valgrind clean)
 - [ ] Visual comparison: screenshots identical across all GPUs
 
-### **Month 33 (Titan 4X Early Access):**
+### **Month 33 (Auctoritas Early Access):**
 - [ ] RTX 4080: 144 FPS @ 20 civs, 10K provinces
 - [ ] Radeon 610M: 60 FPS @ 20 civs, 10K provinces (LOW settings)
 - [ ] Forced fallback: 100K textures across 4-8 atlases
