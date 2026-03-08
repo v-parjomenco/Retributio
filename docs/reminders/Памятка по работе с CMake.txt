@@ -1,13 +1,12 @@
-# 1. Configure (один раз после замены CMakeLists.txt)
-cmake --preset win-msvc-ninja-mc
-
-# Полная пересборка (только если configure упал):
+# 1. Полная пересборка (только если configure упал):
 rmdir /s /q out\build\win-msvc-ninja-mc   # cmd
 Remove-Item -Recurse -Force .\out\build\win-msvc-ninja-mc  # powershell
+cmake --preset win-msvc-ninja-mc # configure
 
 # Аналогично для ci:
-rmdir /s /q out\build\win-msvc-ninja-mc-ci
-cmake --preset win-msvc-ninja-mc-ci
+rmdir /s /q out\build\win-msvc-ninja-mc-ci # cmd
+Remove-Item -Recurse -Force .\out\build\win-msvc-ninja-mc-ci # powershell
+cmake --preset win-msvc-ninja-mc-ci # configure
 
 # Когда удалять: configure упал → удалить обязательно.
 # Когда НЕ удалять: build упал / изменил .cpp/.h / изменил CMakeLists.txt.
@@ -19,7 +18,7 @@ cmake --build --preset win-profile --target retributio_atrapacielos_game   # Pro
 cmake --build --preset win-release --target retributio_atrapacielos_game   # Release: /O2, без overlay, shipping
 
 # 3. Spatial harness (standalone, без GUI)
-cmake --build --preset win-profile --target retributio_spatial_harness  # просто собрать EXE
+cmake --build --preset win-profile --target retributio_stress_spatial  # просто собрать EXE
 
 # Запуск с пресетами (тест + метрики):
 cmake --build --preset win-profile --target stress_small  # smoke: 4×4 chunks, ~198 entities

@@ -19,11 +19,11 @@ retributio_core                  — движок (STATIC)
 retributio_engine_tests          — self-tests движка (STATIC, компилируется везде, линкуется Debug only)
 retributio_atrapacielos          — игровой runtime Atrapacielos (STATIC)
 retributio_atrapacielos_dev      — dev overlay, Debug + Profile (STATIC)
-retributio_spatial_harness_lib   — spatial index harness (STATIC)
-retributio_render_stress_lib     — render stress (INTERFACE, заглушка)
+retributio_stress_spatial_lib    — spatial index harness (STATIC)
+retributio_stress_render_lib     — render stress (INTERFACE, заглушка)
 retributio_atrapacielos_game     — Atrapacielos EXE (все конфиги)
-retributio_spatial_harness       — spatial harness EXE (все конфиги)
-retributio_render_stress         — render stress EXE (все конфиги, заглушка)
+retributio_stress_spatial        — stress spatial EXE (все конфиги)
+retributio_stress_render         — stress render EXE (все конфиги, заглушка)
 ```
 
 ### Entry points (все три — заглушки `int main() { return 0; }`)
@@ -43,13 +43,13 @@ tools/presets/atrapacielos/active_large.env   — soak: ~1M+ entities
 ```
 retributio_atrapacielos_dev  ──uses──►  StressRuntimeStamp
                                         ↑
-retributio_spatial_harness_lib  ──owns──┘  (stress_runtime_stamp.cpp)
+retributio_stress_spatial_lib  ──owns──┘  (stress_runtime_stamp.cpp)
            │
            └──►  retributio_atrapacielos (FrameOrchestrator)
 ```
 
 `retributio_atrapacielos_game` (Profile) линкует `retributio_atrapacielos_dev`, но не линкует
-`retributio_spatial_harness_lib` → когда main перестанет быть заглушкой: LNK2001.
+`retributio_stress_spatial_lib` → когда main перестанет быть заглушкой: LNK2001.
 Решение: Phase 1 ниже.
 
 ---
@@ -105,7 +105,7 @@ retributio_spatial_harness_lib  ──owns──┘  (stress_runtime_stamp.cpp)
 
 ### Новый таргет: `retributio_stress_common`
 
-Файлы, которые **переезжают** из `retributio_spatial_harness_lib`:
+Файлы, которые **переезжают** из `retributio_stress_spatial_lib`:
 ```
 games/atrapacielos/src/dev/stress_runtime_stamp.cpp
 games/atrapacielos/src/dev/stress_chunk_content_provider.cpp
@@ -123,7 +123,7 @@ retributio_stress_common
 retributio_atrapacielos_dev
   -> добавляет зависимость: retributio_stress_common
 
-retributio_spatial_harness_lib
+retributio_stress_spatial_lib
   -> добавляет зависимость: retributio_stress_common
   -> убирает источники: stress_runtime_stamp.cpp, stress_chunk_content_provider.cpp
 
@@ -135,7 +135,7 @@ retributio_atrapacielos_game (Profile)
 ### Файлы которые нужны для Phase 1
 ```
 games/atrapacielos/CMakeLists.txt   <- добавить retributio_stress_common, перераспределить источники
-tools/CMakeLists.txt                <- обновить retributio_spatial_harness_lib
+tools/CMakeLists.txt                <- обновить retributio_stress_spatial_lib
 ```
 Всё остальное — без изменений.
 
@@ -145,10 +145,10 @@ tools/CMakeLists.txt                <- обновить retributio_spatial_harne
 add_custom_target(stress_small
     COMMAND ${CMAKE_COMMAND}
         -DENV_FILE=${_presets_dir}/active_small.env
-        -DEXE=$<TARGET_FILE:retributio_spatial_harness>
+        -DEXE=$<TARGET_FILE:retributio_stress_spatial>
         -P "${_run_with_env}"
-    DEPENDS retributio_spatial_harness
-    COMMENT "[stress_small] retributio_spatial_harness + active_small.env"
+    DEPENDS retributio_stress_spatial
+    COMMENT "[stress_small] retributio_stress_spatial + active_small.env"
     USES_TERMINAL
 )
 ```
@@ -237,12 +237,12 @@ CMakeLists.txt                    <- добавить option(BUILD_TESTS) + add_
 Зависит от: `retributio_atrapacielos`, `retributio_atrapacielos_dev` (Debug+Profile), `SFML::Main`.
 Не знает о харнесах, тестах, stress-коде.
 
-### main_spatial_harness.cpp
+### main_stress_spatial.cpp
 Подключает `SpatialIndexHarness`, читает env-переменные.
 Запускается с пресетами из `tools/presets/atrapacielos/`.
 Profile-билд выдаёт timing метрики в stdout (p50/p95/p99).
 
-### main_render_stress.cpp
+### main_stress_render.cpp
 Создаёт SFML Window + GPU context.
 Запускает `StressChunkContentProvider` сценарий.
 Выдаёт frame timing метрики.
@@ -251,13 +251,13 @@ Profile-билд выдаёт timing метрики в stdout (p50/p95/p99).
 ### Файлы которые нужны для Phase 3
 ```
 games/atrapacielos/src/main_atrapacielos.cpp   <- реальный код
-tools/src/main_spatial_harness.cpp             <- реальный код
-tools/src/main_render_stress.cpp               <- реальный код (позже)
+tools/src/main_stress_spatial.cpp             <- реальный код
+tools/src/main_stress_render.cpp               <- реальный код (позже)
 ```
 
 **Acceptance gate Phase 3:**
 - `retributio_atrapacielos_game` Debug запускается, показывает окно
-- `retributio_spatial_harness` Profile с `active_large.env` выдаёт метрики, не крашится
+- `retributio_stress_spatial` Profile с `active_large.env` выдаёт метрики, не крашится
 - `retributio_atrapacielos_game` Release не содержит стресс-кода (проверка dumpbin на отсутствие символов)
 
 ---

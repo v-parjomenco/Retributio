@@ -2,7 +2,7 @@
 // File: core/debug/scoped_timer.h
 // Purpose: RAII scoped timer — measures wall-clock elapsed time and emits LOG_DEBUG on
 //          destruction. Intended for coarse-grained timing of init sequences and sessions.
-// Used by: Entry point mains (main_atrapacielos, main_spatial_harness, main_render_stress),
+// Used by: Entry point mains (main_atrapacielos, main_stress_spatial, main_stress_render),
 //          stress harnesses, any code needing lightweight elapsed-time instrumentation.
 // Related: core/log/log_macros.h, core/log/log_categories.h
 // Notes:

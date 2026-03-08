@@ -1,7 +1,7 @@
 // ================================================================================================
 // File: core/runtime/entry/logging_lifetime.h
 // Purpose: RAII wrapper for core::log lifetime — guarantees shutdown on all exit paths.
-// Used by: Entry point mains (main_atrapacielos, main_spatial_harness, main_render_stress).
+// Used by: Entry point mains (main_atrapacielos, main_stress_spatial, main_stress_render).
 // Related: core/log/logging.h
 // Notes:
 //  - Non-copyable, non-movable: exactly one live instance must exist at a time.

@@ -224,6 +224,17 @@ namespace core::ecs {
         mFpsText->setFillColor(props.color);
     }
 
+#if defined(RETRIBUTIO_PROFILE)
+    void DebugOverlaySystem::setBackgroundPanelRect(const sf::FloatRect& rect) noexcept {
+        mBackgroundPanelShape.setPosition(rect.position);
+        mBackgroundPanelShape.setSize(rect.size);
+    }
+
+    void DebugOverlaySystem::setBackgroundPanelColor(const sf::Color& color) noexcept {
+        mBackgroundPanelShape.setFillColor(color);
+    }
+#endif
+
     void DebugOverlaySystem::update(World& world, float dt) {
         // Render-only система.
         // Важно: update() может вызываться 0..N раз за кадр (фиксированный timestep),
@@ -457,6 +468,11 @@ namespace core::ecs {
         if (!mEnabled || !mFpsText) {
             return;
         }
+#if defined(RETRIBUTIO_PROFILE)
+        if (mBackgroundPanelEnabled) {
+            window.draw(mBackgroundPanelShape);
+        }
+#endif
         window.draw(*mFpsText);
     }
 

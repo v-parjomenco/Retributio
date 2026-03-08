@@ -1,7 +1,7 @@
 // ================================================================================================
 // File: core/runtime/entry/build_info.h
 // Purpose: Compile-time build metadata (version, build type, date, git commit hash).
-// Used by: Entry point mains (main_atrapacielos, main_spatial_harness, main_render_stress).
+// Used by: Entry point mains (main_atrapacielos, main_stress_spatial, main_stress_render).
 // Related: core/log/log_macros.h
 // Notes:
 //  - Header-only by design: __DATE__, __TIME__, GIT_COMMIT_HASH are compile-time macros

@@ -228,7 +228,7 @@ namespace game::atrapacielos::config {
 
             std::uint32_t perChunk = 0u;
 
-            const auto envPerChunk = readEnvU32("ATRAPACIELOS_STRESS_ENTITIES_PER_CHUNK");
+            const auto envPerChunk = readEnvU32("ATRAPACIELOS_STRESS_SPATIAL_ENTITIES_PER_CHUNK");
 
             if (envPerChunk && (*envPerChunk > 0u)) {
                 perChunk = std::min(*envPerChunk, kMaxEntitiesPerChunk);
@@ -236,7 +236,8 @@ namespace game::atrapacielos::config {
 
             bool stressEnabled = (perChunk > 0u);
             if (!stressEnabled) {
-                if (const auto en = readEnvU32("ATRAPACIELOS_STRESS_ENABLED"); en && (*en > 0u)) {
+                if (const auto en = readEnvU32("ATRAPACIELOS_STRESS_SPATIAL_ENABLED");
+                    en && (*en > 0u)) {
                     stressEnabled = true;
                 }
             }
@@ -252,8 +253,8 @@ namespace game::atrapacielos::config {
                 // Сценарий: viewport маленький (1920×1080 → 3×3 chunks),
                 // окно стриминга большое (16×16 = 256 chunks → 2M entities).
                 // queryFast обходит только viewport-чанки; остальные загружены, но не видимы.
-                const auto envW = readEnvU32("ATRAPACIELOS_STRESS_WINDOW_WIDTH");
-                const auto envH = readEnvU32("ATRAPACIELOS_STRESS_WINDOW_HEIGHT");
+                const auto envW = readEnvU32("ATRAPACIELOS_STRESS_SPATIAL_WINDOW_WIDTH");
+                const auto envH = readEnvU32("ATRAPACIELOS_STRESS_SPATIAL_WINDOW_HEIGHT");
 
                 if (envW && (*envW > 0u)) {
                     windowWidth = static_cast<std::int32_t>(*envW);

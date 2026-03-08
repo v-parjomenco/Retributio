@@ -23,6 +23,8 @@
 #include <string_view>
 
 #include <SFML/Graphics/Font.hpp>
+#include <SFML/Graphics/Rect.hpp>
+#include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Graphics/Text.hpp>
 #include <SFML/System/Clock.hpp>
@@ -109,6 +111,23 @@ namespace core::ecs {
         void clearExtraText() noexcept;
         void appendExtraLine(std::string_view line);
 
+#if defined(RETRIBUTIO_PROFILE)
+        void setBackgroundPanelEnabled(bool enabled) noexcept {
+            mBackgroundPanelEnabled = enabled;
+        }
+
+        void setBackgroundPanelRect(const sf::FloatRect& rect) noexcept;
+
+        void setBackgroundPanelColor(const sf::Color& color) noexcept;
+#else
+        void setBackgroundPanelEnabled(bool) noexcept {
+        }
+        void setBackgroundPanelRect(const sf::FloatRect&) noexcept {
+        }
+        void setBackgroundPanelColor(const sf::Color&) noexcept {
+        }
+#endif
+
         /**
          * @brief Нарисовать оверлей.
          *
@@ -163,6 +182,11 @@ namespace core::ecs {
         sf::Time  mAccumulatedTime{};
         sf::Time  mUpdateInterval{}; // 0 => каждый кадр (без троттлинга)
         std::uint8_t mSmoothingShift = 3;
+
+#if defined(RETRIBUTIO_PROFILE)
+        bool mBackgroundPanelEnabled{false};
+        sf::RectangleShape mBackgroundPanelShape{};
+#endif
 
         // ----------------------------------------------------------------------------------------
         // Только для Debug/Profile: статистика рендера и spatial index

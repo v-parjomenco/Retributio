@@ -52,6 +52,8 @@ target_sources(retributio_atrapacielos PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/config/loader/view_config_loader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/config/loader/window_config_loader.cpp
 
+    $<$<CONFIG:Profile>:${CMAKE_CURRENT_SOURCE_DIR}/src/dev/stress_render_options.cpp>
+
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ecs/systems/player_init_system.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/game.cpp
@@ -73,7 +75,7 @@ target_precompile_headers(retributio_atrapacielos PRIVATE
 # retributio_stress_common — общая stress-инфраструктура для dev builds
 #
 # Владеет stress_runtime_stamp.cpp и stress_chunk_content_provider.cpp.
-# Потребляется ПРИВАТНО retributio_atrapacielos_dev и retributio_spatial_harness_lib.
+# Потребляется ПРИВАТНО retributio_atrapacielos_dev и retributio_stress_spatial_lib.
 # НЕ зависит от retributio_atrapacielos: оба потребителя уже от него зависят,
 # добавление этой зависимости создало бы цикл.
 # -------------------------------------------------------------------------------------------------

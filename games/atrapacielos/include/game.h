@@ -109,6 +109,7 @@ namespace game::atrapacielos {
         game::atrapacielos::config::UserSettings mUserSettings{};
         std::filesystem::path mUserSettingsPath{};
         bool mUserSettingsSavingDisabled = false;
+
 #if defined(RETRIBUTIO_PROFILE)
         /// Snapshot параметров stress-прогона (заполняется один раз в initWorld,
         /// читается per-frame в overlay). Все значения — post-clamp truth

@@ -48,6 +48,7 @@
 #if defined(RETRIBUTIO_PROFILE)
     #include "dev/stress_chunk_content_provider.h"
     #include "dev/stress_runtime_stamp.h"
+    #include "dev/stress_render_options.h"
 #endif
 #if !defined(NDEBUG) || defined(RETRIBUTIO_PROFILE)
     #include "dev/overlay_extras.h"
@@ -313,6 +314,15 @@ namespace game::atrapacielos {
             // потому что compile-time флаг сильнее. Но хоткей F3 (dbg::HOTKEY_TOGGLE_OVERLAY)
             // всё равно позволяет включить оверлей в рантайме в любой сборке.
             mDebugOverlay->setEnabled(overlayCfg.enabled && dbg::SHOW_FPS_OVERLAY);
+
+#if defined(RETRIBUTIO_PROFILE)
+            const bool backplateEnabled = dev::readRenderStressOverlayBackplateEnabled();
+            mDebugOverlay->setBackgroundPanelEnabled(backplateEnabled);
+            mDebugOverlay->setBackgroundPanelColor(sf::Color(0u, 0u, 0u, 102u));
+            const sf::Vector2f uiSize = mViewManager.getUiLogicalSize();
+            mDebugOverlay->setBackgroundPanelRect(
+                sf::FloatRect{{0.f, 0.f}, {uiSize.x, uiSize.y * 0.46f}});
+#endif
         }
 
         // BackgroundRenderer: resident-only + generation-safe cache.

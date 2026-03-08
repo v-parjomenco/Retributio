@@ -152,7 +152,7 @@ ctest --preset win-debug --rerun-failed --output-on-failure
 
 ```powershell
 # Build spatial harness
-cmake --build --preset win-profile --target retributio_spatial_harness
+cmake --build --preset win-profile --target retributio_stress_spatial
 
 # Run with preset (smoke / soak)
 cmake --build --preset win-profile --target stress_small

@@ -2,7 +2,7 @@
 // File: core/runtime/entry/working_directory.h
 // Purpose: Sets the process working directory to the project root via platform-native
 //          executable path resolution and sentinel-file probing.
-// Used by: Entry point mains (main_atrapacielos, main_spatial_harness, main_render_stress).
+// Used by: Entry point mains (main_atrapacielos, main_stress_spatial, main_stress_render).
 // Notes:
 //  - Uses GetModuleFileNameW (Windows), /proc/self/exe (Linux),
 //    _NSGetExecutablePath + realpath (macOS). argv[0] is intentionally NOT used.

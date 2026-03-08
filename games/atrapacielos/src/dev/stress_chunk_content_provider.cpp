@@ -144,7 +144,8 @@ namespace {
         // 1) Явный список (опционально): индексы текстур через запятую.
         // Индексы соответствуют TextureKey.index() (RuntimeKey32 index) в текущем реестре.
         std::array<char, 1024> idsBuf{};
-        const std::string_view ids = readEnvStringView("ATRAPACIELOS_STRESS_TEXTURE_IDS", idsBuf);
+        const std::string_view ids =
+            readEnvStringView("ATRAPACIELOS_STRESS_SPATIAL_TEXTURE_IDS", idsBuf);
 
         if (!ids.empty()) {
             out.reserve(std::min(kMaxTextureIds, registryCount));
@@ -164,8 +165,8 @@ namespace {
 
         // 2) Fallback по количеству (первые N индексов).
         if (out.empty()) {
-            const std::size_t requestedCount =
-                readEnvSize("ATRAPACIELOS_STRESS_TEXTURE_COUNT", /*default*/ 1, /*max*/ kMaxTextureIds);
+            const std::size_t requestedCount = readEnvSize(
+                "ATRAPACIELOS_STRESS_SPATIAL_TEXTURE_COUNT", /*default*/ 1, /*max*/ kMaxTextureIds);
 
             const std::size_t count = std::min(requestedCount, registryCount);
             out.reserve(count);
@@ -250,11 +251,11 @@ namespace game::atrapacielos::dev {
         constexpr std::size_t kMaxEntitiesPerChunk = 8192;
         constexpr std::size_t kDefaultEntitiesPerChunk = 256;
 
-        const std::size_t enabledFlag =
-            readEnvSize("ATRAPACIELOS_STRESS_ENABLED", /*default*/ 0, /*max*/ 1);
+        const std::size_t enabledFlag = readEnvSize(
+            "ATRAPACIELOS_STRESS_SPATIAL_ENABLED", /*default*/ 0, /*max*/ 1);
 
-        const std::size_t envEntities =
-            readEnvSize("ATRAPACIELOS_STRESS_ENTITIES_PER_CHUNK", /*default*/ 0, kMaxEntitiesPerChunk);
+        const std::size_t envEntities = readEnvSize(
+            "ATRAPACIELOS_STRESS_SPATIAL_ENTITIES_PER_CHUNK", /*default*/ 0, kMaxEntitiesPerChunk);
 
         std::size_t entitiesPerChunk = envEntities;
 
@@ -262,11 +263,11 @@ namespace game::atrapacielos::dev {
             entitiesPerChunk = kDefaultEntitiesPerChunk;
         }
 
-        const std::size_t zLayers =
-            readEnvSize("ATRAPACIELOS_STRESS_Z_LAYERS", /*default*/ 5, /*max*/ 256);
+        const std::size_t zLayers = readEnvSize(
+            "ATRAPACIELOS_STRESS_SPATIAL_Z_LAYERS", /*default*/ 5, /*max*/ 256);
 
-        const std::size_t seedValue =
-            readEnvSize("ATRAPACIELOS_STRESS_SEED", /*default*/ 1, /*max*/ 0xFFFFFFFFu);
+        const std::size_t seedValue = readEnvSize(
+            "ATRAPACIELOS_STRESS_SPATIAL_SEED", /*default*/ 1, /*max*/ 0xFFFFFFFFu);
 
         mTextures = buildTextureListFromEnv(resources, fallbackTexture);
 

@@ -25,10 +25,10 @@
 
 namespace {
 
-    constexpr std::string_view kHarnessEnv = "ATRAPACIELOS_SPATIAL_HARNESS";
-    constexpr std::string_view kEntityCountEnv = "ATRAPACIELOS_SPATIAL_HARNESS_ENTITIES";
-    constexpr std::string_view kQueryCountEnv = "ATRAPACIELOS_SPATIAL_HARNESS_QUERIES";
-    constexpr std::string_view kUpdatePassesEnv = "ATRAPACIELOS_SPATIAL_HARNESS_UPDATES";
+    constexpr std::string_view kHarnessEnv = "ATRAPACIELOS_STRESS_SPATIAL_HARNESS";
+    constexpr std::string_view kEntityCountEnv = "ATRAPACIELOS_STRESS_SPATIAL_HARNESS_ENTITIES";
+    constexpr std::string_view kQueryCountEnv = "ATRAPACIELOS_STRESS_SPATIAL_HARNESS_QUERIES";
+    constexpr std::string_view kUpdatePassesEnv = "ATRAPACIELOS_STRESS_SPATIAL_HARNESS_UPDATES";
 
     template <std::size_t N>
     [[nodiscard]] std::string_view readEnvStringView(const char* name,
