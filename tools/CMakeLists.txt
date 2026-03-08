@@ -7,8 +7,8 @@
 # Target graph (A -> B means A depends on B):
 #   retributio_stress_spatial_lib -> retributio_runtime, retributio_atrapacielos,
 #                                     retributio_stress_common (PRIVATE)
-#   retributio_stress_render_lib   -> retributio_atrapacielos  (INTERFACE stub)
-#   retributio_stress_spatial     -> retributio_stress_spatial_lib, retributio_runtime_entry
+#   retributio_stress_render_lib   -> retributio_atrapacielos  (INTERFACE)
+#   retributio_stress_spatial      -> retributio_stress_spatial_lib, retributio_runtime_entry
 #   retributio_stress_render       -> retributio_stress_render_lib,
 #                                     retributio_atrapacielos_dev (Debug+Profile),
 #                                     retributio_runtime_entry
@@ -166,7 +166,6 @@ add_custom_target(spatial_small
         -P "${_run_with_env}"
     DEPENDS retributio_stress_spatial
     COMMENT "[spatial_small] retributio_stress_spatial + stress_spatial/active_small.env"
-    COMMENT "[stress_small] retributio_stress_spatial + active_small.env"
     USES_TERMINAL
 )
 

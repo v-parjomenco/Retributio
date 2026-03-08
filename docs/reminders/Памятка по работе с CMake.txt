@@ -21,15 +21,22 @@ cmake --build --preset win-release --target retributio_atrapacielos_game   # Rel
 cmake --build --preset win-profile --target retributio_stress_spatial  # просто собрать EXE
 
 # Запуск с пресетами (тест + метрики):
-cmake --build --preset win-profile --target stress_small  # smoke: 4×4 chunks, ~198 entities
-cmake --build --preset win-profile --target stress_large  # soak: 128×128 chunks, ~25K entities
+cmake --build --preset win-profile --target spatial_small  # smoke: 4×4 chunks, ~198 entities
+cmake --build --preset win-profile --target spatial_large  # soak: 128×128 chunks, ~25K entities
 
-# 4. Собрать всё в конфиге
+# 4. Render stress (interactive, с GUI)
+cmake --build --preset win-profile --target retributio_stress_render  # собрать EXE
+
+# Запуск с пресетами (x64 Native Tools Command Prompt for VS):
+cmake --build --preset win-profile --target render_small  # ~1.0M active entities
+cmake --build --preset win-profile --target render_large  # ~2.0M active entities
+
+# 5. Собрать всё в конфиге
 cmake --build --preset win-profile   # все таргеты Profile
 cmake --build --preset win-debug     # все таргеты Debug
 cmake --build --preset win-release   # все таргеты Release
 
-# 5. Google Tests (ctest)
+# 6. Google Tests (ctest)
 # Сначала собрать тесты (Debug only — retributio_engine_tests + retributio_atrapacielos_tests):
 cmake --build --preset win-debug --target retributio_engine_tests retributio_atrapacielos_tests
 

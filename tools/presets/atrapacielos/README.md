@@ -7,7 +7,7 @@
 
 ## ENV-ключи
 
-### Spatial stress namespace (`ATRAPACIELOS_STRESS_SPATIAL_*`)
+### Spatial namespace (`ATRAPACIELOS_STRESS_SPATIAL_*`)
 
 | Ключ | Описание |
 |------|----------|
@@ -37,7 +37,7 @@
 | `ATRAPACIELOS_STRESS_RENDER_WINDOW_HEIGHT` | Окно стриминга (чанки), Y |
 | `ATRAPACIELOS_STRESS_RENDER_OVERLAY_BACKPLATE` | Включить чёрный полупрозрачный backplate overlay (1/0) |
 
-### Stress spatial harness namespace
+### Spatial harness namespace
 
 | Ключ | Описание |
 |------|----------|

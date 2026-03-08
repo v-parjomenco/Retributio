@@ -20,19 +20,19 @@ retributio_engine_tests          — self-tests движка (STATIC, компи
 retributio_atrapacielos          — игровой runtime Atrapacielos (STATIC)
 retributio_atrapacielos_dev      — dev overlay, Debug + Profile (STATIC)
 retributio_stress_spatial_lib    — spatial index harness (STATIC)
-retributio_stress_render_lib     — render stress (INTERFACE, заглушка)
+retributio_stress_render_lib     — render stress support (INTERFACE)
 retributio_atrapacielos_game     — Atrapacielos EXE (все конфиги)
-retributio_stress_spatial        — stress spatial EXE (все конфиги)
-retributio_stress_render         — stress render EXE (все конфиги, заглушка)
+retributio_stress_spatial        — spatial harness EXE (все конфиги)
+retributio_stress_render         — render stress EXE (все конфиги)
 ```
 
-### Entry points (все три — заглушки `int main() { return 0; }`)
+### Entry points (актуальные исполняемые main-файлы)
 Реальный код находится в библиотеках, не в main-файлах.
 
 ### Стресс-пресеты (есть, не интегрированы в CMake)
 ```
-tools/presets/atrapacielos/active_small.env   — smoke: ~1K entities
-tools/presets/atrapacielos/active_large.env   — soak: ~1M+ entities
+tools/presets/atrapacielos/stress_spatial/active_small.env   — smoke: ~1K entities
+tools/presets/atrapacielos/stress_spatial/active_large.env   — soak: ~1M+ entities
 ```
 Сейчас: ручной запуск через VS Debugging → Environment или shell.
 
@@ -100,7 +100,7 @@ retributio_stress_spatial_lib  ──owns──┘  (stress_runtime_stamp.cpp)
 ---
 
 ## Phase 1 — Fix архитектурной бомбы + stress_common
-**Когда:** до написания реальных main-файлов. Сейчас, пока entry points заглушки.
+**Когда:** до стабилизации структуры main-файлов и связей между модулями.
 **Что не трогаем:** физическую структуру директорий на диске (только CMake).
 
 ### Новый таргет: `retributio_stress_common`
@@ -142,17 +142,17 @@ tools/CMakeLists.txt                <- обновить retributio_stress_spatia
 ### Пресеты: интеграция в CMake
 Добавить custom target для удобства разработчика (не влияет на бинари):
 ```cmake
-add_custom_target(stress_small
+add_custom_target(spatial_small
     COMMAND ${CMAKE_COMMAND}
-        -DENV_FILE=${_presets_dir}/active_small.env
+        -DENV_FILE=${_presets_dir}/stress_spatial/active_small.env
         -DEXE=$<TARGET_FILE:retributio_stress_spatial>
         -P "${_run_with_env}"
     DEPENDS retributio_stress_spatial
-    COMMENT "[stress_small] retributio_stress_spatial + active_small.env"
+    COMMENT "[spatial_small] retributio_stress_spatial + stress_spatial/active_small.env"
     USES_TERMINAL
 )
 ```
-Запуск: `cmake --build --preset win-profile --target stress_small`.
+Запуск: `cmake --build --preset win-profile --target spatial_small`.
 
 **Acceptance gate Phase 1:**
 - `cmake --build --preset win-profile` — чистый билд без предупреждений
@@ -246,13 +246,13 @@ Profile-билд выдаёт timing метрики в stdout (p50/p95/p99).
 Создаёт SFML Window + GPU context.
 Запускает `StressChunkContentProvider` сценарий.
 Выдаёт frame timing метрики.
-Не существует до тех пор пока не будет реального рендер-сценария.
+Используется как интерактивный render-stress entry point в Profile-конфигурации.
 
 ### Файлы которые нужны для Phase 3
 ```
 games/atrapacielos/src/main_atrapacielos.cpp   <- реальный код
 tools/src/main_stress_spatial.cpp             <- реальный код
-tools/src/main_stress_render.cpp               <- реальный код (позже)
+tools/src/main_stress_render.cpp               <- реальный код
 ```
 
 **Acceptance gate Phase 3:**
@@ -336,9 +336,9 @@ tools/
 Пресеты остаются как есть — это правильный 12-factor подход.
 В Phase 1 добавляем CMake custom targets для удобства:
 ```cmake
-# запуск через: cmake --build --preset win-profile --target stress_small
-add_custom_target(stress_small ...)
-add_custom_target(stress_large ...)
+# запуск через: cmake --build --preset win-profile --target spatial_small
+add_custom_target(spatial_small ...)
+add_custom_target(spatial_large ...)
 ```
 
 ---

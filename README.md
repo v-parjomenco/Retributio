@@ -22,7 +22,7 @@ A high-performance, modular 2D game engine built with **C++20 + SFML 3.0.2**, de
 - **Key-Based Resource Management** — RuntimeKey32 handles, centralized registry, automatic caching and validation
 - **Resolution-Independent UI** — Anchor policies, scaling behaviors, and lock systems for adaptive layouts
 - **Deterministic Simulation** — Fixed timestep, stable iteration order, seeded RNG for replay and multiplayer support
-- **Production-Grade Tooling** — Structured logging, debug overlay, profiling hooks, spatial stress harness
+- **Production-Grade Tooling** — Structured logging, debug overlay, profiling hooks, spatial harness
 
 ---
 
@@ -155,8 +155,8 @@ ctest --preset win-debug --rerun-failed --output-on-failure
 cmake --build --preset win-profile --target retributio_stress_spatial
 
 # Run with preset (smoke / soak)
-cmake --build --preset win-profile --target stress_small
-cmake --build --preset win-profile --target stress_large
+cmake --build --preset win-profile --target spatial_small
+cmake --build --preset win-profile --target spatial_large
 ```
 
 ---
