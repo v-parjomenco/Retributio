@@ -20,7 +20,7 @@ cmake --build --preset win-release --target retributio_atrapacielos_game   # Rel
 # 3. Spatial harness (standalone, без GUI)
 cmake --build --preset win-profile --target retributio_stress_spatial  # просто собрать EXE
 
-# Запуск с пресетами (тест + метрики):
+# Запуск с пресетами Spatial stress (тест + метрики):
 cmake --build --preset win-profile --target spatial_small  # smoke: 4×4 chunks, ~198 entities
 cmake --build --preset win-profile --target spatial_large  # soak: 128×128 chunks, ~25K entities
 
@@ -30,6 +30,8 @@ cmake --build --preset win-profile --target retributio_stress_render  # собр
 # Запуск с пресетами (x64 Native Tools Command Prompt for VS):
 cmake --build --preset win-profile --target render_small  # ~1.0M active entities
 cmake --build --preset win-profile --target render_large  # ~2.0M active entities
+cmake --build --preset win-profile --target render_pathological  # ~1.0M active entities
+cmake --build --preset win-profile --target render_pathological_large  # ~2.0M active entities
 
 # 5. Собрать всё в конфиге
 cmake --build --preset win-profile   # все таргеты Profile

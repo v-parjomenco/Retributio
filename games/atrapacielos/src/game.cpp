@@ -297,7 +297,7 @@ namespace game::atrapacielos {
             mDebugOverlay->setBackgroundPanelColor(sf::Color(0u, 0u, 0u, 102u));
             const sf::Vector2f uiSize = mViewManager.getUiLogicalSize();
             mDebugOverlay->setBackgroundPanelRect(
-                sf::FloatRect{{0.f, 0.f}, {uiSize.x, uiSize.y * 0.46f}});
+                sf::FloatRect{{0.f, 0.f}, {uiSize.x, uiSize.y * 0.55f}});
 #endif
         }
 
