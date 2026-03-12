@@ -3,65 +3,22 @@
 #include "config/loader/spatial_v2_config_builder.h"
 
 #include <algorithm>
-#include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
-#include <optional>
 #include <string_view>
-#include <system_error>
-
-#if defined(RETRIBUTIO_PROFILE)
-    #include <cstdlib>
-#endif
 
 #include "core/log/log_macros.h"
 
-namespace {
-
 #if defined(RETRIBUTIO_PROFILE)
+    #include "dev/stress_env_utils.h"
+    #include "dev/stress_render_options.h"
 
-    [[nodiscard]] std::optional<std::uint64_t> readEnvU64(const char* name) noexcept {
-    #if defined(_MSC_VER)
-        #pragma warning(push)
-        #pragma warning(disable : 4996) // getenv
-    #endif
-        const char* s = std::getenv(name);
-    #if defined(_MSC_VER)
-        #pragma warning(pop)
-    #endif
-        if (s == nullptr || *s == '\0') {
-            return std::nullopt;
-        }
+    namespace env = game::atrapacielos::dev::env;
+#endif
 
-        std::uint64_t value = 0;
-        const char* end = s;
-        while (*end != '\0') {
-            ++end;
-        }
-
-        const auto [ptr, ec] = std::from_chars(s, end, value);
-        if (ec != std::errc{} || ptr != end) {
-            return std::nullopt;
-        }
-        return value;
-    }
-
-    [[nodiscard]] std::optional<std::uint32_t> readEnvU32(const char* name) noexcept {
-        const auto v64 = readEnvU64(name);
-        if (!v64.has_value()) {
-            return std::nullopt;
-        }
-        if (*v64 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
-            LOG_PANIC(core::log::cat::ECS,
-                      "SpatialIndexV2(Atrapacielos): env {}={} exceeds uint32 range",
-                      name, *v64);
-        }
-        return static_cast<std::uint32_t>(*v64);
-    }
-
-#endif // defined(RETRIBUTIO_PROFILE)
+namespace {
 
     /// ceil(v * num / den) без float.
     /// Вызывается ТОЛЬКО на cold path (config init). Входные диапазоны:
@@ -222,91 +179,154 @@ namespace game::atrapacielos::config {
 
 #if defined(RETRIBUTIO_PROFILE)
         {
-            // Семантика строго как у StressChunkContentProvider:
-            constexpr std::uint32_t kMaxEntitiesPerChunk = 8192u;
+
+            constexpr std::uint32_t kMaxEntitiesPerChunk = 131'072u; // 128K for pathological.
             constexpr std::uint32_t kDefaultEntitiesPerChunk = 256u;
 
-            std::uint32_t perChunk = 0u;
+            const dev::StressMode stressMode = dev::readStressModeFromEnv();
 
-            const auto envPerChunk = readEnvU32("ATRAPACIELOS_STRESS_SPATIAL_ENTITIES_PER_CHUNK");
+            if (stressMode == dev::StressMode::Render) {
+                const dev::StressRenderOptions renderOpts = dev::readStressRenderOptionsFromEnv();
 
-            if (envPerChunk && (*envPerChunk > 0u)) {
-                perChunk = std::min(*envPerChunk, kMaxEntitiesPerChunk);
-            }
+                const std::size_t sideHot =
+                    (renderOpts.hotspotRadiusChunks * 2u) + 1u;
+                const std::size_t hotspotChunks = checkedMulSizeT(
+                    sideHot,
+                    sideHot,
+                    "renderHotspotChunks");
 
-            bool stressEnabled = (perChunk > 0u);
-            if (!stressEnabled) {
-                if (const auto en = readEnvU32("ATRAPACIELOS_STRESS_SPATIAL_ENABLED");
-                    en && (*en > 0u)) {
-                    stressEnabled = true;
+                std::size_t hotspotPerChunk = 0u;
+                if (renderOpts.visibleDensity > 0u) {
+                    hotspotPerChunk = renderOpts.visibleDensity;
+                } else {
+                    const std::size_t visible = std::max<std::size_t>(1u, renderOpts.visibleCount);
+                    hotspotPerChunk = divCeil(visible, hotspotChunks);
                 }
-            }
+                hotspotPerChunk =
+                    std::clamp<std::size_t>(hotspotPerChunk, 1u, kMaxEntitiesPerChunk);
 
-            if (stressEnabled) {
-                if (perChunk == 0u) {
-                    perChunk = kDefaultEntitiesPerChunk;
-                }
+                const std::size_t chunksNeededForTotal = divCeil(
+                    std::max<std::size_t>(1u, renderOpts.totalCount),
+                    hotspotPerChunk);
 
-                maxEntitiesPerChunkCeiling = static_cast<std::size_t>(perChunk);
+                const std::size_t sideMinByHotspot =
+                    (renderOpts.hotspotRadiusChunks + renderOpts.overscanChunks) * 2u + 1u;
+                std::size_t sideByTotal = static_cast<std::size_t>(std::ceil(std::sqrt(
+                    static_cast<double>(chunksNeededForTotal))));
+                sideByTotal = std::max(sideByTotal, sideMinByHotspot);
+                sideByTotal = std::max(sideByTotal, static_cast<std::size_t>(viewportWindowWidth));
+                sideByTotal = std::min<std::size_t>(sideByTotal, 1024u);
 
-                // ENV-override: декаплинг размеров окна стриминга от viewport камеры.
-                // Сценарий: viewport маленький (1920×1080 → 3×3 chunks),
-                // окно стриминга большое (16×16 = 256 chunks → 2M entities).
-                // queryFast обходит только viewport-чанки; остальные загружены, но не видимы.
-                const auto envW = readEnvU32("ATRAPACIELOS_STRESS_SPATIAL_WINDOW_WIDTH");
-                const auto envH = readEnvU32("ATRAPACIELOS_STRESS_SPATIAL_WINDOW_HEIGHT");
+                windowWidth = static_cast<std::int32_t>(sideByTotal);
+                windowHeight = static_cast<std::int32_t>(sideByTotal);
 
-                if (envW && (*envW > 0u)) {
-                    windowWidth = static_cast<std::int32_t>(*envW);
-                }
-                if (envH && (*envH > 0u)) {
-                    windowHeight = static_cast<std::int32_t>(*envH);
-                }
-
-                if (windowWidth <= 0 || windowHeight <= 0) {
-                    LOG_PANIC(core::log::cat::ECS,
-                              "SpatialIndexV2(Atrapacielos): stress window dimensions invalid "
-                              "({}x{}) after ENV override",
-                              windowWidth, windowHeight);
-                }
-
-                const bool windowOverridden =
-                    (windowWidth != viewportWindowWidth ||
-                     windowHeight != viewportWindowHeight);
-
-                if (windowOverridden &&
-                    (windowWidth < viewportWindowWidth ||
-                     windowHeight < viewportWindowHeight)) {
-                    LOG_WARN(core::log::cat::ECS,
-                             "SpatialIndexV2(Atrapacielos): stress window ({}x{}) меньше viewport "
-                             "window ({}x{}). Часть видимых чанков может быть non-Loaded.",
-                             windowWidth, windowHeight,
-                             viewportWindowWidth, viewportWindowHeight);
-                }
-
-                // Бюджеты:
-                //  - visible (query output) = viewport window (камера + margin).
-                //    Vertex buffer RenderSystem масштабируется по этому числу.
-                //  - dirty (active set)     = полное окно стриминга.
-                //    Определяет maxEntityId, marks, entity records.
                 const std::size_t stressWindowChunks = checkedMulSizeT(
                     static_cast<std::size_t>(windowWidth),
                     static_cast<std::size_t>(windowHeight),
-                    "stressWindowChunks");
-                const std::size_t activeSetCeilingTmp = checkedMulSizeT(
-                    stressWindowChunks, maxEntitiesPerChunkCeiling, "activeSetCeilingTmp");
+                    "renderWindowChunks");
 
-                if (windowOverridden) {
-                    const std::size_t viewportChunks = checkedMulSizeT(
-                        static_cast<std::size_t>(viewportWindowWidth),
-                        static_cast<std::size_t>(viewportWindowHeight),
-                        "viewportChunks");
-                    maxVisibleSprites = checkedMulSizeT(
-                        viewportChunks, maxEntitiesPerChunkCeiling, "maxVisibleSprites(viewport)");
-                } else {
-                    maxVisibleSprites = activeSetCeilingTmp;
-                }
+                const std::size_t avgPerChunkForTotal = divCeil(
+                    std::max<std::size_t>(1u, renderOpts.totalCount),
+                    stressWindowChunks);
+
+                maxEntitiesPerChunkCeiling = std::max<std::size_t>(
+                    hotspotPerChunk,
+                    std::clamp<std::size_t>(avgPerChunkForTotal, 1u, kMaxEntitiesPerChunk));
+
+                const std::size_t activeSetCeilingTmp = checkedMulSizeT(
+                    stressWindowChunks,
+                    maxEntitiesPerChunkCeiling,
+                    "renderActiveSetCeiling");
+
+                maxVisibleSprites = std::max<std::size_t>(
+                    renderOpts.visibleCount,
+                    checkedMulSizeT(
+                        hotspotChunks,
+                        hotspotPerChunk,
+                        "renderVisibleReserve"));
                 maxDirtyEntities = activeSetCeilingTmp;
+            } else {
+                std::uint32_t perChunk = 0u;
+
+                const auto envPerChunk =
+                    env::readU32("ATRAPACIELOS_STRESS_SPATIAL_ENTITIES_PER_CHUNK");
+
+                if (envPerChunk && (*envPerChunk > 0u)) {
+                    perChunk = std::min(*envPerChunk, kMaxEntitiesPerChunk);
+                }
+
+                bool stressEnabled = (perChunk > 0u);
+                    if (!stressEnabled) {
+                        if (const auto en = env::readU32("ATRAPACIELOS_STRESS_SPATIAL_ENABLED");
+                            en && (*en > 0u)) {
+                            stressEnabled = true;
+                        }
+                    }
+
+                if (stressEnabled) {
+                    if (perChunk == 0u) {
+                        perChunk = kDefaultEntitiesPerChunk;
+                    }
+
+                    maxEntitiesPerChunkCeiling = static_cast<std::size_t>(perChunk);
+
+                    const auto envW = env::readU32("ATRAPACIELOS_STRESS_SPATIAL_WINDOW_WIDTH");
+                    const auto envH = env::readU32("ATRAPACIELOS_STRESS_SPATIAL_WINDOW_HEIGHT");
+
+                    if (envW && (*envW > 0u)) {
+                        windowWidth = static_cast<std::int32_t>(*envW);
+                    }
+                    if (envH && (*envH > 0u)) {
+                        windowHeight = static_cast<std::int32_t>(*envH);
+                    }
+
+                    if (windowWidth <= 0 || windowHeight <= 0) {
+                        LOG_PANIC(core::log::cat::ECS,
+                                  "SpatialIndexV2(Atrapacielos): stress window dimensions invalid "
+                                  "({}x{}) after ENV override",
+                                  windowWidth, windowHeight);
+                    }
+
+                    const bool windowOverridden =
+                        (windowWidth != viewportWindowWidth ||
+                         windowHeight != viewportWindowHeight);
+
+                    if (windowOverridden &&
+                        (windowWidth < viewportWindowWidth ||
+                         windowHeight < viewportWindowHeight)) {
+                        LOG_WARN(core::log::cat::ECS,
+                                 "SpatialIndexV2(Atrapacielos): stress window ({}x{}) меньше "
+                                 "viewport window ({}x{}). Часть видимых чанков может быть "
+                                 "non-Loaded.",
+                                 windowWidth,
+                                 windowHeight,
+                                 viewportWindowWidth,
+                                 viewportWindowHeight);
+                    }
+
+                    const std::size_t stressWindowChunks = checkedMulSizeT(
+                        static_cast<std::size_t>(windowWidth),
+                        static_cast<std::size_t>(windowHeight),
+                        "stressWindowChunks");
+                    const std::size_t activeSetCeilingTmp = checkedMulSizeT(
+                        stressWindowChunks,
+                        maxEntitiesPerChunkCeiling,
+                        "activeSetCeilingTmp");
+
+                    if (windowOverridden) {
+                        const std::size_t viewportChunks = checkedMulSizeT(
+                            static_cast<std::size_t>(viewportWindowWidth),
+                            static_cast<std::size_t>(viewportWindowHeight),
+                            "viewportChunks");
+                        maxVisibleSprites = checkedMulSizeT(
+                            viewportChunks,
+                            maxEntitiesPerChunkCeiling,
+                            "maxVisibleSprites(viewport)");
+                    } else {
+                        maxVisibleSprites = activeSetCeilingTmp;
+                    }
+                    maxDirtyEntities = activeSetCeilingTmp;
+                }
             }
         }
 #endif
@@ -374,9 +394,23 @@ namespace game::atrapacielos::config {
         const std::uint32_t expectedMaxEntities =
             computeExpectedMaxEntitiesAtrapacielosFromActiveSet(adjustedCeiling);
 
-        // overflow.maxNodes: uint32 range guard (cold path, zero cost).
+        // overflow.maxNodes:
+        //  - baseline берём по худшему из visible/dirty ceilings;
+        //  - учитываем AABB coverage до 4 cells/entity;
+        //  - добавляем safety headroom x2 для dense overlap/scatter.
+        // Расчёт только в cold path (config build), hot loop не затрагивается.
+        const std::size_t overflowBaseline =
+            std::max<std::size_t>(maxVisibleSprites, maxDirtyEntities);
+
+        const std::size_t overflowCellsCoverage = checkedMulSizeT(
+            std::max<std::size_t>(1u, overflowBaseline), 4u, "overflowCellsCoverage");
+
+        const std::size_t overflowEntriesWithHeadroom =
+            checkedMulSizeT(overflowCellsCoverage, 2u, "overflowEntriesWithHeadroom");
+
         const std::size_t rawOverflowMaxNodes = std::max<std::size_t>(
-            1u, maxVisibleSprites / core::spatial::Cell::kInlineCapacity);
+            1u, divCeil(overflowEntriesWithHeadroom,
+                        static_cast<std::size_t>(core::spatial::Cell::kInlineCapacity)));
 
         if (rawOverflowMaxNodes >
             static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max())) {

@@ -56,6 +56,15 @@ namespace game::atrapacielos::utils {
             const std::int64_t intPart = scaled / 100;
             const std::int64_t fracAbs = (scaled >= 0) ? (scaled % 100) : (-(scaled % 100));
 
+            // Fix: small negatives (-0.99..0) have intPart==0, losing the sign.
+            // appendNumber(0) outputs "0", not "-0". Emit sign explicitly.
+            if (scaled < 0 && intPart == 0) {
+                if (it >= end) {
+                    return false;
+                }
+                *it++ = '-';
+            }
+
             if (!appendNumber(it, end, intPart)) {
                 return false;
             }
@@ -82,6 +91,14 @@ namespace game::atrapacielos::utils {
 
             const std::int64_t intPart = scaled / 10;
             const std::int64_t fracAbs = (scaled >= 0) ? (scaled % 10) : (-(scaled % 10));
+
+            // Fix: small negatives (-0.9..0) have intPart==0, losing the sign.
+            if (scaled < 0 && intPart == 0) {
+                if (it >= end) {
+                    return false;
+                }
+                *it++ = '-';
+            }
 
             if (!appendNumber(it, end, intPart)) {
                 return false;
@@ -178,7 +195,12 @@ namespace game::atrapacielos::utils {
                           std::size_t texCount,
                           std::size_t zLayers,
                           std::int32_t windowWidth,
-                          std::int32_t windowHeight) noexcept;
+                          std::int32_t windowHeight,
+                          std::size_t totalCount,
+                          std::size_t visibleCount,
+                          std::size_t visibleDensity,
+                          std::size_t hotspotRadius,
+                          std::size_t overscan) noexcept;
 
 #endif
 

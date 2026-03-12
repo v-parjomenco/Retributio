@@ -492,7 +492,11 @@ namespace game::atrapacielos::utils {
                                       const std::uint32_t seed, const std::size_t entitiesPerChunk,
                                       const std::size_t texCount, const std::size_t zLayers,
                                       const std::int32_t windowWidth,
-                                      const std::int32_t windowHeight) noexcept {
+                                      const std::int32_t windowHeight, const std::size_t totalCount,
+                                      const std::size_t visibleCount,
+                                      const std::size_t visibleDensity,
+                                      const std::size_t hotspotRadius,
+                                      const std::size_t overscan) noexcept {
         if (cap == 0) {
             return 0;
         }
@@ -546,6 +550,44 @@ namespace game::atrapacielos::utils {
         }
         if (!detail::appendNumber(it, end, windowHeight)) {
             return static_cast<std::size_t>(it - buf);
+        }
+
+        // Render-specific fields: mode starts with "Render" (e.g. "Render/GL", "Render/Path").
+        if (mode.size() >= 6u && mode.substr(0, 6u) == "Render") {
+            if (!detail::appendLiteral(it, end, " total=")) {
+                return static_cast<std::size_t>(it - buf);
+            }
+            if (!detail::appendNumber(it, end, totalCount)) {
+                return static_cast<std::size_t>(it - buf);
+            }
+
+            if (!detail::appendLiteral(it, end, " visible=")) {
+                return static_cast<std::size_t>(it - buf);
+            }
+            if (!detail::appendNumber(it, end, visibleCount)) {
+                return static_cast<std::size_t>(it - buf);
+            }
+
+            if (!detail::appendLiteral(it, end, " hotPerChk=")) {
+                return static_cast<std::size_t>(it - buf);
+            }
+            if (!detail::appendNumber(it, end, visibleDensity)) {
+                return static_cast<std::size_t>(it - buf);
+            }
+
+            if (!detail::appendLiteral(it, end, " hotspot=")) {
+                return static_cast<std::size_t>(it - buf);
+            }
+            if (!detail::appendNumber(it, end, hotspotRadius)) {
+                return static_cast<std::size_t>(it - buf);
+            }
+
+            if (!detail::appendLiteral(it, end, " overscan=")) {
+                return static_cast<std::size_t>(it - buf);
+            }
+            if (!detail::appendNumber(it, end, overscan)) {
+                return static_cast<std::size_t>(it - buf);
+            }
         }
 
         return static_cast<std::size_t>(it - buf);

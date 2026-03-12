@@ -46,6 +46,7 @@
 #include "presentation/view_manager.h"
 
 #if defined(RETRIBUTIO_PROFILE)
+    #include "dev/stress_render_chunk_content_provider.h"
     #include "dev/stress_chunk_content_provider.h"
     #include "dev/stress_runtime_stamp.h"
     #include "dev/stress_render_options.h"
@@ -90,26 +91,19 @@ namespace game::atrapacielos {
         // ----------------------------------------------------------------------------------------
         mUserSettingsPath = platform::getUserSettingsPath(appCfg.id);
 #if !defined(NDEBUG)
-        // Диагностика пути user settings (только Debug, один раз на запуск).
-        // Полезно для тестов на Linux/macOS, чтобы сразу видеть OS-standard location.
         try {
             LOG_DEBUG(core::log::cat::Config, "[UserSettingsLoader] Path: '{}'",
                       mUserSettingsPath.string());
         } catch (...) {
-            // На Windows строковая конверсия path может теоретически бросить
-            // (экзотика с кодировками).
             LOG_DEBUG(core::log::cat::Config,
                       "[UserSettingsLoader] Path: <failed to stringify std::filesystem::path>");
         }
 #endif
         mUserSettings = skycfg::loadUserSettings(mUserSettingsPath);
 
-        // Итоговый runtime window config: shipped -> user override.
         const skycfg::WindowConfig effectiveWindowCfg =
             skycfg::applyUserSettings(windowCfg, mUserSettings);
 
-        // Создаём окно (режимы: windowed/borderless/fullscreen).
-        // Используется менеджер для поддержки переключения режимов.
         mWindowModeManager.init(effectiveWindowCfg, appCfg.displayName);
         if (!mWindowModeManager.createInitial(mWindow) || !mWindow.isOpen()) {
             throw std::runtime_error("Failed to create main window");
@@ -122,7 +116,6 @@ namespace game::atrapacielos {
         mEngineSettings = cfg::loadEngineSettings(skycfg_paths::ENGINE_SETTINGS);
         applyEngineSettingsToWindow();
 
-        // Логируем итоговые настройки рендеринга один раз при запуске игры.
         LOG_INFO(core::log::cat::Gameplay, "[EngineSettings] VSync: {}, frameLimit: {}{}",
                  (mEngineSettings.vsyncEnabled ? "enabled" : "disabled"),
                  mEngineSettings.frameLimit,
@@ -137,10 +130,6 @@ namespace game::atrapacielos {
         // ----------------------------------------------------------------------------------------
         // Инициализация ресурсного слоя (реестр ресурсов + fallback-ресурсы)
         // ----------------------------------------------------------------------------------------
-        // Важно: initResources() должен быть вызван до initWorld(), чтобы:
-        //  - реестр ресурсов был загружен;
-        //  - fallback-ресурсы были настроены;
-        //  - системы/лоадеры могли безопасно резолвить ресурсы через ResourceManager.
         initResources();
 
         // ----------------------------------------------------------------------------------------
@@ -153,9 +142,6 @@ namespace game::atrapacielos {
     }
 
     void Game::applyEngineSettingsToWindow() noexcept {
-        // Политика применения:
-        //  - VSync ON  => frameLimit выключен (0), избегаем двойного ограничения.
-        //  - VSync OFF => применяем frameLimit из конфига.
         mWindow.setVerticalSyncEnabled(mEngineSettings.vsyncEnabled);
         if (!mEngineSettings.vsyncEnabled) {
             mWindow.setFramerateLimit(mEngineSettings.frameLimit);
@@ -165,21 +151,15 @@ namespace game::atrapacielos {
     }
 
     void Game::initResources() {
-        // Инициализация key-world реестра ресурсов (v1).
-        // Критичный конфиг: если он сломан — нет смысла продолжать игру.
         const std::array<core::resources::ResourceSource, 1> sources{
-            core::resources::ResourceSource{std::string(skycfg_paths::RESOURCES), 0, 0, "atrapacielos"}
+            core::resources::ResourceSource{
+                std::string(skycfg_paths::RESOURCES), 0, 0, "atrapacielos"}
         };
-
         mResources.initialize(sources);
-
-        // Fallback-ключи (core.texture.missing, core.font.default) валидируются
-        // автоматически в ResourceManager::initialize().
     }
 
     // initWorld() без try/catch — все исключения уходят наверх в main()
     void Game::initWorld() {
-        // Загружаем blueprint игрока (data-driven).
         auto playerCfg = skycfg::ConfigLoader::loadPlayerConfig(mResources, skycfg_paths::PLAYER);
         const float playerFloorY = mViewManager.getWorldLogicalSize().y;
 
@@ -209,7 +189,6 @@ namespace game::atrapacielos {
         worldInfo.reserveEntities = spatialCfg.maxEntityId;
         
         mWorld = std::make_unique<core::ecs::World>(worldInfo);
-        // ----------------------------------------------------------------------------------------
 
 #if !defined(NDEBUG)
         if (spatialCfg.determinismEnabled) {
@@ -217,14 +196,11 @@ namespace game::atrapacielos {
         }
 #endif
 
-        // Deterministic wiring — включаем StableID сервис один раз до первого createEntity().
         if (spatialCfg.determinismEnabled) {
             auto& ids = mWorld->stableIds();
             ids.enable();
-
             const std::size_t capacity = config::computeStableIdCapacityAtrapacielos(spatialCfg);
             ids.prewarm(capacity);
-
             assert(ids.isEnabled() && ids.isPrewarmed() &&
                    "Game::initWorld: StableIdService wiring failed in deterministic mode");
         }
@@ -233,33 +209,49 @@ namespace game::atrapacielos {
         // Подключаем ECS-системы (порядок важен для update/render)
         // ----------------------------------------------------------------------------------------
 
-        // PlayerInitSystem сам создаёт сущности на первом тике и больше не работает.
-        // ВАЖНО: система строго data-only (без ResourceManager): все derived поля уже resolved.
         mWorld->addSystem<game::atrapacielos::ecs::PlayerInitSystem>(std::move(players));
 
-        // ВАЖНО: AircraftControl должен обновляться ДО Movement, т.к. пишет VelocityComponent,
-        // а Movement читает VelocityComponent в этом же тике.
-        mAircraftControlSystem = &mWorld->addSystem<game::atrapacielos::ecs::AircraftControlSystem>();
+        mAircraftControlSystem =
+            &mWorld->addSystem<game::atrapacielos::ecs::AircraftControlSystem>();
         mWorld->addSystem<core::ecs::MovementSystem>();
         mWorld->addSystem<game::atrapacielos::ecs::PlayerBoundsSystem>(
             mViewManager.getWorldLogicalSize(), playerFloorY);
 
 #if defined(RETRIBUTIO_PROFILE)
-        // Profile: streaming stress provider (deterministic per-chunk).
         if (!boot.stressPlayerKey.has_value()) {
             LOG_PANIC(core::log::cat::Config,
                       "Game::initWorld: stressPlayerKey must be resolved in PROFILE builds.");
         }
 
-        auto stressProvider = std::make_unique<dev::StressChunkContentProvider>(
-            mResources, *boot.stressPlayerKey, spatialCfg.index.chunkSizeWorld);
+        const dev::StressMode stressMode = dev::readStressModeFromEnv();
 
-        // Stamp из фактических (post-clamp) данных provider + config.
-        // Zero ENV reads: единственный source of truth — runtime объекты.
-        mStressStamp = dev::buildStressRuntimeStamp(
-            *stressProvider, spatialCfg.storage.width, spatialCfg.storage.height);
+        if (stressMode == dev::StressMode::Render) {
+            const sf::Vector2f worldLogical = mViewManager.getWorldLogicalSize();
 
-        mChunkContentProvider = std::move(stressProvider);
+            auto stressProvider = std::make_unique<dev::StressRenderChunkContentProvider>(
+                mResources, *boot.stressPlayerKey, spatialCfg.index.chunkSizeWorld,
+                spatialCfg.storage.width, spatialCfg.storage.height,
+                spatialCfg.hysteresisMarginChunks,
+                worldLogical.x, worldLogical.y);
+
+            mStressStamp = dev::buildRenderStressRuntimeStamp(
+                *stressProvider, spatialCfg.storage.width, spatialCfg.storage.height);
+
+            mChunkContentProvider = std::move(stressProvider);
+        } else if (stressMode == dev::StressMode::Spatial) {
+            auto stressProvider = std::make_unique<dev::StressChunkContentProvider>(
+                mResources, *boot.stressPlayerKey, spatialCfg.index.chunkSizeWorld);
+
+            mStressStamp = dev::buildSpatialStressRuntimeStamp(
+                *stressProvider, spatialCfg.storage.width, spatialCfg.storage.height);
+
+            mChunkContentProvider = std::move(stressProvider);
+        } else {
+            // StressMode::None in Profile: no stress content.
+            mChunkContentProvider =
+                std::make_unique<game::atrapacielos::streaming::EmptyChunkContentProvider>();
+        }
+
 #else
         // Debug/Release: no stress content (empty provider).
         mChunkContentProvider =
@@ -276,22 +268,15 @@ namespace game::atrapacielos {
 
         streamingSystem.bind(&spatialSystem, mChunkContentProvider.get());
 
-        // 1) Создаём систему рендеринга конструктором по умолчанию (без аргументов).
         auto& renderSys = mWorld->addSystem<core::ecs::RenderSystem>();
-        // 2) Привязываем зависимости через bind().
         renderSys.bind(&spatialSystem.index(),
                        spatialSystem.entitiesBySpatialId(),
                        spatialCfg.maxVisibleSprites,
                        &mResources);
-        // 3) Сохраняем указатель.
         mRenderSystem = &renderSys;
 
-        // Эти системы требуют прямого доступа (onResize, onKeyEvent),
-        // поэтому сохраняем указатели.
         mDebugOverlay = &mWorld->addSystem<core::ecs::DebugOverlaySystem>();
 
-        // Привязываем оверлей к сервису времени и шрифту (resident-only).
-        // Важно: ресурсы резолвим один раз при старте, не в hot-path.
         {
             const sf::Font& font = mResources.expectFontResident(boot.defaultFontKey).get();
 
@@ -299,20 +284,11 @@ namespace game::atrapacielos {
             mDebugOverlay->setRenderSystem(mRenderSystem);
             mDebugOverlay->setSpatialIndexSystem(mSpatialIndexSystem);
 
-            // Грузим конфиг для DebugOverlay (dev/косметика, не должен валить игру).
             const auto overlayCfg = cfg::loadDebugOverlayBlueprint(skycfg_paths::DEBUG_OVERLAY);
 
-            // Применяем стиль.
             mDebugOverlay->applyTextProperties(overlayCfg.text);
             mDebugOverlay->applyRuntimeProperties(overlayCfg.runtime);
 
-            // Политика дефолтного состояния оверлея при старте:
-            //  - overlayCfg.enabled может ОТКЛЮЧИТЬ оверлей по умолчанию;
-            //  - dbg::SHOW_FPS_OVERLAY — compile-time флаг (Debug/Profile: true, Release: false).
-            //
-            // ВАЖНО: при формуле ниже JSON не может "включить оверлей в Release на старте",
-            // потому что compile-time флаг сильнее. Но хоткей F3 (dbg::HOTKEY_TOGGLE_OVERLAY)
-            // всё равно позволяет включить оверлей в рантайме в любой сборке.
             mDebugOverlay->setEnabled(overlayCfg.enabled && dbg::SHOW_FPS_OVERLAY);
 
 #if defined(RETRIBUTIO_PROFILE)
@@ -325,7 +301,6 @@ namespace game::atrapacielos {
 #endif
         }
 
-        // BackgroundRenderer: resident-only + generation-safe cache.
         mBackgroundRenderer.init(mResources, boot.backgroundKey);
     }
 
@@ -333,10 +308,8 @@ namespace game::atrapacielos {
         if (mUserSettingsSavingDisabled) {
             return;
         }
-
         if (!skycfg::saveUserSettingsAtomic(mUserSettingsPath, mUserSettings)) {
             mUserSettingsSavingDisabled = true;
-            // Один WARN на сессию: не спамим.
             LOG_WARN(core::log::cat::Config,
                      "[UserSettings] Не удалось сохранить настройки пользователя. "
                      "Дальнейшие попытки сохранения отключены на время сессии.");
@@ -348,11 +321,6 @@ namespace game::atrapacielos {
 
         const sf::Time fixedTimeStep = timecfg::FIXED_TIME_STEP;
 
-        // ----------------------------------------------------------------------------------------
-        // Spiral of death prevention: вычисляем max апдейтов за кадр из инварианта TimeService.
-        // Формула выводится из константы TimeService::kMaxAccumulatedSeconds и fixed timestep.
-        // При значениях (0.5s / (1/60)) ≈ 30 апдейтов максимум.
-        // ----------------------------------------------------------------------------------------
         const int maxUpdatesPerFrame = static_cast<int>(
             core::time::TimeService::kMaxAccumulatedSeconds / fixedTimeStep.asSeconds());
 
@@ -363,33 +331,21 @@ namespace game::atrapacielos {
 #endif
 
         while (mWindow.isOpen()) {
-            // Обновляем время кадра (raw dt, scaled dt, FPS/метрики).
             mTime.tick();
-
-            // Обрабатываем события окна и ввода.
             processEvents();
 
-            // ------------------------------------------------------------------------------------
-            // Выполняем один или несколько фиксированных шагов логики.
-            // Ограничение на количество апдейтов за кадр предотвращает спираль смерти при лагах.
-            // ------------------------------------------------------------------------------------
             int updateCount = 0;
             while (mTime.shouldUpdate(fixedTimeStep)) {
                 update(fixedTimeStep);
-
                 if (++updateCount >= maxUpdatesPerFrame) {
-                    // Достигнут лимит апдейтов за кадр → отбрасываем оставшийся "долг".
-                    // Без этого долг переходит на следующий кадр (lag echo / mini spiral).
                     mTime.clearAccumulatedTime();
                     break;
                 }
             }
 
-            // Отрисовываем текущее состояние мира.
             render();
 
 #if !defined(NDEBUG) || defined(RETRIBUTIO_PROFILE)
-            // Ограничение частоты вывода отладочной информации, чтобы избежать спама логом.
             if (++frameCount % 600ULL == 0ULL) {
                 LOG_DEBUG(core::log::cat::Performance, "FPS: {:.1f} (frame {})",
                           mTime.getSmoothedFps(), frameCount);
@@ -399,7 +355,6 @@ namespace game::atrapacielos {
     }
 
     void Game::processEvents() {
-        // Инварианты инициализации: Game::run() вызывается после ctor/initWorld().
         assert(mAircraftControlSystem != nullptr);
         assert(mDebugOverlay != nullptr);
 
@@ -411,31 +366,15 @@ namespace game::atrapacielos {
 
             const sf::Event& event = *eventOpt;
 
-            // Закрытие окна.
             if (event.is<sf::Event::Closed>()) {
                 mWindow.close();
             }
-            // Нажатие клавиш.
             else if (const auto* keyPressed = event.getIf<sf::Event::KeyPressed>()) {
-
-                // Alt+Enter: циклическое переключение режимов:
-                //   Windowed -> BorderlessFullscreen -> Fullscreen -> Windowed.
-                //
-                // TODO (когда появится меню настроек):
-                //  - Alt+Enter оставить как Windowed <-> Borderless
-                //    (или Windowed <-> LastFullscreenMode),
-                //  - Exclusive Fullscreen включать только через меню.
                 if (keyPressed->alt && keyPressed->code == sf::Keyboard::Key::Enter) {
-                    // ВАЖНО: не используем continue после вызова requestCycleMode().
-                    // Если в сигнатуре requestCycleMode() случайно окажется [[noreturn]],
-                    // MSVC будет ругаться на "недостижимый код" сразу на continue/следующей строке.
                     mWindowModeManager.requestCycleMode();
                 } else {
                     mAircraftControlSystem->onKeyEvent(keyPressed->code, true);
 
-                    // Debug overlay toggle: хоткей работает во всех сборках.
-                    // Политика: хоткей ВСЕГДА активен, независимо от дефолтного состояния overlay
-                    // при старте.
                     if (keyPressed->code == dbg::HOTKEY_TOGGLE_OVERLAY) {
                         mDebugOverlay->setEnabled(!mDebugOverlay->isEnabled());
                     }
@@ -461,19 +400,14 @@ namespace game::atrapacielos {
 #endif
                 }
             }
-            // Отпускание клавиш.
             else if (const auto* keyReleased = event.getIf<sf::Event::KeyReleased>()) {
                 mAircraftControlSystem->onKeyEvent(keyReleased->code, false);
             }
-            // Потеря фокуса: сбрасываем ввод, чтобы не залипали клавиши при Alt-Tab.
-            // Также сбрасываем состояние управления самолетом.
             else if (event.is<sf::Event::FocusLost>()) {
                 mAircraftControlSystem->resetState();
             }
-            // Изменение размера окна.
             else if (const auto* resized = event.getIf<sf::Event::Resized>()) {
                 const sf::Vector2u newSize{resized->size.x, resized->size.y};
-                // При минимизации окно может сообщить 0x0. Не создаём/не применяем невалидный view.
                 if (newSize.x == 0u || newSize.y == 0u) {
                     continue;
                 }
@@ -491,24 +425,16 @@ namespace game::atrapacielos {
             }
         }
 
-        // Применяем отложенный Alt+Enter toggle одним действием, вне цикла pollEvent.
         if (mWindow.isOpen() && mWindowModeManager.applyPending(mWindow)) {
             mWindow.setKeyRepeatEnabled(false);
-
             applyEngineSettingsToWindow();
             mViewManager.onResize(mWindow.getSize());
 
-            // Безопасно сбросить ввод: при пересоздании окна возможны "залипания" состояния.
             if (mAircraftControlSystem) {
                 mAircraftControlSystem->resetState();
             }
 
-            // Примечание:
-            //  - mode сохраняем всегда (Alt+Enter).
-            //  - width/height сохраняем только в Windowed, чтобы не "затирать" желаемый размер
-            //    случайным desktop size из borderless/fullscreen.
             bool changed = false;
-
             changed = skycfg::setWindowMode(mUserSettings, mWindowModeManager.getMode()) || changed;
 
             if (mWindowModeManager.getMode() == skycfg::WindowMode::Windowed) {
@@ -522,14 +448,11 @@ namespace game::atrapacielos {
         }
     }
 
-    // Здесь dt — фиксированный шаг (FIXED_TIME_STEP), который пришёл из игрового цикла
-    // и был "разрулен" TimeService (через shouldUpdate). ECS-системы не знают о том,
-    // сколько реального времени прошло между кадрами, они видят стабильный шаг логики.
     void Game::update(const sf::Time& dt) {
         const float dtSeconds = dt.asSeconds();
-        assert(dtSeconds > 0.0f); // фиксированный шаг должен быть положительным
+        assert(dtSeconds > 0.0f);
         mFrameOrchestrator.beginFrameRead();
-        mWorld->update(dtSeconds); // обновляем все ECS-системы
+        mWorld->update(dtSeconds);
         updateCamera();
         mWorld->flushDestroyed();
     }
@@ -579,6 +502,7 @@ namespace game::atrapacielos {
         if (mDebugOverlay->isEnabled()) {
             dev::populateDebugOverlayExtraLines(
                 *mDebugOverlay, *mWorld, mSpatialIndexSystem,
+                mSpatialStreamingSystem,
                 mBackgroundRenderer, mViewManager
     #if defined(RETRIBUTIO_PROFILE)
                 , &mStressStamp

@@ -27,6 +27,7 @@
 #include "core/utils/math_constants.h"
 
 #include "ecs/queries/local_player_query.h"
+#include "ecs/systems/spatial_streaming_system.h"
 #include "presentation/background_renderer.h"
 #include "presentation/view_manager.h"
 #include "utils/debug_format.h"
@@ -41,6 +42,7 @@ namespace game::atrapacielos::dev {
         core::ecs::DebugOverlaySystem& overlay,
         core::ecs::World& world,
         const core::ecs::SpatialIndexSystem* spatialIndex,
+        const ecs::SpatialStreamingSystem* streamingSystem,
         const presentation::BackgroundRenderer& background,
         const presentation::ViewManager& viewManager
 #if defined(RETRIBUTIO_PROFILE)
@@ -57,7 +59,6 @@ namespace game::atrapacielos::dev {
             const std::size_t len = utils::formatBackgroundStatsLine(
                 buf.data(), buf.size(), background);
 
-            // Если обрезали строку — увеличь буфер или сократи формат.
             assert(len < buf.size() &&
                    "overlay_extras: background debug line truncated. Increase buffer.");
 
@@ -91,12 +92,13 @@ namespace game::atrapacielos::dev {
 #endif
 
         // ========================================================================================
-        // Streaming stats + Cell health (Debug + Profile, если spatial index привязан)
+        // Streaming stats + Cell health + Density + Range (Debug + Profile)
         // ========================================================================================
         if (spatialIndex) {
             const auto& idx = spatialIndex->index();
             const auto& worldView = viewManager.getWorldView();
             const std::int32_t chunkSize = idx.chunkSizeWorld();
+            const std::int32_t cellSize = idx.cellSizeWorld();
 
             // View + winOrigin.
             {
@@ -109,7 +111,7 @@ namespace game::atrapacielos::dev {
                 }
             }
 
-            // CellsHealth для чанка, в котором центр камеры.
+            // CellsHealth.
             {
                 const sf::Vector2f viewCenter = worldView.getCenter();
                 const core::spatial::ChunkCoord viewChunk = core::spatial::worldToChunk(
@@ -124,6 +126,88 @@ namespace game::atrapacielos::dev {
                     overlay.appendExtraLine(std::string_view(buf.data(), len));
                 }
             }
+
+            // Range (from last spatial query stats).
+            {
+                const auto& qstats = idx.debugLastQueryStatsRef();
+                std::array<char, 256> buf{};
+                const std::size_t len = utils::formatRangeLine(
+                    buf.data(), buf.size(),
+                    qstats.chunkMinX, qstats.chunkMinY,
+                    qstats.chunkMaxX, qstats.chunkMaxY,
+                    qstats.cellMinX, qstats.cellMinY,
+                    qstats.cellMaxX, qstats.cellMaxY);
+                if (len > 0) {
+                    overlay.appendExtraLine(std::string_view(buf.data(), len));
+                }
+            }
+
+            // Density.
+            if (streamingSystem) {
+                const std::size_t maxPerChunk = streamingSystem->debugMaxEntitiesPerChunk();
+                const sf::Vector2f viewSize = worldView.getSize();
+
+                std::array<char, 256> buf{};
+                const std::size_t len = utils::formatDensityLine(
+                    buf.data(), buf.size(),
+                    static_cast<float>(maxPerChunk), maxPerChunk,
+                    chunkSize, cellSize, viewSize);
+                if (len > 0) {
+                    overlay.appendExtraLine(std::string_view(buf.data(), len));
+                }
+            }
+
+            // Residency.
+            // IMPORTANT: uses debugSpawnedChunkCount (Phase 2 progress), NOT loadedChunkCount
+            // (Phase 1). loadedChunkCount reaches total after Phase 1, but entities aren't
+            // spawned until Phase 2. initialLoadRemaining must reflect true completion.
+            if (streamingSystem) {
+                const sf::Vector2f viewCenter = worldView.getCenter();
+                const core::spatial::ChunkCoord viewChunk = core::spatial::worldToChunk(
+                    core::spatial::WorldPosf{viewCenter.x, viewCenter.y}, chunkSize);
+
+                core::ecs::Entity playerEntity{};
+                const core::ecs::TransformComponent* playerTr = nullptr;
+                const bool hasPlayer =
+                    ecs::queries::tryGetLocalPlayerTransform(world, playerEntity, playerTr);
+
+                core::spatial::ChunkCoord playerChunk = viewChunk;
+                if (hasPlayer) {
+                    playerChunk = core::spatial::worldToChunk(
+                        core::spatial::WorldPosf{playerTr->position.x, playerTr->position.y},
+                        chunkSize);
+                }
+
+                const core::spatial::ChunkCoord focusChunk = playerChunk;
+
+                const auto viewState = idx.chunkState(viewChunk);
+                const auto playerState = idx.chunkState(playerChunk);
+                const auto focusState = idx.chunkState(focusChunk);
+
+                const auto originCurrent = idx.windowOrigin();
+                const auto originDesired = streamingSystem->debugDesiredOrigin();
+
+                // Use spawnedChunkCount for "remaining" — this reflects Phase 2 (entity spawn),
+                // not Phase 1 (state→Loaded). Only after Phase 2 completes is initial load done.
+                const std::uint32_t spawned = streamingSystem->debugSpawnedChunkCount();
+                const std::uint32_t total = streamingSystem->windowTotalChunks();
+                const std::uint32_t remaining = (total > spawned) ? (total - spawned) : 0u;
+
+                const std::uint32_t frameLoads = streamingSystem->debugFrameLoads();
+                const std::uint32_t frameUnloads = streamingSystem->debugFrameUnloads();
+
+                std::array<char, 384> buf{};
+                const std::size_t len = utils::formatResidencyLine(
+                    buf.data(), buf.size(),
+                    viewChunk, viewState,
+                    playerChunk, playerState,
+                    focusChunk, focusState,
+                    originCurrent, originDesired,
+                    remaining, frameLoads, frameUnloads);
+                if (len > 0) {
+                    overlay.appendExtraLine(std::string_view(buf.data(), len));
+                }
+            }
         }
 
         // ========================================================================================
@@ -131,13 +215,16 @@ namespace game::atrapacielos::dev {
         // ========================================================================================
 #if defined(RETRIBUTIO_PROFILE)
         if (stressStamp) {
-            std::array<char, 256> buf{};
+            std::array<char, 384> buf{};
             const std::size_t len = utils::formatStressStampLine(
                 buf.data(), buf.size(),
                 stressStamp->mode, stressStamp->seed,
                 stressStamp->entitiesPerChunk, stressStamp->texCount,
                 stressStamp->zLayers,
-                stressStamp->windowWidth, stressStamp->windowHeight);
+                stressStamp->windowWidth, stressStamp->windowHeight,
+                stressStamp->totalCount, stressStamp->visibleCount,
+                stressStamp->hotPerChunk, stressStamp->hotspotRadius,
+                stressStamp->overscan);
             if (len > 0) {
                 overlay.appendExtraLine(std::string_view(buf.data(), len));
             }
@@ -154,8 +241,6 @@ namespace game::atrapacielos::dev {
             if (!ecs::queries::tryGetLocalPlayerTransform(world, e, tr)) {
                 return;
             }
-
-            // --- Данные для обеих строк (state + vis) ---
 
             const auto* spatialId =
                 world.tryGetComponent<core::ecs::SpatialIdComponent>(e);
@@ -200,7 +285,6 @@ namespace game::atrapacielos::dev {
                     }
                 }
 
-                // viewAabb из камеры (для fineCullPass).
                 const sf::View& worldView = viewManager.getWorldView();
                 const sf::Vector2f viewSize = worldView.getSize();
                 const sf::Vector2f viewCenter = worldView.getCenter();
@@ -218,7 +302,6 @@ namespace game::atrapacielos::dev {
                     ? spatialIndex->index().debugWasInLastQuery(spatialId->id)
                     : false;
 
-                // predictedVisible != "реально отрисовано": прогноз по условиям UI-pass.
                 const bool predictedVisible =
                     (sprite != nullptr) && inQuery && fineCullPass && !hasStreamedOut;
 

@@ -153,6 +153,8 @@ unset(_exe)
 # cmake --build --preset win-profile --target spatial_large
 # cmake --build --preset win-profile --target render_small
 # cmake --build --preset win-profile --target render_large
+# cmake --build --preset win-profile --target render_pathological
+# cmake --build --preset win-profile --target render_pathological_large
 #
 # engine/cmake/run_with_env.cmake — portable env-file runner без shell-зависимости.
 # -------------------------------------------------------------------------------------------------
@@ -196,6 +198,26 @@ add_custom_target(render_large
         -P "${_run_with_env}"
     DEPENDS retributio_stress_render
     COMMENT "[render_large] retributio_stress_render + stress_render/render_large.env"
+    USES_TERMINAL
+)
+
+add_custom_target(render_pathological
+    COMMAND ${CMAKE_COMMAND}
+        -DENV_FILE=${_presets_dir}/stress_render/render_pathological.env
+        -DEXE=$<TARGET_FILE:retributio_stress_render>
+        -P "${_run_with_env}"
+    DEPENDS retributio_stress_render
+    COMMENT "[render_pathological] retributio_stress_render + stress_render/render_pathological.env"
+    USES_TERMINAL
+)
+
+add_custom_target(render_pathological_large
+    COMMAND ${CMAKE_COMMAND}
+        -DENV_FILE=${_presets_dir}/stress_render/render_pathological_large.env
+        -DEXE=$<TARGET_FILE:retributio_stress_render>
+        -P "${_run_with_env}"
+    DEPENDS retributio_stress_render
+    COMMENT "[render_pathological_large] retributio_stress_render + stress_render/render_pathological_large.env"
     USES_TERMINAL
 )
 
